@@ -6,8 +6,8 @@
 //! Real, defensive reading of a sibling repo's own `hydra-umc.project.json`.
 //!
 //! `hydra-umc.project.json` is already the single source of truth the
-//! whole ecosystem's dashboard/updater trust (see `SONNET/BIBLIA
-//! HYDRA-UMC`) - reading it back here rather than hand-maintaining a
+//! whole ecosystem's dashboard/updater trust - reading it back here rather
+//! than hand-maintaining a
 //! second list means this hub can never drift from a child's real,
 //! current maturity.
 

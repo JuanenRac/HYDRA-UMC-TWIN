@@ -51,7 +51,7 @@ flowchart TB
 
 ## 3. 🧱 ARCHITECTURE & DÉCISIONS DE CONCEPTION
 
-* **Pourquoi ce moteur n'a pas de dossiers `hardware/`/`firmware/`/`os/`.** Logiciel pur - aucune carte propre, donc ces dossiers ont été supprimés plutôt que laissés vides (voir la règle d'élagage des dossiers dans `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`, un document de planification privé).
+* **Pourquoi ce moteur n'a pas de dossiers `hardware/`/`firmware/`/`os/`.** Logiciel pur sans carte propre; les dossiers source ne sont inclus que lorsque leur implémentation les requiert.
 * **Pourquoi `Cargo.toml` n'a délibérément pas encore de dépendance Bevy.** Bevy est un moteur graphique lourd - temps de compilation longs, nécessite une chaîne d'outils GPU/graphique pas toujours disponible. v0 n'a ajouté que `serde`/`serde_json` (pour lire les manifestes des enfants) - le vrai travail de rendu attend toujours qu'une vraie chaîne d'outils GPU/graphique existe pour compiler contre.
 * **Pourquoi `docker-compose.yml` existe avant que ses 3 enfants n'aient de Dockerfile.** Décider et documenter le contrat d'intégration (quel service dépend de lequel, quels montages device/volume chacun nécessite) maintenant évite que cette forme soit inventée à l'improviste plus tard, même si `docker compose up` ne peut pas pleinement réussir tant que chaque enfant n'a pas publié son propre Dockerfile.
 * **Comment cela s'intègre dans le reste de l'écosystème.** Le parent d'intégration de la famille Digital Twin & Simulation - HYDRA-UMC-PHYSICS-REPLICA lui apporte un vrai solveur physique, HYDRA-UMC-HIL-BRIDGE permet à de vraies applications de le contrôler comme s'il s'agissait de matériel, et HYDRA-UMC-SYNTHETIC-DATA-GEN rend des jeux de données d'entraînement via son propre moteur.
@@ -64,7 +64,7 @@ flowchart TB
 
 Moteur purement logiciel, sans conception matérielle propre - ce projet ne
 comporte donc pas de dossiers `hardware/`, `firmware/` ni `os/` (voir la
-règle d'élagage dans `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`).
+politique de structure du dépôt).
 
 ```text
 HYDRA-UMC-TWIN/
@@ -128,7 +128,7 @@ Par défaut, utilise le propre dossier parent de ce dépôt - la vraie dispositi
 
 ### Intégration des 3 enfants (`docker-compose.yml`)
 
-En tant que parent d'intégration, `docker-compose.yml` documente comment ce moteur compose ses 3 enfants en une seule stack : **PHYSICS-REPLICA** (solveur, appelé à chaque tick physique), **HIL-BRIDGE** (synchronisation des commandes réel vs virtuel) et **SYNTHETIC-DATA-GEN** (export de jeux de données par lot, hors ligne). Aucun des 4 projets n'a encore de `Dockerfile` à ce stade de squelette, donc `docker compose up` n'est pas exécutable aujourd'hui - le fichier est la référence confirmée de topologie/ports/graphe de dépendances contre laquelle le vrai `Dockerfile` de chaque projet sera ajouté plus tard (suivi par projet dans son propre `SONNET/<projet>/mejoras_futuras.txt`).
+En tant que parent d'intégration, `docker-compose.yml` documente comment ce moteur compose ses 3 enfants en une seule stack : **PHYSICS-REPLICA** (solveur, appelé à chaque tick physique), **HIL-BRIDGE** (synchronisation des commandes réel vs virtuel) et **SYNTHETIC-DATA-GEN** (export de jeux de données par lot, hors ligne). Aucun des 4 projets n'a encore de `Dockerfile` à ce stade de squelette, donc `docker compose up` n'est pas exécutable aujourd'hui; le fichier est la référence confirmée de topologie, ports et dépendances des futurs Dockerfiles.
 
 ---
 
@@ -225,3 +225,14 @@ Ce projet fait partie d'un écosystème robotique plus large du même auteur (Ju
 
 ## 📜 LICENCE
 GPL-3.0 - Voir le fichier LICENSE pour plus de détails.
+
+## 🛠️ BUILD & RUN
+
+Utilisez la vérification de compilation sans versionnement avant une compilation de publication :
+
+| Action | Windows | Linux / macOS |
+|---|---|---|
+| Vérification de compilation (sans modifier la version ni le CHANGELOG) | `build-test.bat` | `./build-test.sh` |
+| Exécution / développement (si disponible) | `run*.bat` ou `dev*.bat` | `./run*.sh` ou `./dev*.sh` |
+
+`build-test.bat` et `build-test.sh` compilent ou valident la pile du projet sans incrémenter `hydra-umc.project.json` ni modifier `CHANGELOG.md`. Ils peuvent uniquement créer les sorties normales du compilateur. Les scripts existants `build*.bat`, `build*.sh`, `run*` et `dev*` conservent leur comportement spécifique de versionnement ou d'exécution ; utilisez-les lorsque ce comportement est requis.

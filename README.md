@@ -51,7 +51,7 @@ flowchart TB
 
 ## 3. 🧱 ARCHITECTURE & DESIGN DECISIONS
 
-* **Why this engine has no `hardware/`/`firmware/`/`os/` folders.** Pure software - no board of its own, so those folders were pruned rather than left empty (see the folder-pruning rule in `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`, a private planning document).
+* **Why this engine has no `hardware/`/`firmware/`/`os/` folders.** It is pure software with no board of its own, so source folders exist only when their implementation requires them.
 * **Why `Cargo.toml` deliberately has no Bevy dependency yet.** Bevy is a heavy graphics engine - long compile times, needs a GPU/graphics toolchain that isn't always available. v0 only added `serde`/`serde_json` (for reading children's manifests) - real rendering work still waits for a real GPU/graphics toolchain to build against.
 * **Why `docker-compose.yml` exists before its 3 children have Dockerfiles.** Deciding and documenting the integration contract (which service depends on which, what device/volume mounts each needs) now avoids that shape being invented ad hoc later, even though `docker compose up` can't fully succeed until each child publishes its own Dockerfile.
 * **How this fits the rest of the ecosystem.** The integration parent of the Digital Twin & Simulation family - HYDRA-UMC-PHYSICS-REPLICA feeds it a real physics solver, HYDRA-UMC-HIL-BRIDGE lets real apps control it as if it were hardware, and HYDRA-UMC-SYNTHETIC-DATA-GEN renders training datasets through its own engine.
@@ -62,9 +62,9 @@ flowchart TB
 
 ## 📂 DIRECTORY STRUCTURE
 
-Pure software engine, no own hardware design - so this project carries no
-`hardware/`, `firmware/` or `os/` folders (see the folder-pruning rule in
-`SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`).
+Pure software engine with no hardware design of its own, so source folders
+exist only when their implementation requires them; this project carries no
+`hardware/`, `firmware/` or `os/` folders.
 
 ```text
 HYDRA-UMC-TWIN/
@@ -128,7 +128,7 @@ Defaults to this repo's own parent directory - the real sibling-checkout layout 
 
 ### Integrating the 3 children (`docker-compose.yml`)
 
-As the integration parent, `docker-compose.yml` documents how this engine composes its 3 children into one stack: **PHYSICS-REPLICA** (solver, called every physics tick), **HIL-BRIDGE** (real-vs-virtual command sync), and **SYNTHETIC-DATA-GEN** (offline batch dataset export). None of the 4 projects has a `Dockerfile` yet at skeleton stage, so `docker compose up` is not runnable today - the file is the confirmed topology/ports/dependency-graph reference that each project's own `Dockerfile` will be added against later (tracked per project in its own `SONNET/<project>/mejoras_futuras.txt`).
+As the integration parent, `docker-compose.yml` documents how this engine composes its 3 children into one stack: **PHYSICS-REPLICA** (solver, called every physics tick), **HIL-BRIDGE** (real-vs-virtual command sync), and **SYNTHETIC-DATA-GEN** (offline batch dataset export). None of the 4 projects has a `Dockerfile` yet at skeleton stage, so `docker compose up` is not runnable today; the file is the confirmed topology/ports/dependency-graph reference for future Dockerfiles.
 
 ---
 
@@ -225,3 +225,14 @@ This project is part of a larger robotics ecosystem by the same author (JuanenRa
 
 ## 📜 LICENSE
 GPL-3.0 - See LICENSE for details.
+
+## 🛠️ BUILD & RUN
+
+Use the non-versioning build check before a release build:
+
+| Action | Windows | Linux / macOS |
+|---|---|---|
+| Build check (no version or CHANGELOG change) | `build-test.bat` | `./build-test.sh` |
+| Run / development (when provided) | `run*.bat` or `dev*.bat` | `./run*.sh` or `./dev*.sh` |
+
+`build-test.bat` and `build-test.sh` compile or validate the project stack without incrementing `hydra-umc.project.json` or modifying `CHANGELOG.md`. They may create normal compiler output only. Existing `build*.bat`, `build*.sh`, `run*` and `dev*` scripts retain their project-specific, versioned or runtime behavior; use them when that behavior is required.

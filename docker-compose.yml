@@ -3,15 +3,13 @@
 # Documents how the Digital Twin engine integrates its 3 children as
 # independent services once each one carries real business logic. This is
 # the confirmed integration blueprint for the "Digital Twin & Simulation"
-# category (see SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt and
-# SONNET/4.MAPA_RELACIONAL_Y_DESCRIPCIONES_HYDRA-UMC.txt).
+# category.
 #
 # CURRENT STATE (skeleton stage): none of the 4 projects below has a
 # Dockerfile yet - each is still a minimal `cargo`/`pip` skeleton that
 # prints its identity and exits (see each project's own bump_version.py +
 # build.sh/build.bat). `docker-compose up` will NOT work until each child
-# gets a real Dockerfile, tracked per-project in its own
-# SONNET/<project>/mejoras_futuras.txt. Until then, this file is the single
+# gets a real Dockerfile. Until then, this file is the single
 # source of truth for service names, ports and the dependency graph so the
 # real Dockerfiles can be added later without re-deciding the topology.
 #

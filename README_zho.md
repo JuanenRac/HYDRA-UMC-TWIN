@@ -54,7 +54,7 @@ flowchart TB
 
 ## 3. 🧱 架构与设计决策
 
-* **为什么本引擎没有 `hardware/`/`firmware/`/`os/` 文件夹。** 纯软件——没有自己的板卡，因此这些文件夹被直接省略而非留空（参见 `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt` 中的文件夹裁剪规则，这是一份私有规划文档）。
+* **为什么本引擎没有 `hardware/`/`firmware/`/`os/` 文件夹。** 这是没有自有板卡的纯软件；源代码文件夹仅在实现需要时才包含。
 * **为什么 `Cargo.toml` 目前刻意不包含 Bevy 依赖。** Bevy 是一个较重的图形引擎——编译耗时长，需要并非总是可用的 GPU/图形工具链。v0 只添加了 `serde`/`serde_json`（用于读取子项目的清单）——真正的渲染工作仍在等待一个真实可用的 GPU/图形工具链出现后才能编译。
 * **为什么 `docker-compose.yml` 在其 3 个子项目尚未拥有 Dockerfile 之前就已存在。** 现在决定并记录集成契约（哪个服务依赖哪个服务、每个服务需要哪些设备/卷挂载），避免这一形态日后被临时拼凑出来，尽管在每个子项目发布各自的 Dockerfile 之前，`docker compose up` 尚无法完全成功。
 * **这如何融入生态系统的其余部分。** 作为 Digital Twin & Simulation 系列的集成父项目——HYDRA-UMC-PHYSICS-REPLICA 为其提供真实的物理求解器，HYDRA-UMC-HIL-BRIDGE 使真实应用程序能够像控制真实硬件一样控制它，而 HYDRA-UMC-SYNTHETIC-DATA-GEN 则通过其自身引擎渲染训练数据集。
@@ -66,7 +66,7 @@ flowchart TB
 ## 📂 目录结构
 
 纯软件引擎，没有自己的硬件设计——因此本项目不携带 `hardware/`、
-`firmware/` 或 `os/` 文件夹（参见 `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt` 中的文件夹裁剪规则）。
+`firmware/` 或 `os/` 文件夹（遵循仓库结构策略）。
 
 ```text
 HYDRA-UMC-TWIN/
@@ -143,8 +143,7 @@ All 3 children present.
 **HIL-BRIDGE**（真实与虚拟指令同步）、**SYNTHETIC-DATA-GEN**（离线批量
 数据集导出）。这 4 个项目在骨架阶段均尚未拥有 `Dockerfile`，因此今天
 `docker compose up` 尚不可运行——该文件是已确认的拓扑结构/端口/依赖图
-参考，每个项目自身的 `Dockerfile` 日后将据此添加（在各项目自身的
-`SONNET/<project>/mejoras_futuras.txt` 中分别跟踪）。
+参考，未来的 `Dockerfile` 将据此添加。
 
 ---
 
@@ -243,3 +242,14 @@ All 3 children present.
 
 ## 📜 许可证
 GPL-3.0 —— 详见 LICENSE。
+
+## 🛠️ BUILD & RUN
+
+请在发布构建前使用不改动版本的构建检查：
+
+| 操作 | Windows | Linux / macOS |
+|---|---|---|
+| 构建检查（不修改版本或 CHANGELOG） | `build-test.bat` | `./build-test.sh` |
+| 运行 / 开发（如提供） | `run*.bat` 或 `dev*.bat` | `./run*.sh` 或 `./dev*.sh` |
+
+`build-test.bat` 和 `build-test.sh` 会编译或验证项目技术栈，但不会递增 `hydra-umc.project.json`，也不会修改 `CHANGELOG.md`。它们仅可能生成正常的编译器输出。现有的 `build*.bat`、`build*.sh`、`run*` 和 `dev*` 脚本保留各自的版本化或运行时行为；需要该行为时请使用它们。

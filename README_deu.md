@@ -51,7 +51,7 @@ flowchart TB
 
 ## 3. 🧱 ARCHITEKTUR & DESIGNENTSCHEIDUNGEN
 
-* **Warum diese Engine keine `hardware/`/`firmware/`/`os/`-Ordner hat.** Reine Software - keine eigene Platine, daher wurden diese Ordner entfernt statt leer gelassen (siehe die Ordner-Beschneidungsregel in `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`, einem privaten Planungsdokument).
+* **Warum diese Engine keine `hardware/`/`firmware/`/`os/`-Ordner hat.** Reine Software ohne eigene Platine; Quellordner werden nur aufgenommen, wenn ihre Implementierung sie erfordert.
 * **Warum `Cargo.toml` bewusst noch keine Bevy-Abhängigkeit hat.** Bevy ist eine schwere Grafik-Engine - lange Kompilierzeiten, benötigt eine GPU-/Grafik-Toolchain, die nicht immer verfügbar ist. v0 hat nur `serde`/`serde_json` hinzugefügt (zum Lesen der Manifeste der Kinder) - die echte Rendering-Arbeit wartet weiterhin darauf, dass eine echte GPU-/Grafik-Toolchain existiert, gegen die kompiliert werden kann.
 * **Warum `docker-compose.yml` existiert, bevor seine 3 Kinder ein Dockerfile haben.** Den Integrationsvertrag jetzt zu entscheiden und zu dokumentieren (welcher Dienst von welchem abhängt, welche Device-/Volume-Mounts jeder benötigt) verhindert, dass diese Form später ad hoc erfunden wird, auch wenn `docker compose up` erst vollständig gelingen kann, wenn jedes Kind sein eigenes Dockerfile veröffentlicht.
 * **Wie sich das ins restliche Ökosystem einfügt.** Der Integrations-Elternteil der Digital-Twin-&-Simulation-Familie - HYDRA-UMC-PHYSICS-REPLICA liefert ihm einen echten Physik-Solver, HYDRA-UMC-HIL-BRIDGE lässt echte Apps ihn steuern, als wäre er Hardware, und HYDRA-UMC-SYNTHETIC-DATA-GEN rendert Trainingsdatensätze über seine eigene Engine.
@@ -64,7 +64,7 @@ flowchart TB
 
 Reine Software-Engine ohne eigenes Hardware-Design - daher hat dieses
 Projekt keine Ordner `hardware/`, `firmware/` oder `os/` (siehe die
-Ordner-Pruning-Regel in `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`).
+Ordnerstruktur-Richtlinie).
 
 ```text
 HYDRA-UMC-TWIN/
@@ -128,7 +128,7 @@ Standardmäßig wird das eigene übergeordnete Verzeichnis dieses Repositorys ve
 
 ### Integration der 3 Kinder (`docker-compose.yml`)
 
-Als Integrations-Elternteil dokumentiert `docker-compose.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar - die Datei ist die bestätigte Referenz für Topologie/Ports/Abhängigkeitsgraph, gegen die später das echte `Dockerfile` jedes Projekts hinzugefügt wird (pro Projekt verfolgt in dessen eigenem `SONNET/<projekt>/mejoras_futuras.txt`).
+Als Integrations-Elternteil dokumentiert `docker-compose.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar; die Datei ist die bestätigte Referenz für Topologie, Ports und Abhängigkeiten künftiger Dockerfiles.
 
 ---
 
@@ -225,3 +225,14 @@ Dieses Projekt ist Teil eines größeren Robotik-Ökosystems desselben Autors (J
 
 ## 📜 LIZENZ
 GPL-3.0 - Siehe LICENSE für Details.
+
+## 🛠️ BUILD & RUN
+
+Verwenden Sie den Build-Check ohne Versionierung vor einem Release-Build:
+
+| Aktion | Windows | Linux / macOS |
+|---|---|---|
+| Build-Check (ohne Änderung von Version oder CHANGELOG) | `build-test.bat` | `./build-test.sh` |
+| Ausführung / Entwicklung (falls vorhanden) | `run*.bat` oder `dev*.bat` | `./run*.sh` oder `./dev*.sh` |
+
+`build-test.bat` und `build-test.sh` kompilieren oder validieren den Projekt-Stack, ohne `hydra-umc.project.json` zu erhöhen oder `CHANGELOG.md` zu verändern. Sie dürfen nur normale Compiler-Ausgaben erzeugen. Die vorhandenen Skripte `build*.bat`, `build*.sh`, `run*` und `dev*` behalten ihr projektbezogenes Versions- oder Laufzeitverhalten bei; verwenden Sie sie, wenn dieses Verhalten benötigt wird.
