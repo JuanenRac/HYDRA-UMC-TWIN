@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use crate::contract::{self, SyncReadiness};
 use crate::manifest::{read_child_manifest, ChildManifest};
 
 /// The 3 real children documented in this project's own README/manifest -
@@ -43,6 +44,47 @@ pub fn check_family_status(workspace_root: &Path) -> Vec<ChildStatus> {
         .map(|&name| ChildStatus {
             name: name.to_string(),
             manifest: read_child_manifest(&workspace_root.join(name)),
+        })
+        .collect()
+}
+
+/// A child's sync readiness, combining whether it is checked out at all
+/// with the real state-sync contract from `contract.rs`. A missing
+/// checkout is its own, distinct outcome - there is no manifest to
+/// assess a contract against.
+#[derive(Debug, Clone, PartialEq)]
+pub enum FamilySyncOutcome {
+    Missing,
+    Assessed(SyncReadiness),
+}
+
+impl FamilySyncOutcome {
+    pub fn is_ready(&self) -> bool {
+        matches!(self, FamilySyncOutcome::Assessed(r) if r.is_ready())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FamilySyncStatus {
+    pub name: String,
+    pub outcome: FamilySyncOutcome,
+}
+
+/// The real, combined answer to "which children can this Twin actually
+/// sync state with right now": every expected child, checked out or
+/// not, run through the real `contract::assess()` gate when it is.
+pub fn assess_family_sync(workspace_root: &Path) -> Vec<FamilySyncStatus> {
+    check_family_status(workspace_root)
+        .into_iter()
+        .map(|status| {
+            let outcome = match &status.manifest {
+                None => FamilySyncOutcome::Missing,
+                Some(m) => FamilySyncOutcome::Assessed(contract::assess(m)),
+            };
+            FamilySyncStatus {
+                name: status.name,
+                outcome,
+            }
         })
         .collect()
 }
@@ -132,5 +174,44 @@ mod tests {
             .find(|s| s.name == "HYDRA-UMC-HIL-BRIDGE")
             .unwrap();
         assert_eq!(hil.manifest.as_ref().unwrap().maturity, "scaffolding");
+    }
+
+    #[test]
+    fn sync_outcome_is_missing_for_an_uncheckedout_child() {
+        let ws = tempdir();
+        // Nothing written for any child.
+        let statuses = assess_family_sync(ws.path());
+        assert!(statuses
+            .iter()
+            .all(|s| s.outcome == FamilySyncOutcome::Missing));
+        assert!(statuses.iter().all(|s| !s.outcome.is_ready()));
+    }
+
+    #[test]
+    fn sync_outcome_is_ready_for_a_functional_child_at_a_compatible_version() {
+        let ws = tempdir();
+        write_manifest(ws.path(), "HYDRA-UMC-PHYSICS-REPLICA", "functional");
+        let statuses = assess_family_sync(ws.path());
+        let replica = statuses
+            .iter()
+            .find(|s| s.name == "HYDRA-UMC-PHYSICS-REPLICA")
+            .unwrap();
+        assert!(replica.outcome.is_ready());
+    }
+
+    #[test]
+    fn sync_outcome_rejects_a_scaffolding_child_via_the_real_contract() {
+        let ws = tempdir();
+        write_manifest(ws.path(), "HYDRA-UMC-SYNTHETIC-DATA-GEN", "scaffolding");
+        let statuses = assess_family_sync(ws.path());
+        let gen = statuses
+            .iter()
+            .find(|s| s.name == "HYDRA-UMC-SYNTHETIC-DATA-GEN")
+            .unwrap();
+        assert!(!gen.outcome.is_ready());
+        match &gen.outcome {
+            FamilySyncOutcome::Assessed(SyncReadiness::ImmatureMaturity { .. }) => {}
+            other => panic!("expected Assessed(ImmatureMaturity), got {other:?}"),
+        }
     }
 }

@@ -14,8 +14,12 @@
 //! "real" means here, and their own module docs for what is still out of
 //! scope (the real Bevy engine and physics backend).
 
+mod contract;
 mod family;
 mod manifest;
+
+use contract::SyncReadiness;
+use family::FamilySyncOutcome;
 
 use std::env;
 use std::path::PathBuf;
@@ -81,11 +85,55 @@ fn run_family_status(args: &[String]) -> ExitCode {
     }
 }
 
+fn run_family_sync(args: &[String]) -> ExitCode {
+    let workspace: PathBuf = find_flag(args, "--workspace")
+        .map(PathBuf::from)
+        .unwrap_or_else(default_workspace);
+
+    println!(
+        "Digital Twin family sync contract (workspace: {}):",
+        workspace.display()
+    );
+
+    let statuses = family::assess_family_sync(&workspace);
+    for status in &statuses {
+        match &status.outcome {
+            FamilySyncOutcome::Missing => {
+                println!("  {}: MISSING (not checked out)", status.name);
+            }
+            FamilySyncOutcome::Assessed(SyncReadiness::Ready(snapshot)) => {
+                println!(
+                    "  {}: READY (v{}, maturity={})",
+                    status.name, snapshot.version, snapshot.maturity
+                );
+            }
+            FamilySyncOutcome::Assessed(SyncReadiness::ImmatureMaturity { reason }) => {
+                println!("  {}: REJECTED (immature) - {reason}", status.name);
+            }
+            FamilySyncOutcome::Assessed(SyncReadiness::IncompatibleVersion { reason }) => {
+                println!("  {}: REJECTED (incompatible version) - {reason}", status.name);
+            }
+            FamilySyncOutcome::Assessed(SyncReadiness::UnparseableManifest { reason }) => {
+                println!("  {}: REJECTED (unparseable manifest) - {reason}", status.name);
+            }
+        }
+    }
+    println!();
+    if statuses.iter().all(|s| s.outcome.is_ready()) {
+        println!("All {} children are sync-ready.", statuses.len());
+        ExitCode::SUCCESS
+    } else {
+        println!("Not every child is sync-ready - see the lines above.");
+        ExitCode::from(1)
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
     match args.first().map(|s| s.as_str()) {
         Some("family-status") => run_family_status(&args[1..]),
+        Some("family-sync") => run_family_sync(&args[1..]),
         _ => {
             println!("{PROJECT_NAME} v{VERSION}");
             println!("{ROLE}");

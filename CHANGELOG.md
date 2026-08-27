@@ -20,6 +20,14 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.3] - Real v0: state-sync contract with incompatible-version rejection
+
+- **`src/contract.rs`** (new) - the real state-sync contract this Twin enforces before treating a child as sync-ready: `MaturityLevel` (ordered `Scaffolding < Functional < Established`) gates on `MIN_MATURITY = Functional`, and a per-child major version is gated against `MAX_COMPATIBLE_MAJOR` (0 today, every child is still pre-1.0) - a child reporting a higher major is refused as an incompatible simulator version, since its own sync contract may have changed in a way this Twin hasn't verified. `assess()` checks maturity before version so the reported rejection reason always names the most fundamental gate that failed. A child that clears both gates gets a real `SyncSnapshot` fixture (child/version/maturity) - a concrete, typed value for a future sync transport to serialize, not a loose blob.
+- **`src/family.rs`** - new `FamilySyncStatus`/`FamilySyncOutcome`/`assess_family_sync()`: combines `check_family_status()`'s presence check with `contract::assess()` per child, so "missing", "immature", "incompatible version", and "ready" are each their own distinct, real outcome.
+- **`main.rs`** - new `family-sync [--workspace PATH]` subcommand prints every child's real sync outcome and exits `0` only if all are `READY`, `1` otherwise.
+- 12 new tests (7 in `contract.rs` covering both gates and their boundaries - maturity exactly at the minimum, major version exactly at the compatibility ceiling and one past it, maturity checked before version; 3 new integration tests in `family.rs` covering missing/ready/rejected through the real combined path). 21 tests total.
+- Real verification beyond the test suite: ran the compiled binary against a real temp workspace with a compatible child (`READY`), an incompatible major version (`REJECTED (incompatible version)`), a missing child (`MISSING`), and a `scaffolding` child (`REJECTED (immature)`) - all 4 outcomes confirmed live.
+
 ## [0.0.2] - Real v0 family-readiness check
 ### Added
 - `manifest.rs` - a real, defensive reader for a sibling repo's own `hydra-umc.project.json` (via `serde`/`serde_json`, this project's only dependencies), returning `None` for every real failure mode (missing checkout, missing file, malformed JSON, missing field) instead of panicking.

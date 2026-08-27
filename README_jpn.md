@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Engine-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
   <img src="https://img.shields.io/badge/Tech-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="HIL">
-  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
+  <img src="https://img.shields.io/badge/Stage-Established%20v0-brightgreen.svg" alt="Established v0 stage">
 </p>
 
 ---
@@ -31,12 +31,13 @@ Rust と Bevy エンジンを用いて構築されており、EDITOR からの U
 
 ### 主な機能：
 * 🧩 **ファミリーレディネスチェック（v0）：** 実際の `family-status` サブコマンドが 3 つの実際の子プロジェクトそれぞれの実際の `hydra-umc.project.json` を読み取り、存在/バージョン/成熟度/役割を報告します——自分自身はまだ何のエンジンも動かしていない統合ハブとして正直な機能です。下記「正直な現状確認」を参照してください。
+* 🔒 **実装済み v0 —— 状態同期契約：** `family-sync` は、各子プロジェクトを同期可能とみなす前に、実際のテスト可能な契約——最低成熟度（`functional`）と互換性のある最大メジャーバージョン——でふるいにかけ、未成熟またはバージョン非互換の子プロジェクトを、検証されていない状態形状に対して同期する代わりに、実際の理由とともに拒否します。
 * 🌐 **完全な工場シミュレーション（計画中）：** ロボット、工具、環境を統一された 3D 空間内で複製します——まず実際の Bevy エンジン統合が存在することが前提です。
 * ⚡ **ハードウェア・イン・ザ・ループ（HIL）（計画中）：** アプリと Studio を、あたかも実際のコントローラーであるかのようにシミュレーターに接続します。
 * 📊 **摩耗予測（計画中）：** シミュレートされた機械的応力に基づいてコンポーネントの寿命を推定します。
 * 🛡️ **安全検証（計画中）：** 物理的な実行の前に、複雑な軌道と衝突回避をテストします。
 
-**正直な現状確認 —— 今日実際に動くもの：** 引数なしの呼び出しは引き続き識別情報/バージョン/役割を表示しますが、今では実際の `family-status [--workspace パス]` サブコマンドもあります：ローカルチェックアウトから `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` それぞれの実際のマニフェストを読み取り、見つけたものを正直に報告します。Bevy アプリ、レンダリング、物理ティックループ、URDF シーンの読み込みはまだ何も存在しません——実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている作業は下記のロードマップを参照してください。
+**正直な現状確認 —— 今日実際に動くもの：** 引数なしの呼び出しは引き続き識別情報/バージョン/役割を表示しますが、今では実際のサブコマンドが 2 つあります。`family-status [--workspace パス]` はローカルチェックアウトから `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` それぞれの実際のマニフェストを読み取り、見つけたものを正直に報告します。`family-sync [--workspace パス]` はさらに一歩進みます——存在する各子プロジェクトを実際の状態同期契約（最低成熟度 `functional`、互換性のある最大メジャーバージョン）にかけ、子プロジェクトごとに `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)`、または `MISSING` を報告します。Bevy アプリ、レンダリング、物理ティックループ、URDF シーンの読み込み、そして実際のネットワーク同期トランスポートは、まだ何も存在しません——実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている作業は下記のロードマップを参照してください。
 
 ---
 
@@ -62,6 +63,8 @@ flowchart TB
 * **エコシステムの他の部分との関係。** Digital Twin & Simulation ファミリーの統合親プロジェクトです——HYDRA-UMC-PHYSICS-REPLICA が実際の物理ソルバーを供給し、HYDRA-UMC-HIL-BRIDGE により実際のアプリがまるでハードウェアであるかのようにこれを制御でき、HYDRA-UMC-SYNTHETIC-DATA-GEN はこのエンジン自体を通じてトレーニングデータセットをレンダリングします。
 * **`family-status` が手作業で管理するリストではなく、各子プロジェクト自身のマニフェストを読み取る理由。** `hydra-umc.project.json` は、エコシステム全体のダッシュボードとアップデーターがすでに信頼している唯一の真実の情報源です——ここに第 2 のリストを持つと、子プロジェクトの実際の成熟度が変わった瞬間、誰も更新を忘れずに済むとは限らず、すぐに食い違いが生じてしまいます。
 * **兄弟プロジェクトのローカルチェックアウトが見つからない場合、クラッシュではなく実際の正直な「見つかりません」になる理由。** 統合ハブは、開発者が実際に 3 つの子プロジェクトすべてをローカルにチェックアウトしているかどうかを本当には知り得ません——`manifest.rs` は実際に起こりうるあらゆる失敗（リポジトリなし、マニフェストなし、不正な JSON）に対して `None` を返すため、`family-status` はパニックする代わりにそれを明確に報告します。
+* **`family-sync` が「存在するかどうか」だけでなく、成熟度と両方をバージョン上限で選別する理由。** `family-status` はすでに「この子プロジェクトはチェックアウトされているか、そして自身について何を主張しているか」に答えています——しかし、チェックアウト済みで `scaffolding` 成熟度の子プロジェクトには、まだ同期する価値のある実際の状態がありません。また、この Twin が検証済みの最大メジャーバージョンを超えた子プロジェクトは、この Twin がまだ把握していない方法で自身の状態形状を変更している可能性があります。どちらも同期を拒否する実際の理由であり、「見つからない」とは別のものです。そのため `contract.rs` はこれらを別々にチェックして報告し、すべてを汎用的な「準備未完了」にまとめてしまうことはありません。
+* **`contract::assess()` において、成熟度がバージョン互換性より先にチェックされる理由。** 未成熟な子プロジェクトのバージョン番号は、まだ意味のあるシグナルではありません——成熟度を先にチェックすることで、報告される却下理由は常に実際に失敗した最も根本的なゲートを指し示すことになり、バージョンの不一致が「この子プロジェクトはまだ本物ではない」というより基本的な問題を覆い隠すことはありません。
 
 ---
 
@@ -75,15 +78,20 @@ flowchart TB
 HYDRA-UMC-TWIN/
 ├── src/
 │   ├── manifest.rs       # 兄弟プロジェクト自身のマニフェストの実際の防御的リーダー
-│   ├── family.rs          # 3 つの実際の子プロジェクトに対する実際のファミリーレディネスチェック
-│   └── main.rs              # エントリポイント + 実際の `family-status` サブコマンド
+│   ├── family.rs         # 実際のレディネスチェック + 統合された同期結果
+│   ├── contract.rs       # 実際の状態同期契約（成熟度 + バージョン上限）
+│   └── main.rs           # エントリポイント + 実際の `family-status`/`family-sync` サブコマンド
 ├── docs/                # ドキュメントと物理チューニング
 ├── build/               # ビルドノート/成果物（cargo 自身の出力は target/ にあり、gitignore 対象）
 ├── images/              # メディアと図表
 ├── scripts/             # ユーティリティスクリプト
+├── tools/
+│   ├── build_test.py    # バージョンを増やさないビルドチェック
+│   └── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証
 ├── Cargo.toml           # パッケージメタデータ、依存関係（serde/serde_json）、オドメーターバージョン
 ├── bump_version.py      # オドメーター式バージョンインクリメント（build.sh/.bat が使用）
 ├── build.sh / build.bat # バージョンを増加させ、`cargo test`、その後 `cargo build --release` を実行
+├── build-test.sh / build-test.bat # バージョンを増やさないビルドチェック
 ├── run.sh / run.bat     # コンパイル済みの release バイナリを実行（引数を転送）
 └── docker-compose.yml   # 下記 3 つの子プロジェクトの統合ブループリント
 ```
@@ -97,7 +105,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # オドメーター式バージョンインクリメント、`cargo test`（9 件のテスト）、その後 `cargo build --release`
+./build.sh   # オドメーター式バージョンインクリメント、`cargo test`（21 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 
@@ -136,6 +144,27 @@ All 3 children present.
 このエコシステムの実際のチェックアウトがすでに使用しているのと同じ
 レイアウトです。実際の子プロジェクトが 1 つでも見つからない場合は `1`
 で終了します。
+
+実際の `family-sync` サブコマンドはさらに一歩進みます——存在する各子
+プロジェクトに対して、実際の状態同期契約（最低成熟度、互換性のある
+最大メジャーバージョン）もチェックします：
+
+```bash
+./run.sh family-sync --workspace /path/to/some/checkout
+```
+
+```text
+Digital Twin family sync contract (workspace: /path/to/some/checkout):
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=functional)
+  HYDRA-UMC-HIL-BRIDGE: REJECTED (incompatible version) - HYDRA-UMC-HIL-BRIDGE reports major version 1 - this Twin's sync contract is only verified up to major 0 (incompatible simulator version)
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: MISSING (not checked out)
+
+Not every child is sync-ready - see the lines above.
+```
+
+期待されるすべての子プロジェクトが `READY` の場合にのみ終了コード `0`
+で終了します。`MISSING`/`REJECTED` の子プロジェクトが 1 つでもあれば
+`1` で終了します。
 
 **重要：** `Cargo.toml` は今のところ意図的に**Bevy 依存関係を持ちません**。
 Bevy は重量級のグラフィックスエンジンです（コンパイル時間が長く、常に

@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Engine-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
   <img src="https://img.shields.io/badge/Technologie-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
   <img src="https://img.shields.io/badge/Funktion-HIL%20Ready-green.svg" alt="HIL">
-  <img src="https://img.shields.io/badge/Stufe-Funktional%20v0-yellow.svg" alt="Funktionale v0-Stufe">
+  <img src="https://img.shields.io/badge/Stufe-Etabliert%20v0-brightgreen.svg" alt="Etablierte v0-Stufe">
 </p>
 
 ---
@@ -26,12 +26,13 @@ Entwickelt mit Rust und der Bevy-Engine, konsumiert es direkt URDF-Modelle aus d
 
 ### Hauptmerkmale:
 * 🧩 **Familien-Bereitschaftscheck (v0):** der echte Subbefehl `family-status` liest die eigene `hydra-umc.project.json` jedes der 3 echten Kinder und meldet Vorhandensein/Version/Reife/Rolle - ehrlich für einen Integrations-Hub, der selbst noch keine Engine ausführt. Siehe "Ehrlichkeitscheck" unten.
+* 🔒 **Echtes v0 - Zustands-Sync-Vertrag:** `family-sync` filtert jedes Kind nach einem echten, testbaren Vertrag - Mindestreife (`functional`) und eine maximal kompatible Hauptversion - bevor es überhaupt als sync-bereit behandelt wird, und weist ein unreifes oder versionsinkompatibles Kind mit einem echten Grund ab, statt gegen eine unverifizierte Zustandsform zu synchronisieren.
 * 🌐 **Vollständige Fabriksimulation (geplant):** repliziert Roboter, Werkzeuge und die Umgebung in einem einheitlichen 3D-Raum - setzt voraus, dass zuerst eine echte Bevy-Engine-Integration existiert.
 * ⚡ **Hardware-in-the-Loop (HIL) (geplant):** Verbinden Sie Apps und Studios mit dem Simulator, als wäre er ein echter Controller.
 * 📊 **Verschleißvorhersage (geplant):** schätzt die Lebensdauer von Komponenten basierend auf simuliertem mechanischem Stress.
 * 🛡️ **Sicherheitsvalidierung (geplant):** testet komplexe Trajektorien und Kollisionsvermeidung vor der physischen Ausführung.
 
-**Ehrlichkeitscheck - was heute wirklich läuft:** Der argumentlose Aufruf gibt weiterhin Identität/Version/Rolle aus, es gibt jetzt aber einen echten Subbefehl `family-status [--workspace PFAD]`: Er liest die echten eigenen Manifeste von `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` aus einem lokalen Checkout und meldet ehrlich, was er findet. Es gibt noch keine Bevy-App, kein Rendering, keine Physik-Tick-Schleife und kein Laden von URDF-Szenen - siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was geliefert wurde, und die Roadmap unten für das, was noch aussteht.
+**Ehrlichkeitscheck - was heute wirklich läuft:** Der argumentlose Aufruf gibt weiterhin Identität/Version/Rolle aus, es gibt jetzt aber zwei echte Subbefehle. `family-status [--workspace PFAD]` liest die echten eigenen Manifeste von `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` aus einem lokalen Checkout und meldet ehrlich, was er findet. `family-sync [--workspace PFAD]` geht einen Schritt weiter: Es lässt jedes vorhandene Kind durch einen echten Zustands-Sync-Vertrag laufen (Mindestreife `functional`, maximal kompatible Hauptversion) und meldet pro Kind `READY`, `REJECTED (immature)`, `REJECTED (incompatible version)` oder `MISSING`. Es gibt noch keine Bevy-App, kein Rendering, keine Physik-Tick-Schleife, kein Laden von URDF-Szenen und keinen echten Netzwerk-Sync-Transport - siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was geliefert wurde, und die Roadmap unten für das, was noch aussteht.
 
 ---
 
@@ -57,6 +58,8 @@ flowchart TB
 * **Wie sich das ins restliche Ökosystem einfügt.** Der Integrations-Elternteil der Digital-Twin-&-Simulation-Familie - HYDRA-UMC-PHYSICS-REPLICA liefert ihm einen echten Physik-Solver, HYDRA-UMC-HIL-BRIDGE lässt echte Apps ihn steuern, als wäre er Hardware, und HYDRA-UMC-SYNTHETIC-DATA-GEN rendert Trainingsdatensätze über seine eigene Engine.
 * **Warum `family-status` das eigene Manifest jedes Kindes liest, statt eine handgepflegte Liste zu führen.** `hydra-umc.project.json` ist bereits die einzige Wahrheitsquelle, der Dashboard/Updater des Ökosystems vertrauen - eine zweite Liste hier würde in dem Moment auseinanderlaufen, in dem sich die echte Reife eines Kindes ändert und niemand daran denkt, sie zu aktualisieren.
 * **Warum ein fehlender Geschwister-Checkout ein echtes, ehrliches "nicht gefunden" ist, statt eines Absturzes.** Ein Integrations-Hub kann wirklich nicht wissen, ob ein Entwickler alle 3 Kinder lokal ausgecheckt hat - `manifest.rs` gibt für jeden echten Fehlerfall (fehlendes Repo, fehlende Datei, fehlerhaftes JSON) `None` zurück, damit `family-status` es klar melden kann, statt in Panik zu geraten.
+* **Warum `family-sync` sowohl nach Reife ALS AUCH nach einer Versionsobergrenze filtert, nicht nur nach "ist es da".** `family-status` beantwortet bereits "ist dieses Kind ausgecheckt und was behauptet es über sich selbst" - aber ein ausgechecktes Kind mit `scaffolding`-Reife hat noch keinen echten Zustand, der eine Synchronisation wert wäre, und ein Kind, das die von diesem Twin verifizierte maximale Hauptversion überschritten hat, könnte seine eigene Zustandsform auf eine Weise geändert haben, die dieser Twin noch nicht kennt. Beides sind echte Gründe, die Synchronisation zu verweigern, verschieden von "fehlend" - daher prüft und meldet `contract.rs` sie getrennt, statt alles in ein generisches "nicht bereit" zu vermengen.
+* **Warum die Reife in `contract::assess()` vor der Versionskompatibilität geprüft wird.** Die Versionsnummer eines unreifen Kindes ist noch kein aussagekräftiges Signal - die Reife zuerst zu prüfen bedeutet, dass der gemeldete Ablehnungsgrund immer das grundlegendste Gate benennt, das tatsächlich fehlgeschlagen ist, statt dass eine Versionsinkompatibilität ein grundlegenderes Problem à la "dieses Kind ist noch nicht echt" verdeckt.
 
 ---
 
@@ -70,15 +73,20 @@ Ordnerstruktur-Richtlinie).
 HYDRA-UMC-TWIN/
 ├── src/
 │   ├── manifest.rs       # Echter, defensiver Reader für das eigene Manifest eines Geschwisters
-│   ├── family.rs          # Echter Familien-Bereitschaftscheck über die 3 echten Kinder
-│   └── main.rs              # Einstiegspunkt + echter `family-status`-Subbefehl
+│   ├── family.rs         # Echter Bereitschaftscheck + kombiniertes Sync-Ergebnis
+│   ├── contract.rs       # Echter Zustands-Sync-Vertrag (Reife + Versionsobergrenze)
+│   └── main.rs           # Einstiegspunkt + echte `family-status`/`family-sync`-Subbefehle
 ├── docs/                # Dokumentation und Physikanpassung
 ├── build/               # Build-Notizen/Artefakte (die eigentliche cargo-Ausgabe liegt in target/, per .gitignore ausgeschlossen)
 ├── images/              # Medien und Diagramme
 ├── scripts/             # Utility-Skripte
+├── tools/
+│   ├── build_test.py    # Nicht-versionierender Build-Check
+│   └── ci_validate.py   # Manifest/CHANGELOG/Docs-Validierung, von CI genutzt
 ├── Cargo.toml           # Paket-Metadaten, Abhängigkeiten (serde/serde_json), Kilometerzähler-Version
 ├── bump_version.py      # Kilometerzähler-artiger Versions-Bump (von build.sh/.bat verwendet)
 ├── build.sh / build.bat # Erhöht die Version, `cargo test`, dann `cargo build --release`
+├── build-test.sh / build-test.bat # Nicht-versionierender Build-Check
 ├── run.sh / run.bat     # Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
 └── docker-compose.yml   # Integrations-Blueprint für die 3 Kinder unten
 ```
@@ -91,7 +99,7 @@ Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https:/
 
 ```bash
 # Linux / macOS
-./build.sh   # Kilometerzähler-Versions-Bump, `cargo test` (9 Tests), dann `cargo build --release`
+./build.sh   # Kilometerzähler-Versions-Bump, `cargo test` (21 Tests), dann `cargo build --release`
 ./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
 ```
 
@@ -123,6 +131,23 @@ All 3 children present.
 ```
 
 Standardmäßig wird das eigene übergeordnete Verzeichnis dieses Repositorys verwendet - das echte Geschwister-Checkout-Layout, das dieses Ökosystem bereits nutzt. Beendet sich mit `1`, wenn ein echtes Kind fehlt.
+
+Der echte Subbefehl `family-sync` geht weiter - er prüft auch den echten Zustands-Sync-Vertrag (Mindestreife, maximal kompatible Hauptversion) für jedes vorhandene Kind:
+
+```bash
+./run.sh family-sync --workspace /pfad/zu/einem/checkout
+```
+
+```text
+Digital Twin family sync contract (workspace: /pfad/zu/einem/checkout):
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=functional)
+  HYDRA-UMC-HIL-BRIDGE: REJECTED (incompatible version) - HYDRA-UMC-HIL-BRIDGE reports major version 1 - this Twin's sync contract is only verified up to major 0 (incompatible simulator version)
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: MISSING (not checked out)
+
+Not every child is sync-ready - see the lines above.
+```
+
+Beendet sich nur dann mit `0`, wenn jedes erwartete Kind `READY` ist; mit `1` für jedes `MISSING`/`REJECTED`-Kind.
 
 **Wichtig:** `Cargo.toml` enthält absichtlich **noch keine Bevy-Abhängigkeit**. Bevy ist eine schwere Grafik-Engine (lange Kompilierzeiten, benötigt eine GPU/Grafik-Toolchain, die nicht immer verfügbar ist); v0 hat nur `serde`/`serde_json` zum Lesen von Manifesten hinzugefügt. Die echte `bevy`-Abhängigkeit (plus ein Physik-Backend und der gRPC/WebSocket-Client für HIL-BRIDGE) wird hinzugefügt, wenn die echte Rendering-/Engine-Arbeit beginnt.
 

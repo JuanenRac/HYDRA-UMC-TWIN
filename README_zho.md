@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/Engine-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
   <img src="https://img.shields.io/badge/Tech-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="HIL">
-  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
+  <img src="https://img.shields.io/badge/Stage-Established%20v0-brightgreen.svg" alt="Established v0 stage">
 </p>
 
 ---
@@ -29,12 +29,13 @@
 
 ### 关键特性：
 * 🧩 **家族就绪检查（v0）：** 真实的 `family-status` 子命令读取 3 个真实子项目各自真实的 `hydra-umc.project.json`，报告其是否存在/版本/成熟度/角色——对于一个自身尚未运行任何引擎的集成中枢来说，这是诚实的。详见下方"诚实说明"。
+* 🔒 **真实 v0 —— 状态同步契约：** `family-sync` 会先用一份真实、可测试的契约筛选每个子项目——最低成熟度（`functional`）和一个兼容的最高主版本号——然后才会将其视为可同步，对不成熟或版本不兼容的子项目给出真实理由并予以拒绝，而不是对着一个未经验证的状态形态直接同步。
 * 🌐 **完整工厂仿真（计划中）：** 在统一的 3D 空间中复制机器人、工具和环境——依赖于先有真实的 Bevy 引擎集成。
 * ⚡ **硬件在环（HIL）（计划中）：** 将应用程序和 Studio 连接到仿真器，就像连接到真实控制器一样。
 * 📊 **磨损预测（计划中）：** 基于模拟的机械应力估算组件寿命。
 * 🛡️ **安全验证（计划中）：** 在物理执行之前测试复杂轨迹和避碰。
 
-**诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在新增了一个真实的 `family-status [--workspace 路径]` 子命令：从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。目前还没有任何 Bevy 应用、渲染、物理帧循环或 URDF 场景加载——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的内容请参见下方路线图。
+**诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在有两个真实的子命令。`family-status [--workspace 路径]` 从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。`family-sync [--workspace 路径]` 更进一步：它会让每个已存在的子项目通过一份真实的状态同步契约（最低成熟度 `functional`、兼容的最高主版本号），并为每个子项目报告 `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)` 或 `MISSING`。目前还没有任何 Bevy 应用、渲染、物理帧循环、URDF 场景加载，也没有任何真实的网络同步传输层——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的内容请参见下方路线图。
 
 ---
 
@@ -59,7 +60,9 @@ flowchart TB
 * **为什么 `docker-compose.yml` 在其 3 个子项目尚未拥有 Dockerfile 之前就已存在。** 现在决定并记录集成契约（哪个服务依赖哪个服务、每个服务需要哪些设备/卷挂载），避免这一形态日后被临时拼凑出来，尽管在每个子项目发布各自的 Dockerfile 之前，`docker compose up` 尚无法完全成功。
 * **这如何融入生态系统的其余部分。** 作为 Digital Twin & Simulation 系列的集成父项目——HYDRA-UMC-PHYSICS-REPLICA 为其提供真实的物理求解器，HYDRA-UMC-HIL-BRIDGE 使真实应用程序能够像控制真实硬件一样控制它，而 HYDRA-UMC-SYNTHETIC-DATA-GEN 则通过其自身引擎渲染训练数据集。
 * **为何 `family-status` 读取每个子项目自身的清单，而不是一份手工维护的列表。** `hydra-umc.project.json` 已经是整个生态系统仪表盘和更新器都信任的唯一真相来源——在这里再维护第二份列表，只要某个子项目的真实成熟度发生变化而没人记得同步更新，就会立刻产生偏差。
-* **为何缺少某个兄弟项目的本地检出会得到一个真实、诚实的"未找到"，而非一个崩溃。** 一个集成中枢真的无法预先知道开发者是否在本地检出了全部 3 个子项目——`manifest.rs` 对每一种真实的失败情形（仓库缺失、清单缺失、JSON 格式错误）都返回 `None`，让 `family-status` 清楚地报告出来，而不是直接崩溃。
+* **为何缺少某个兄弟项目的本地检出会得到一个真实、诚实的「未找到」，而非一个崩溃。** 一个集成中枢真的无法预先知道开发者是否在本地检出了全部 3 个子项目——`manifest.rs` 对每一种真实的失败情形（仓库缺失、清单缺失、JSON 格式错误）都返回 `None`，让 `family-status` 清楚地报告出来，而不是直接崩溃。
+* **为何 `family-sync` 同时按成熟度和版本上限筛选，而不仅仅是"是否存在"。** `family-status` 已经回答了"这个子项目是否被检出，它对自己有什么声明"——但一个已检出、成熟度为 `scaffolding` 的子项目还没有真正值得同步的状态，而一个已经超出本 Twin 已验证的最高主版本号的子项目，可能已经以本 Twin 尚不了解的方式改变了自己的状态形态。这两者都是拒绝同步的真实理由，且都不同于「缺失」，所以 `contract.rs` 会分别检查并报告它们，而不是把一切都合并成一个笼统的「未就绪」。
+* **为何 `contract::assess()` 中成熟度检查先于版本兼容性检查。** 一个不成熟子项目的版本号还不是一个有意义的信号——先检查成熟度，意味着报告出的拒绝理由总会指出真正失败的那个最根本的关卡，而不会让一个版本不匹配掩盖了「这个子项目还不是真的」这个更基础的问题。
 
 ---
 
@@ -72,15 +75,20 @@ flowchart TB
 HYDRA-UMC-TWIN/
 ├── src/
 │   ├── manifest.rs       # 真实的、具防御性的兄弟项目自身清单读取器
-│   ├── family.rs          # 对 3 个真实子项目的真实家族就绪检查
-│   └── main.rs              # 入口点 + 真实的 `family-status` 子命令
+│   ├── family.rs         # 真实的就绪检查 + 综合同步结果
+│   ├── contract.rs       # 真实的状态同步契约（成熟度 + 版本上限）
+│   └── main.rs           # 入口点 + 真实的 `family-status`/`family-sync` 子命令
 ├── docs/                # 文档与物理调参
 ├── build/               # 构建笔记/产物（cargo 自身的输出位于 target/，已被 gitignore）
 ├── images/              # 媒体与图表
 ├── scripts/             # 实用脚本
+├── tools/
+│   ├── build_test.py    # 不递增版本号的构建检查
+│   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
 ├── Cargo.toml           # 包元数据、依赖项（serde/serde_json）、里程表版本号
 ├── bump_version.py      # 里程表式版本递增（由 build.sh/.bat 使用）
 ├── build.sh / build.bat # 递增版本号、`cargo test`，然后执行 `cargo build --release`
+├── build-test.sh / build-test.bat # 不递增版本号的构建检查
 ├── run.sh / run.bat     # 运行编译后的 release 二进制文件（转发参数）
 └── docker-compose.yml   # 下方 3 个子项目的集成蓝图
 ```
@@ -94,7 +102,7 @@ HYDRA-UMC-TWIN/
 
 ```bash
 # Linux / macOS
-./build.sh   # 里程表式版本递增、`cargo test`（9 个测试），然后执行 `cargo build --release`
+./build.sh   # 里程表式版本递增、`cargo test`（21 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 
@@ -129,6 +137,25 @@ All 3 children present.
 
 默认使用本仓库自身的父目录——这正是本生态系统任何真实检出已经在使用的
 布局。如果缺少任何真实子项目，将以 `1` 退出。
+
+真实的 `family-sync` 子命令更进一步——它还会针对每个已存在的子项目检查
+真实的状态同步契约（最低成熟度、兼容的最高主版本号）：
+
+```bash
+./run.sh family-sync --workspace /path/to/some/checkout
+```
+
+```text
+Digital Twin family sync contract (workspace: /path/to/some/checkout):
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=functional)
+  HYDRA-UMC-HIL-BRIDGE: REJECTED (incompatible version) - HYDRA-UMC-HIL-BRIDGE reports major version 1 - this Twin's sync contract is only verified up to major 0 (incompatible simulator version)
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: MISSING (not checked out)
+
+Not every child is sync-ready - see the lines above.
+```
+
+仅当所有预期子项目都是 `READY` 时才以 `0` 退出；任何 `MISSING`/`REJECTED`
+子项目都会导致以 `1` 退出。
 
 **重要提示：** `Cargo.toml` 目前刻意**不包含 Bevy 依赖**。Bevy 是一个
 较重的图形引擎（编译耗时长，需要并非总是可用的 GPU/图形工具链）；v0 只
