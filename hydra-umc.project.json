@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "ecosystem": "HYDRA-UMC",
+  "name": "HYDRA-UMC-TWIN",
+  "version": "0.0.2",
+  "role": "service",
+  "stack": "rust",
+  "technologies": [
+    "Rust",
+    "Bevy engine"
+  ],
+  "deployment_target": "cm5",
+  "maturity": "functional",
+  "family": "Digital Twin & Simulation",
+  "parent": null,
+  "build": "cargo build --release.",
+  "notes": "Real v0 family-readiness check (`family-status` subcommand): reads each of the 3 real children's own hydra-umc.project.json and reports presence/version/maturity/role. Honest for an integration hub that runs no rendering/physics engine itself - the real Bevy-based engine and MuJoCo/PhysX backend stay future work, blocked on a real GPU/graphics toolchain and the children's own engines maturing.",
+  "native_version": {
+    "file": "Cargo.toml",
+    "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
+  }
+}

@@ -1,0 +1,22 @@
+[package]
+name = "hydra-umc-twin"
+version = "0.0.2"
+edition = "2021"
+description = "Physics-based Digital Twin engine for safe robotic simulation - integrates PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN."
+authors = ["JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>"]
+license = "GPL-3.0-only"
+readme = "README.md"
+
+# v0: real family-readiness check (`family-status` subcommand) - reads
+# each of the 3 real children's own hydra-umc.project.json via serde_json.
+#
+# IMPORTANT: the real Bevy engine dependency is still intentionally NOT
+# added. Bevy is a heavy graphics engine (long compile times, needs a
+# GPU/graphics toolchain that may not be available or fast in every build
+# environment) - none of that is needed for a readiness check that reads
+# small JSON files. The real `bevy = "..."` dependency (plus bevy_rapier3d
+# or a MuJoCo/PhysX FFI layer for the physics backend, and tonic/prost or
+# tokio-tungstenite to talk to HIL-BRIDGE) is still real future work.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

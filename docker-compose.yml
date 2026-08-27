@@ -1,0 +1,66 @@
+# docker-compose.yml - HYDRA-UMC-TWIN (integration parent)
+#
+# Documents how the Digital Twin engine integrates its 3 children as
+# independent services once each one carries real business logic. This is
+# the confirmed integration blueprint for the "Digital Twin & Simulation"
+# category (see SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt and
+# SONNET/4.MAPA_RELACIONAL_Y_DESCRIPCIONES_HYDRA-UMC.txt).
+#
+# CURRENT STATE (skeleton stage): none of the 4 projects below has a
+# Dockerfile yet - each is still a minimal `cargo`/`pip` skeleton that
+# prints its identity and exits (see each project's own bump_version.py +
+# build.sh/build.bat). `docker-compose up` will NOT work until each child
+# gets a real Dockerfile, tracked per-project in its own
+# SONNET/<project>/mejoras_futuras.txt. Until then, this file is the single
+# source of truth for service names, ports and the dependency graph so the
+# real Dockerfiles can be added later without re-deciding the topology.
+#
+# Network topology:
+#   twin (this repo)  -- owns the Bevy viewport + physics tick loop
+#     depends_on: physics-replica, hil-bridge
+#   physics-replica    -- MuJoCo/PhysX solver, called every physics tick
+#   hil-bridge          -- gRPC/WebSocket sync with real HYDRA-UMC controllers
+#   synthetic-data-gen -- offline batch job, reads the twin's scene/render
+#                          output on demand (not part of the live tick loop)
+
+services:
+  twin:
+    build:
+      context: .
+      dockerfile: Dockerfile   # TODO: add once Bevy dependency lands for real
+    container_name: hydra-umc-twin
+    ports:
+      - "7878:7878"   # planned: HIL-BRIDGE gRPC/WebSocket ingress
+    depends_on:
+      - physics-replica
+      - hil-bridge
+    environment:
+      - HYDRA_TWIN_ROLE=digital-twin-engine
+
+  physics-replica:
+    build:
+      context: ../HYDRA-UMC-PHYSICS-REPLICA
+      dockerfile: Dockerfile   # TODO: add once solver bindings land for real
+    container_name: hydra-umc-physics-replica
+    environment:
+      - HYDRA_TWIN_ROLE=physics-solver
+
+  hil-bridge:
+    build:
+      context: ../HYDRA-UMC-HIL-BRIDGE
+      dockerfile: Dockerfile   # TODO: add once gRPC/WebSocket server lands
+    container_name: hydra-umc-hil-bridge
+    ports:
+      - "50051:50051"   # planned: gRPC to real HYDRA-UMC controllers
+    environment:
+      - HYDRA_TWIN_ROLE=hil-sync
+
+  synthetic-data-gen:
+    build:
+      context: ../HYDRA-UMC-SYNTHETIC-DATA-GEN
+      dockerfile: Dockerfile   # TODO: add once the renderer/annotator land
+    container_name: hydra-umc-synthetic-data-gen
+    profiles:
+      - batch   # opt-in only: `docker compose --profile batch up synthetic-data-gen`
+    environment:
+      - HYDRA_TWIN_ROLE=dataset-generator

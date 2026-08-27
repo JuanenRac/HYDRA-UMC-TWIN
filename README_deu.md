@@ -1,0 +1,240 @@
+<p align="center">
+  <img src="images/HYDRA_UMC_BANNER.svg" alt="HYDRA-UMC-TWIN banner" width="100%">
+</p>
+
+# ♊ HYDRA-UMC-TWIN
+
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | 🇩🇪 <b>Deutsch</b> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+
+### 🌐 Physikbasierter Digitaler Zwilling & High-Fidelity Simulations-Engine
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Lizenz-GPL%203.0-blue.svg" alt="GPL 3.0">
+  <img src="https://img.shields.io/badge/Engine-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
+  <img src="https://img.shields.io/badge/Technologie-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
+  <img src="https://img.shields.io/badge/Funktion-HIL%20Ready-green.svg" alt="HIL">
+  <img src="https://img.shields.io/badge/Stufe-Funktional%20v0-yellow.svg" alt="Funktionale v0-Stufe">
+</p>
+
+---
+
+## 1. 🛠️ TECHNISCHER ÜBERBLICK
+
+**HYDRA-UMC-TWIN** ist das virtuelle Herz des Ökosystems. Es bietet ein High-Fidelity, physikbasiertes Replikat der gesamten Micro-Factory und ermöglicht so sicheres Testen, Training und Echtzeit-Überwachung von Roboterschwärmen.
+
+Entwickelt mit Rust und der Bevy-Engine, konsumiert es direkt URDF-Modelle aus dem EDITOR und emuliert reale physikalische Eigenschaften wie Trägheit, Reibung und Motordrehmoment, um sicherzustellen, dass "wenn es im Zwilling funktioniert, es auch in der Fabrik funktioniert".
+
+### Hauptmerkmale:
+* 🧩 **Familien-Bereitschaftscheck (v0):** der echte Subbefehl `family-status` liest die eigene `hydra-umc.project.json` jedes der 3 echten Kinder und meldet Vorhandensein/Version/Reife/Rolle - ehrlich für einen Integrations-Hub, der selbst noch keine Engine ausführt. Siehe "Ehrlichkeitscheck" unten.
+* 🌐 **Vollständige Fabriksimulation (geplant):** repliziert Roboter, Werkzeuge und die Umgebung in einem einheitlichen 3D-Raum - setzt voraus, dass zuerst eine echte Bevy-Engine-Integration existiert.
+* ⚡ **Hardware-in-the-Loop (HIL) (geplant):** Verbinden Sie Apps und Studios mit dem Simulator, als wäre er ein echter Controller.
+* 📊 **Verschleißvorhersage (geplant):** schätzt die Lebensdauer von Komponenten basierend auf simuliertem mechanischem Stress.
+* 🛡️ **Sicherheitsvalidierung (geplant):** testet komplexe Trajektorien und Kollisionsvermeidung vor der physischen Ausführung.
+
+**Ehrlichkeitscheck - was heute wirklich läuft:** Der argumentlose Aufruf gibt weiterhin Identität/Version/Rolle aus, es gibt jetzt aber einen echten Subbefehl `family-status [--workspace PFAD]`: Er liest die echten eigenen Manifeste von `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` aus einem lokalen Checkout und meldet ehrlich, was er findet. Es gibt noch keine Bevy-App, kein Rendering, keine Physik-Tick-Schleife und kein Laden von URDF-Szenen - siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was geliefert wurde, und die Roadmap unten für das, was noch aussteht.
+
+---
+
+## 2. 🔄 TWIN-ARCHITEKTUR
+
+```mermaid
+flowchart TB
+    URDF["URDF-Modelle (EDITOR)"] --> TWIN["HYDRA-UMC-TWIN"]
+    TWIN --> PHYS["PHYSICS-REPLICA (MuJoCo/PhysX)"]
+    PHYS --> SYNC["HIL-BRIDGE (Befehlssynchronisation)"]
+    SYNC --> APP["Android / iOS App"]
+    SYNC --> STUDIO["HYDRA-UMC-STUDIO"]
+    TWIN --> DATA["SYNTHETIC-DATA-GEN"]
+```
+
+---
+
+## 3. 🧱 ARCHITEKTUR & DESIGNENTSCHEIDUNGEN
+
+* **Warum diese Engine keine `hardware/`/`firmware/`/`os/`-Ordner hat.** Reine Software - keine eigene Platine, daher wurden diese Ordner entfernt statt leer gelassen (siehe die Ordner-Beschneidungsregel in `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`, einem privaten Planungsdokument).
+* **Warum `Cargo.toml` bewusst noch keine Bevy-Abhängigkeit hat.** Bevy ist eine schwere Grafik-Engine - lange Kompilierzeiten, benötigt eine GPU-/Grafik-Toolchain, die nicht immer verfügbar ist. v0 hat nur `serde`/`serde_json` hinzugefügt (zum Lesen der Manifeste der Kinder) - die echte Rendering-Arbeit wartet weiterhin darauf, dass eine echte GPU-/Grafik-Toolchain existiert, gegen die kompiliert werden kann.
+* **Warum `docker-compose.yml` existiert, bevor seine 3 Kinder ein Dockerfile haben.** Den Integrationsvertrag jetzt zu entscheiden und zu dokumentieren (welcher Dienst von welchem abhängt, welche Device-/Volume-Mounts jeder benötigt) verhindert, dass diese Form später ad hoc erfunden wird, auch wenn `docker compose up` erst vollständig gelingen kann, wenn jedes Kind sein eigenes Dockerfile veröffentlicht.
+* **Wie sich das ins restliche Ökosystem einfügt.** Der Integrations-Elternteil der Digital-Twin-&-Simulation-Familie - HYDRA-UMC-PHYSICS-REPLICA liefert ihm einen echten Physik-Solver, HYDRA-UMC-HIL-BRIDGE lässt echte Apps ihn steuern, als wäre er Hardware, und HYDRA-UMC-SYNTHETIC-DATA-GEN rendert Trainingsdatensätze über seine eigene Engine.
+* **Warum `family-status` das eigene Manifest jedes Kindes liest, statt eine handgepflegte Liste zu führen.** `hydra-umc.project.json` ist bereits die einzige Wahrheitsquelle, der Dashboard/Updater des Ökosystems vertrauen - eine zweite Liste hier würde in dem Moment auseinanderlaufen, in dem sich die echte Reife eines Kindes ändert und niemand daran denkt, sie zu aktualisieren.
+* **Warum ein fehlender Geschwister-Checkout ein echtes, ehrliches "nicht gefunden" ist, statt eines Absturzes.** Ein Integrations-Hub kann wirklich nicht wissen, ob ein Entwickler alle 3 Kinder lokal ausgecheckt hat - `manifest.rs` gibt für jeden echten Fehlerfall (fehlendes Repo, fehlende Datei, fehlerhaftes JSON) `None` zurück, damit `family-status` es klar melden kann, statt in Panik zu geraten.
+
+---
+
+## 📂 VERZEICHNISSTRUKTUR
+
+Reine Software-Engine ohne eigenes Hardware-Design - daher hat dieses
+Projekt keine Ordner `hardware/`, `firmware/` oder `os/` (siehe die
+Ordner-Pruning-Regel in `SONNET/5.PLAN_EJECUCION_32_PROYECTOS_NUEVOS.txt`).
+
+```text
+HYDRA-UMC-TWIN/
+├── src/
+│   ├── manifest.rs       # Echter, defensiver Reader für das eigene Manifest eines Geschwisters
+│   ├── family.rs          # Echter Familien-Bereitschaftscheck über die 3 echten Kinder
+│   └── main.rs              # Einstiegspunkt + echter `family-status`-Subbefehl
+├── docs/                # Dokumentation und Physikanpassung
+├── build/               # Build-Notizen/Artefakte (die eigentliche cargo-Ausgabe liegt in target/, per .gitignore ausgeschlossen)
+├── images/              # Medien und Diagramme
+├── scripts/             # Utility-Skripte
+├── Cargo.toml           # Paket-Metadaten, Abhängigkeiten (serde/serde_json), Kilometerzähler-Version
+├── bump_version.py      # Kilometerzähler-artiger Versions-Bump (von build.sh/.bat verwendet)
+├── build.sh / build.bat # Erhöht die Version, `cargo test`, dann `cargo build --release`
+├── run.sh / run.bat     # Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
+└── docker-compose.yml   # Integrations-Blueprint für die 3 Kinder unten
+```
+
+---
+
+## 🏗️ BUILD UND RUN
+
+Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https://rustup.rs)) und Python 3.10+ (nur für `bump_version.py`).
+
+```bash
+# Linux / macOS
+./build.sh   # Kilometerzähler-Versions-Bump, `cargo test` (9 Tests), dann `cargo build --release`
+./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
+```
+
+```bat
+:: Windows
+build.bat
+run.bat
+```
+
+`build.sh`/`build.bat` erhöhen die Version der eigenen `Cargo.toml` dieses Projekts nach der "Kilometerzähler"-Regel des Ökosystems (PATCH+1, mit Übertrag auf MINOR nach 9), führen die echte Testsuite aus und bauen dann eine Release-Binärdatei.
+
+Der echte Subbefehl `family-status` prüft den echten lokalen Checkout:
+
+```bash
+./run.sh family-status
+./run.sh family-status --workspace /pfad/zu/einem/anderen/checkout
+
+# Windows
+run.bat family-status
+```
+
+```text
+Digital Twin family status (workspace: /pfad/zu/GitHub):
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.2, maturity=functional, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.1, maturity=scaffolding, role=service
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.4, maturity=functional, role=tool
+
+All 3 children present.
+```
+
+Standardmäßig wird das eigene übergeordnete Verzeichnis dieses Repositorys verwendet - das echte Geschwister-Checkout-Layout, das dieses Ökosystem bereits nutzt. Beendet sich mit `1`, wenn ein echtes Kind fehlt.
+
+**Wichtig:** `Cargo.toml` enthält absichtlich **noch keine Bevy-Abhängigkeit**. Bevy ist eine schwere Grafik-Engine (lange Kompilierzeiten, benötigt eine GPU/Grafik-Toolchain, die nicht immer verfügbar ist); v0 hat nur `serde`/`serde_json` zum Lesen von Manifesten hinzugefügt. Die echte `bevy`-Abhängigkeit (plus ein Physik-Backend und der gRPC/WebSocket-Client für HIL-BRIDGE) wird hinzugefügt, wenn die echte Rendering-/Engine-Arbeit beginnt.
+
+### Integration der 3 Kinder (`docker-compose.yml`)
+
+Als Integrations-Elternteil dokumentiert `docker-compose.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar - die Datei ist die bestätigte Referenz für Topologie/Ports/Abhängigkeitsgraph, gegen die später das echte `Dockerfile` jedes Projekts hinzugefügt wird (pro Projekt verfolgt in dessen eigenem `SONNET/<projekt>/mejoras_futuras.txt`).
+
+---
+
+## 🚀 ROADMAP
+* **Phase 1:** Digital-Twin-Synchronisation mit Echtzeit-Hardware-Telemetrie und Sub-10ms-Latenz.
+* **Phase 2:** Physics Replica-Integration mit industriellen Simulatoren (Isaac Sim) und Unterstützung für verformbare Körper.
+* **Phase 3:** Automatisierte Wiederherstellungsmuster von Node Healing für dezentrales Failover und frühzeitige Erkennung von Sensordegradation.
+* **Phase 4:** Fotorealistisches Rendering für die Erzeugung synthetischer Daten und HIL-Bridge-Unterstützung für Full-Scale Vehicle-in-the-Loop.
+
+---
+
+## 🔗 Verwandte Projekte
+
+Dieses Projekt ist Teil eines größeren Robotik-Ökosystems desselben Autors (JuanenRac / Electro Hobby 3D), das Firmware, Steuerungssoftware, KI-Knoten und Flotten-Tools umfasst. Gut zu wissen, denn eine Anfrage könnte tatsächlich eines dieser Projekte betreffen statt dieses Repository.
+
+### Familie
+
+**Elternteil:** keiner — dieses Projekt ist selbst der Integrations-Elternteil der Digital Twin & Simulation-Familie.
+
+**Kinder:**
+- **[HYDRA-UMC-PHYSICS-REPLICA](https://github.com/JuanenRac/HYDRA-UMC-PHYSICS-REPLICA)** — die Starrkörper-/Kontaktsimulation, die diesen Renderer speist.
+- **[HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE)** — die Hardware-in-the-Loop-Verbindung, über die dieser Zwilling reale I/O steuert.
+- **[HYDRA-UMC-SYNTHETIC-DATA-GEN](https://github.com/JuanenRac/HYDRA-UMC-SYNTHETIC-DATA-GEN)** — rendert Trainingsdatensätze über die eigene Engine dieses Zwillings.
+
+### Direkte Beziehung (außerhalb der Familie)
+
+- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — verwendet die hier erstellten URDF-Modelle.
+- **[HYDRA-UMC-SUITE](https://github.com/JuanenRac/HYDRA-UMC-SUITE)** — steuert diesen Zwilling, als wäre er echte Hardware, über HIL-BRIDGE.
+- **[HYDRA-UMC-ANDROID-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-ANDROID-CONTROL)** — steuert diesen Zwilling, als wäre er echte Hardware, über HIL-BRIDGE.
+- **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — steuert diesen Zwilling, als wäre er echte Hardware, über HIL-BRIDGE.
+
+### Restliches Ökosystem
+
+**HYDRA-UMC-Plattform** — die Multi-Roboter-Mikrofabrikzelle
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — das CM5 + STM32H745-Motherboard, das bis zu 8 Roboterarme orchestriert.
+- **[HYDRA-UMC-SERVER](https://github.com/JuanenRac/HYDRA-UMC-SERVER)** — das Express/WebSocket-Backend, mit dem jeder Steuerungsclient spricht.
+- **[HYDRA-UMC-STUDIO](https://github.com/JuanenRac/HYDRA-UMC-STUDIO)** — webbasiertes Steuerungs-Dashboard, Multi-Roboter-3D-Visualisierung.
+- **[HYDRA-UMC-ANDROID-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-ANDROID-CONTROL)** — Android-Steuerungs-App über Wi-Fi/Bluetooth.
+- **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — iOS/iPadOS-Steuerungs-App, gebaut in Flutter.
+- **[HYDRA-UMC-SUITE](https://github.com/JuanenRac/HYDRA-UMC-SUITE)** — Desktop-Schwarm-Kommandozentrale (Python/PySide6).
+- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — Desktop-URDF-Modelleditor für den Roboterkatalog.
+- **[HYDRA-UMC-DSI](https://github.com/JuanenRac/HYDRA-UMC-DSI)** — native Touch-UI für den eingebauten DSI-Touchscreen.
+
+**URTC-Plattform** — der Werkzeugkopf-Controller, den jeder HYDRA-UMC-Roboterarm trägt
+- **[URTC](https://github.com/JuanenRac/URTC)** — CAN-Bus-Werkzeugkopf-Controller, 25 Werkzeugprofile.
+- **[URTC-FLASHER](https://github.com/JuanenRac/URTC-FLASHER)** — Desktop-Tool für CAN-OTA + SWD/JTAG-Flashing.
+- **[URTC-TESTER](https://github.com/JuanenRac/URTC-TESTER)** — Desktop-Tool für Live-CAN-Bus-Diagnose.
+- **[URTC-WEB-STUDIO](https://github.com/JuanenRac/URTC-WEB-STUDIO)** — browserbasierte Alternative über die Web-Serial-API.
+
+**🎥 Vision AI Node (Hailo-8)**
+- [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE)
+- [HYDRA-UMC-VISION-STREAMER](https://github.com/JuanenRac/HYDRA-UMC-VISION-STREAMER)
+- [HYDRA-UMC-DETECTION-HEF](https://github.com/JuanenRac/HYDRA-UMC-DETECTION-HEF)
+- [HYDRA-UMC-SAFETY-ZONES](https://github.com/JuanenRac/HYDRA-UMC-SAFETY-ZONES)
+- [HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)
+
+**🧠 Cognitive AI Node (Hailo-10)**
+- [HYDRA-UMC-COGNITIVE-NODE](https://github.com/JuanenRac/HYDRA-UMC-COGNITIVE-NODE)
+- [HYDRA-UMC-VLA-ENGINE](https://github.com/JuanenRac/HYDRA-UMC-VLA-ENGINE)
+- [HYDRA-UMC-VOICE-UI](https://github.com/JuanenRac/HYDRA-UMC-VOICE-UI)
+- [HYDRA-UMC-SEMANTIC-PLANNER](https://github.com/JuanenRac/HYDRA-UMC-SEMANTIC-PLANNER)
+- [HYDRA-UMC-DOCS-QA](https://github.com/JuanenRac/HYDRA-UMC-DOCS-QA)
+
+**🐝 Orchestration & Swarm**
+- [HYDRA-UMC-ORCHESTRATOR](https://github.com/JuanenRac/HYDRA-UMC-ORCHESTRATOR)
+- [HYDRA-UMC-SWARM-SYNC](https://github.com/JuanenRac/HYDRA-UMC-SWARM-SYNC)
+- [HYDRA-UMC-PATH-PLANNER-3D](https://github.com/JuanenRac/HYDRA-UMC-PATH-PLANNER-3D)
+- [HYDRA-UMC-JOB-DISPATCHER](https://github.com/JuanenRac/HYDRA-UMC-JOB-DISPATCHER)
+- [HYDRA-UMC-NODE-HEALING](https://github.com/JuanenRac/HYDRA-UMC-NODE-HEALING)
+
+**📊 Data & Analytics**
+- [HYDRA-UMC-DATALAKE](https://github.com/JuanenRac/HYDRA-UMC-DATALAKE)
+- [HYDRA-UMC-TELEMETRY-COLLECTOR](https://github.com/JuanenRac/HYDRA-UMC-TELEMETRY-COLLECTOR)
+- [HYDRA-UMC-ANOMALY-DETECTOR](https://github.com/JuanenRac/HYDRA-UMC-ANOMALY-DETECTOR)
+- [HYDRA-UMC-PRODUCTION-REPORTS](https://github.com/JuanenRac/HYDRA-UMC-PRODUCTION-REPORTS)
+
+**🏭 Industrial Gateway**
+- [HYDRA-UMC-GATEWAY-INDUSTRIAL](https://github.com/JuanenRac/HYDRA-UMC-GATEWAY-INDUSTRIAL)
+- [HYDRA-UMC-OPCUA-SERVER](https://github.com/JuanenRac/HYDRA-UMC-OPCUA-SERVER)
+- [HYDRA-UMC-MQTT-BROKER](https://github.com/JuanenRac/HYDRA-UMC-MQTT-BROKER)
+- [HYDRA-UMC-MTCONNECT-ADAPTER](https://github.com/JuanenRac/HYDRA-UMC-MTCONNECT-ADAPTER)
+
+**🛠️ Complementary Tools**
+- [URTC-SMART-RACK](https://github.com/JuanenRac/URTC-SMART-RACK)
+- [URTC-VISION-TOOL](https://github.com/JuanenRac/URTC-VISION-TOOL)
+- [HYDRA-UMC-WATCH](https://github.com/JuanenRac/HYDRA-UMC-WATCH)
+- [HYDRA-UMC-TOOL-CLI](https://github.com/JuanenRac/HYDRA-UMC-TOOL-CLI)
+- [HYDRA-UMC-DASHBOARD-AI](https://github.com/JuanenRac/HYDRA-UMC-DASHBOARD-AI)
+
+
+## 👤 AUTOR
+**JuanenRac** (Electro Hobby 3D)
+📧 electrohobby3d@gmail.com
+
+## 📜 LIZENZ
+GPL-3.0 - Siehe LICENSE für Details.
+
+## Verwandte Projekte
+
+> Canonical public ecosystem relationship map.
+
+**Direct integrations:**
+[HYDRA-UMC-OS](https://github.com/JuanenRac/HYDRA-UMC-OS) · [HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK) · [HYDRA-UMC-SERVER](https://github.com/JuanenRac/HYDRA-UMC-SERVER) · [URTC](https://github.com/JuanenRac/URTC) · [HYDRA-UMC-PHYSICS-REPLICA](https://github.com/JuanenRac/HYDRA-UMC-PHYSICS-REPLICA) · [HYDRA-UMC-HIL-BRIDGE](https://github.com/JuanenRac/HYDRA-UMC-HIL-BRIDGE) · [HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)
+
+**Platform and contracts:**
+[HYDRA-UMC-OS](https://github.com/JuanenRac/HYDRA-UMC-OS) · [HYDRA-UMC-SDK](https://github.com/JuanenRac/HYDRA-UMC-SDK)
+
+**Rest of the ecosystem:**
+All remaining public repositories are grouped by the seven ecosystem layers in the [JuanenRac ecosystem dashboard](https://juanenrac.github.io/JuanenRac/).
