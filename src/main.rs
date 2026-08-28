@@ -111,10 +111,16 @@ fn run_family_sync(args: &[String]) -> ExitCode {
                 println!("  {}: REJECTED (immature) - {reason}", status.name);
             }
             FamilySyncOutcome::Assessed(SyncReadiness::IncompatibleVersion { reason }) => {
-                println!("  {}: REJECTED (incompatible version) - {reason}", status.name);
+                println!(
+                    "  {}: REJECTED (incompatible version) - {reason}",
+                    status.name
+                );
             }
             FamilySyncOutcome::Assessed(SyncReadiness::UnparseableManifest { reason }) => {
-                println!("  {}: REJECTED (unparseable manifest) - {reason}", status.name);
+                println!(
+                    "  {}: REJECTED (unparseable manifest) - {reason}",
+                    status.name
+                );
             }
         }
     }
