@@ -20,6 +20,7 @@
 //!     state contract may have changed in a way this Twin does not yet
 //!     know how to handle, so it is refused rather than synced against
 //!     blindly.
+//!
 //! A child that clears both gates gets a real `SyncSnapshot` - the
 //! fixture representing exactly what would be exchanged, real and
 //! testable independent of any actual network sync transport (which
