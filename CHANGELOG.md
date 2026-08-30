@@ -20,6 +20,15 @@ semantic-versioning judgment calls:
 
 ---
 
+## Unreleased - strict child manifest versions
+
+- The state-sync gate now requires a complete numeric `MAJOR.MINOR.PATCH`
+  child version before it assesses compatibility. Incomplete, extra-component
+  or non-numeric versions fail as unparseable instead of being accepted from
+  their first component alone.
+
+---
+
 ## [0.0.3] - Real v0: state-sync contract with incompatible-version rejection
 
 - **`src/contract.rs`** (new) - the real state-sync contract this Twin enforces before treating a child as sync-ready: `MaturityLevel` (ordered `Scaffolding < Functional < Established`) gates on `MIN_MATURITY = Functional`, and a per-child major version is gated against `MAX_COMPATIBLE_MAJOR` (0 today, every child is still pre-1.0) - a child reporting a higher major is refused as an incompatible simulator version, since its own sync contract may have changed in a way this Twin hasn't verified. `assess()` checks maturity before version so the reported rejection reason always names the most fundamental gate that failed. A child that clears both gates gets a real `SyncSnapshot` fixture (child/version/maturity) - a concrete, typed value for a future sync transport to serialize, not a loose blob.

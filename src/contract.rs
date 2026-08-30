@@ -84,7 +84,17 @@ impl SyncReadiness {
 }
 
 fn parse_major(version: &str) -> Option<u32> {
-    version.split('.').next()?.parse().ok()
+    let mut components = version.split('.');
+    let major = components.next()?.parse().ok()?;
+    let minor: u32 = components.next()?.parse().ok()?;
+    let patch: u32 = components.next()?.parse().ok()?;
+    if components.next().is_some() {
+        return None;
+    }
+    // Consume the parsed values to make the full three-component format an
+    // explicit contract, rather than accidentally accepting "0.anything".
+    let _ = (minor, patch);
+    Some(major)
 }
 
 /// Assesses one child's manifest against the real sync contract above.
@@ -240,6 +250,17 @@ mod tests {
                 assert!(reason.contains("not-a-version"));
             }
             other => panic!("expected UnparseableManifest, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn incomplete_or_extra_version_components_are_rejected_honestly() {
+        for version in ["0", "0.1", "0.1.2.3", "0.x.1"] {
+            let m = manifest("HYDRA-UMC-PHYSICS-REPLICA", version, "functional");
+            assert!(matches!(
+                assess(&m),
+                SyncReadiness::UnparseableManifest { .. }
+            ));
         }
     }
 
