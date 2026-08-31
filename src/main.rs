@@ -17,6 +17,7 @@
 mod contract;
 mod family;
 mod manifest;
+mod server;
 
 use contract::SyncReadiness;
 use family::FamilySyncOutcome;
@@ -134,12 +135,35 @@ fn run_family_sync(args: &[String]) -> ExitCode {
     }
 }
 
+fn run_serve(args: &[String]) -> ExitCode {
+    let addr = find_flag(args, "--addr").unwrap_or_else(|| "127.0.0.1".to_string());
+    let port = find_flag(args, "--port").unwrap_or_else(|| "8111".to_string());
+    let workspace: PathBuf = find_flag(args, "--workspace")
+        .map(PathBuf::from)
+        .unwrap_or_else(default_workspace);
+
+    let bind_addr = format!("{addr}:{port}");
+    match server::bind(&bind_addr) {
+        Ok(bound) => {
+            eprintln!("[twin] HTTP API listening on {bind_addr} (workspace={})", workspace.display());
+            eprintln!("[twin] GET /family-status, GET /family-sync, GET /stats");
+            server::run(bound, workspace);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("[twin] fatal: could not start HTTP server on {bind_addr}: {e}");
+            ExitCode::from(2)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
     match args.first().map(|s| s.as_str()) {
         Some("family-status") => run_family_status(&args[1..]),
         Some("family-sync") => run_family_sync(&args[1..]),
+        Some("serve") => run_serve(&args[1..]),
         _ => {
             println!("{PROJECT_NAME} v{VERSION}");
             println!("{ROLE}");

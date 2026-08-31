@@ -9,6 +9,8 @@
 
 use std::path::Path;
 
+use serde::Serialize;
+
 use crate::contract::{self, SyncReadiness};
 use crate::manifest::{read_child_manifest, ChildManifest};
 
@@ -22,7 +24,7 @@ pub const EXPECTED_CHILDREN: [&str; 3] = [
     "HYDRA-UMC-SYNTHETIC-DATA-GEN",
 ];
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChildStatus {
     pub name: String,
     pub manifest: Option<ChildManifest>,
@@ -52,7 +54,7 @@ pub fn check_family_status(workspace_root: &Path) -> Vec<ChildStatus> {
 /// with the real state-sync contract from `contract.rs`. A missing
 /// checkout is its own, distinct outcome - there is no manifest to
 /// assess a contract against.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum FamilySyncOutcome {
     Missing,
     Assessed(SyncReadiness),
@@ -64,7 +66,7 @@ impl FamilySyncOutcome {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct FamilySyncStatus {
     pub name: String,
     pub outcome: FamilySyncOutcome,

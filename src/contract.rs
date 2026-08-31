@@ -26,6 +26,8 @@
 //! testable independent of any actual network sync transport (which
 //! doesn't exist yet - see `family.rs`'s own honesty note).
 
+use serde::Serialize;
+
 use crate::manifest::ChildManifest;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -62,14 +64,14 @@ pub const MAX_COMPATIBLE_MAJOR: u32 = 0;
 /// typed value rather than a loose string/JSON blob, so a future sync
 /// transport has a concrete contract to serialize instead of inventing
 /// one from scratch.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SyncSnapshot {
     pub child: String,
     pub version: String,
     pub maturity: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum SyncReadiness {
     Ready(SyncSnapshot),
     ImmatureMaturity { reason: String },

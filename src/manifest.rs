@@ -14,11 +14,11 @@
 use std::fs;
 use std::path::Path;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub const MANIFEST_FILE: &str = "hydra-umc.project.json";
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct ChildManifest {
     pub name: String,
     pub version: String,

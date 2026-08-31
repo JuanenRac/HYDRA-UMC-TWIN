@@ -29,6 +29,37 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.4] - Real v0: JSON/HTTP server mode, plus CM5 deployment
+
+- **`server.rs`** (new) - `GET /family-status` and `GET /family-sync`
+  reach the exact same `check_family_status()`/`assess_family_sync()`
+  functions the CLI's own subcommands already run, over a real
+  `tiny_http` server (blocking, no async runtime - the closest Rust
+  equivalent to this ecosystem's other services' stdlib
+  `ThreadingHTTPServer`, first used in this ecosystem here). Real gap
+  this closes: this project's own readiness/sync-contract check was only
+  ever reachable as a one-shot CLI.
+- **`ChildManifest`/`ChildStatus`/`FamilySyncOutcome`/`FamilySyncStatus`/
+  `SyncReadiness`/`SyncSnapshot`** (manifest.rs, family.rs, contract.rs)
+  - all gained a `Serialize` derive (behavior-preserving, additive only)
+  so `server.rs` can hand them straight to `serde_json::json!` without a
+  second, parallel JSON shape to keep in sync with the CLI's own
+  human-readable printer.
+- **`main.rs`** - new `serve` subcommand (`--addr`/`--port`/
+  `--workspace`, default `127.0.0.1:8111`).
+- **`systemd/hydra-umc-twin.service`** (new) - unit for
+  `HYDRA-UMC-OS/provisioning/install_twin.sh` (new, that repo) - first
+  Rust service installed on this CM5 as a compiled release binary rather
+  than built on-device (unlike the Go services). `--workspace` points at
+  a real `root:root 0755` tree holding just this node's real children's
+  own `hydra-umc.project.json` files - same real permission lesson as
+  `HYDRA-UMC-VISION-NODE`'s own install (a symlink to the real sibling-
+  checkout root would be unreadable by this service's own unprivileged
+  account, since that root lives under the operator's home directory).
+- 7 new tests (`server.rs`'s own `#[cfg(test)]` module, real end-to-end
+  HTTP over a raw `TcpStream` since no HTTP client crate is a dependency
+  here) - 29 total.
+
 ## [0.0.3] - Real v0: state-sync contract with incompatible-version rejection
 
 - **`src/contract.rs`** (new) - the real state-sync contract this Twin enforces before treating a child as sync-ready: `MaturityLevel` (ordered `Scaffolding < Functional < Established`) gates on `MIN_MATURITY = Functional`, and a per-child major version is gated against `MAX_COMPATIBLE_MAJOR` (0 today, every child is still pre-1.0) - a child reporting a higher major is refused as an incompatible simulator version, since its own sync contract may have changed in a way this Twin hasn't verified. `assess()` checks maturity before version so the reported rejection reason always names the most fundamental gate that failed. A child that clears both gates gets a real `SyncSnapshot` fixture (child/version/maturity) - a concrete, typed value for a future sync transport to serialize, not a loose blob.
