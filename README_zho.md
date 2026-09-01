@@ -58,7 +58,7 @@ flowchart TB
 * **为什么本引擎没有 `hardware/`/`firmware/`/`os/` 文件夹。** 这是没有自有板卡的纯软件；源代码文件夹仅在实现需要时才包含。
 * **为什么 `Cargo.toml` 目前刻意不包含 Bevy 依赖。** Bevy 是一个较重的图形引擎——编译耗时长，需要并非总是可用的 GPU/图形工具链。v0 只添加了 `serde`/`serde_json`（用于读取子项目的清单）——真正的渲染工作仍在等待一个真实可用的 GPU/图形工具链出现后才能编译。
 * **为什么 `docker-compose.yml` 在其 3 个子项目尚未拥有 Dockerfile 之前就已存在。** 现在决定并记录集成契约（哪个服务依赖哪个服务、每个服务需要哪些设备/卷挂载），避免这一形态日后被临时拼凑出来，尽管在每个子项目发布各自的 Dockerfile 之前，`docker compose up` 尚无法完全成功。
-* **这如何融入生态系统的其余部分。** 作为 Digital Twin & Simulation 系列的集成父项目——HYDRA-UMC-PHYSICS-REPLICA 为其提供真实的物理求解器，HYDRA-UMC-HIL-BRIDGE 使真实应用程序能够像控制真实硬件一样控制它，而 HYDRA-UMC-SYNTHETIC-DATA-GEN 则通过其自身引擎渲染训练数据集。
+* **这如何融入生态系统的其余部分。** 作为 数字孪生与仿真 系列的集成父项目——HYDRA-UMC-PHYSICS-REPLICA 为其提供真实的物理求解器，HYDRA-UMC-HIL-BRIDGE 使真实应用程序能够像控制真实硬件一样控制它，而 HYDRA-UMC-SYNTHETIC-DATA-GEN 则通过其自身引擎渲染训练数据集。
 * **为何 `family-status` 读取每个子项目自身的清单，而不是一份手工维护的列表。** `hydra-umc.project.json` 已经是整个生态系统仪表盘和更新器都信任的唯一真相来源——在这里再维护第二份列表，只要某个子项目的真实成熟度发生变化而没人记得同步更新，就会立刻产生偏差。
 * **为何缺少某个兄弟项目的本地检出会得到一个真实、诚实的「未找到」，而非一个崩溃。** 一个集成中枢真的无法预先知道开发者是否在本地检出了全部 3 个子项目——`manifest.rs` 对每一种真实的失败情形（仓库缺失、清单缺失、JSON 格式错误）都返回 `None`，让 `family-status` 清楚地报告出来，而不是直接崩溃。
 * **为何 `family-sync` 同时按成熟度和版本上限筛选，而不仅仅是"是否存在"。** `family-status` 已经回答了"这个子项目是否被检出，它对自己有什么声明"——但一个已检出、成熟度为 `scaffolding` 的子项目还没有真正值得同步的状态，而一个已经超出本 Twin 已验证的最高主版本号的子项目，可能已经以本 Twin 尚不了解的方式改变了自己的状态形态。这两者都是拒绝同步的真实理由，且都不同于「缺失」，所以 `contract.rs` 会分别检查并报告它们，而不是把一切都合并成一个笼统的「未就绪」。
@@ -190,7 +190,7 @@ Not every child is sync-ready - see the lines above.
 
 ### 项目族
 
-**父项目：** 无——本项目本身就是 Digital Twin & Simulation 系列的集成父项目。
+**父项目：** 无——本项目本身就是 数字孪生与仿真 系列的集成父项目。
 
 **子项目：**
 - **[HYDRA-UMC-PHYSICS-REPLICA](https://github.com/JuanenRac/HYDRA-UMC-PHYSICS-REPLICA)** —— 为本渲染器提供输入的刚体/接触仿真。
