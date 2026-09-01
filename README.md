@@ -180,7 +180,7 @@ This project is part of a larger robotics ecosystem by the same author (JuanenRa
 
 ### Directly Related (outside the family)
 
-- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — consumes the URDF models authored here.
+- **[HYDRA-UMC-EDITOR-URDF](https://github.com/JuanenRac/HYDRA-UMC-EDITOR-URDF)** — the tool the URDF models this twin consumes are authored with.
 - **[HYDRA-UMC-SUITE](https://github.com/JuanenRac/HYDRA-UMC-SUITE)** — controls this twin as if it were real hardware, via HIL-BRIDGE.
 - **[HYDRA-UMC-ANDROID-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-ANDROID-CONTROL)** — controls this twin as if it were real hardware, via HIL-BRIDGE.
 - **[HYDRA-UMC-IOS-CONTROL](https://github.com/JuanenRac/HYDRA-UMC-IOS-CONTROL)** — controls this twin as if it were real hardware, via HIL-BRIDGE.
