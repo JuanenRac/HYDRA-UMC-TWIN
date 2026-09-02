@@ -48,7 +48,7 @@ fn query_param(url: &str, key: &str) -> Option<String> {
 /// this split, a test would have no way to discover which port a
 /// `serve()`-all-in-one call actually bound.
 pub fn bind(addr: &str) -> std::io::Result<Server> {
-    Server::http(addr).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    Server::http(addr).map_err(std::io::Error::other)
 }
 
 /// Runs the real, blocking HTTP server forever against an already-bound
@@ -97,7 +97,11 @@ pub fn run(server: Server, workspace: PathBuf) {
                 );
             }
             "/stats" => {
-                write_json(request, 200, &json!({"workspace": workspace.display().to_string()}));
+                write_json(
+                    request,
+                    200,
+                    &json!({"workspace": workspace.display().to_string()}),
+                );
             }
             _ => {
                 write_json(request, 404, &json!({"error": "not found"}));
@@ -136,7 +140,8 @@ mod tests {
     /// after reading the response, which is all a test needs.
     fn get(port: u16, path: &str) -> (u16, String) {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect must succeed");
-        let request = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        let request =
+            format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
         stream.write_all(request.as_bytes()).unwrap();
         let mut raw = String::new();
         stream.read_to_string(&mut raw).unwrap();
@@ -164,7 +169,11 @@ mod tests {
         use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::SeqCst);
-        let path = std::env::temp_dir().join(format!("hydra-umc-twin-server-test-{}-{}", std::process::id(), n));
+        let path = std::env::temp_dir().join(format!(
+            "hydra-umc-twin-server-test-{}-{}",
+            std::process::id(),
+            n
+        ));
         std::fs::create_dir_all(&path).unwrap();
         path
     }
@@ -198,7 +207,10 @@ mod tests {
             write_manifest(&other_ws, name, "functional");
         }
         let port = start_test_server(default_ws);
-        let (status, body) = get(port, &format!("/family-status?workspace={}", other_ws.display()));
+        let (status, body) = get(
+            port,
+            &format!("/family-status?workspace={}", other_ws.display()),
+        );
         assert_eq!(status, 200);
         assert!(body.contains("\"allPresent\":true"));
     }

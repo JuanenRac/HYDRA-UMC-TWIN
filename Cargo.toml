@@ -1,6 +1,6 @@
 [package]
 name = "hydra-umc-twin"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
 description = "Physics-based Digital Twin engine for safe robotic simulation - integrates PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN."
 authors = ["JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>"]

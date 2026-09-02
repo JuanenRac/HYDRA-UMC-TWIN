@@ -29,6 +29,15 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.5]
+
+- **Fixed CI**: `cargo fmt --check` was failing on `src/main.rs`/
+  `src/server.rs` (unwrapped lines over the 100-column limit), and
+  `cargo clippy -- -D warnings` was failing on `std::io::Error::new(
+  ErrorKind::Other, e)` (now `std::io::Error::other`, clippy's own
+  suggested idiom). No behavior change - `cargo test`: 29/29 passing
+  throughout.
+
 ## [0.0.4] - Real v0: JSON/HTTP server mode, plus CM5 deployment
 
 - **`server.rs`** (new) - `GET /family-status` and `GET /family-sync`

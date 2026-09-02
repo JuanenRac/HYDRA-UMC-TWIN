@@ -145,7 +145,10 @@ fn run_serve(args: &[String]) -> ExitCode {
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
-            eprintln!("[twin] HTTP API listening on {bind_addr} (workspace={})", workspace.display());
+            eprintln!(
+                "[twin] HTTP API listening on {bind_addr} (workspace={})",
+                workspace.display()
+            );
             eprintln!("[twin] GET /family-status, GET /family-sync, GET /stats");
             server::run(bound, workspace);
             ExitCode::SUCCESS
