@@ -77,11 +77,13 @@ HYDRA-UMC-TWIN/
 │   ├── manifest.rs       # 真实的、具防御性的兄弟项目自身清单读取器
 │   ├── family.rs         # 真实的就绪检查 + 综合同步结果
 │   ├── contract.rs       # 真实的状态同步契约（成熟度 + 版本上限）
+│   ├── server.rs         # 简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
 │   └── main.rs           # 入口点 + 真实的 `family-status`/`family-sync` 子命令
 ├── docs/                # 文档与物理调参
 ├── build/               # 构建笔记/产物（cargo 自身的输出位于 target/，已被 gitignore）
 ├── images/              # 媒体与图表
-├── scripts/             # 实用脚本
+├── systemd/
+│   └── hydra-umc-twin.service # 本地 CM5 family-status/sync API 的 systemd 单元
 ├── tools/
 │   ├── build_test.py    # 不递增版本号的构建检查
 │   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验

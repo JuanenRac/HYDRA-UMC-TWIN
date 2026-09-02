@@ -80,11 +80,13 @@ HYDRA-UMC-TWIN/
 │   ├── manifest.rs       # 兄弟プロジェクト自身のマニフェストの実際の防御的リーダー
 │   ├── family.rs         # 実際のレディネスチェック + 統合された同期結果
 │   ├── contract.rs       # 実際の状態同期契約（成熟度 + バージョン上限）
+│   ├── server.rs         # シンプルなJSON/HTTPサーフェス(tiny_http、ブロッキング、非同期ランタイムなし)
 │   └── main.rs           # エントリポイント + 実際の `family-status`/`family-sync` サブコマンド
 ├── docs/                # ドキュメントと物理チューニング
 ├── build/               # ビルドノート/成果物（cargo 自身の出力は target/ にあり、gitignore 対象）
 ├── images/              # メディアと図表
-├── scripts/             # ユーティリティスクリプト
+├── systemd/
+│   └── hydra-umc-twin.service # ローカルCM5 family-status/sync APIのsystemdユニット
 ├── tools/
 │   ├── build_test.py    # バージョンを増やさないビルドチェック
 │   └── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証

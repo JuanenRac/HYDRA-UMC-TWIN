@@ -75,11 +75,13 @@ HYDRA-UMC-TWIN/
 │   ├── manifest.rs       # Lector real y defensivo del manifiesto propio de un hermano
 │   ├── family.rs         # Chequeo real de disponibilidad + resultado de sync combinado
 │   ├── contract.rs       # Contrato real de sync de estado (madurez + techo de version)
+│   ├── server.rs         # Superficie JSON/HTTP plana (tiny_http, bloqueante, sin runtime async)
 │   └── main.rs           # Entry point + subcomandos reales `family-status`/`family-sync`
 ├── docs/                # Documentación y ajuste de física
 ├── build/               # Notas/artefactos de build (la salida real de cargo vive en target/, en .gitignore)
 ├── images/              # Medios y diagramas
-├── scripts/             # Scripts de utilidad
+├── systemd/
+│   └── hydra-umc-twin.service # Unidad systemd de la API local de family-status/sync en la CM5
 ├── tools/
 │   ├── build_test.py    # Comprobación de compilación sin versionado
 │   └── ci_validate.py   # Validación de manifiesto/CHANGELOG/docs usada por CI
