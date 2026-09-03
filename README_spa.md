@@ -125,9 +125,9 @@ run.bat family-status
 
 ```text
 Digital Twin family status (workspace: /ruta/a/GitHub):
-  HYDRA-UMC-PHYSICS-REPLICA: v0.0.2, maturity=functional, role=library
-  HYDRA-UMC-HIL-BRIDGE: v0.0.1, maturity=scaffolding, role=service
-  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.4, maturity=functional, role=tool
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.3, maturity=established, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.5, maturity=established, role=service
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.6, maturity=established, role=tool
 
 All 3 children present.
 ```
