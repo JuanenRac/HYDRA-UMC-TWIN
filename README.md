@@ -27,12 +27,13 @@ Built using Rust and the Bevy engine, it directly consumes URDF models from the 
 ### Key Features:
 * 🧩 **Family Readiness Check (v0):** the real `family-status` subcommand reads each of the 3 real children's own `hydra-umc.project.json` and reports presence/version/maturity/role - honest for an integration hub that runs no engine itself yet. See "Honesty check" below.
 * 🔒 **Real v0 - State-Sync Contract:** `family-sync` gates each child on a real, testable contract - minimum maturity (`functional`) and a maximum compatible major version - before ever treating it as sync-ready, refusing an immature or incompatible-version child with a real reason instead of syncing against an unverified state shape.
+* 🔌 **HTTP JSON API (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PATH]` (default `127.0.0.1:8111`) exposes the exact same family-status/family-sync logic over `GET /family-status`, `GET /family-sync`, `GET /stats` via a real blocking `tiny_http` server - the same binary a deployed CM5's `systemd/hydra-umc-twin.service` unit runs (loopback-only). See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full contract.
 * 🌐 **Full Factory Simulation (planned):** replicates robots, tools, and the environment in a unified 3D space - depends on the real Bevy engine integration.
 * ⚡ **Hardware-in-the-Loop (HIL) (planned):** connect Apps and Studios to the simulator as if it were a real controller.
 * 📊 **Wear Prediction (planned):** estimates component lifespan based on simulated mechanical stress.
 * 🛡️ **Safety Validation (planned):** test complex trajectories and collision avoidance before physical execution.
 
-**Honesty check - what actually runs today:** bare invocation still prints identity/version/role, but there are now two real subcommands. `family-status [--workspace PATH]` reads `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN`'s own real manifests from a local checkout and reports what it honestly finds. `family-sync [--workspace PATH]` goes one step further: it runs each present child through a real state-sync contract (minimum maturity `functional`, maximum compatible major version) and reports `READY`, `REJECTED (immature)`, `REJECTED (incompatible version)`, or `MISSING` per child. No Bevy app, no rendering, no physics tick loop, no URDF scene loading, and no actual network sync transport exists yet - see [`CHANGELOG.md`](CHANGELOG.md) for exactly what shipped, and the Roadmap below for what's still ahead.
+**Honesty check - what actually runs today:** bare invocation still prints identity/version/role, but there are now three real subcommands. `family-status [--workspace PATH]` reads `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN`'s own real manifests from a local checkout and reports what it honestly finds. `family-sync [--workspace PATH]` goes one step further: it runs each present child through a real state-sync contract (minimum maturity `functional`, maximum compatible major version) and reports `READY`, `REJECTED (immature)`, `REJECTED (incompatible version)`, or `MISSING` per child. `serve` exposes both over real HTTP JSON instead of one-shot CLI invocations. No Bevy app, no rendering, no physics tick loop, no URDF scene loading, and no actual network sync transport exists yet - see [`CHANGELOG.md`](CHANGELOG.md) for exactly what shipped, [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for every command/endpoint, and the Roadmap below for what's still ahead.
 
 ---
 
@@ -254,6 +255,7 @@ This project is part of the HYDRA-UMC robotics ecosystem by the same author (Jua
 
 ## 📚 Documentation & Community
 
+- **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — every `family-status`/`family-sync`/`serve` invocation, real output captured from a built release binary, the exit-code table, and the `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP JSON contract.
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — tech stack and coding guidelines for a pull request.
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — the standards of behavior expected in this community.
 - **[SECURITY.md](SECURITY.md)** — how to report a vulnerability, and this project's own real security focus areas.

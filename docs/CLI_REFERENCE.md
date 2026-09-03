@@ -116,12 +116,50 @@ specific gate that failed (see `src/contract.rs`'s `assess()`); this
 machine's real siblings are all `established` at major version `0`, so none
 of those rejection paths could be captured from a real run today.
 
+## `serve [--addr ADDR] [--port PORT] [--workspace PATH]`
+
+Starts a real, blocking HTTP JSON server (`src/server.rs`, `tiny_http`, no
+async runtime) that exposes the exact same `check_family_status()`/
+`assess_family_sync()` logic the `family-status`/`family-sync`
+subcommands run above — closes the "only reachable as a one-shot CLI
+invocation" gap. `ADDR` defaults to `127.0.0.1`, `PORT` to `8111`,
+`WORKSPACE` to this repo's own parent directory (same default as the
+other two subcommands). This is the same binary
+`systemd/hydra-umc-twin.service` runs on a deployed CM5
+(`hydra-umc-twin serve --addr 127.0.0.1 --port 8111 --workspace /opt/hydra-umc/twin/workspace`).
+
+```
+$ hydra-umc-twin serve --addr 127.0.0.1 --port 8111
+[twin] HTTP API listening on 127.0.0.1:8111 (workspace=C:\Users\juane\Documents\GitHub)
+[twin] GET /family-status, GET /family-sync, GET /stats
+```
+
+**`GET /family-status`** and **`GET /family-sync`** — same real check as
+the CLI subcommands, as JSON; both accept an optional `?workspace=` query
+parameter that overrides the server's own default for that one request:
+
+```bash
+$ curl http://127.0.0.1:8111/family-status
+{"allPresent":true,"children":[{"manifest":{"maturity":"established","name":"HYDRA-UMC-PHYSICS-REPLICA","role":"library","version":"0.0.3"},"name":"HYDRA-UMC-PHYSICS-REPLICA"},...],"workspace":"C:\\Users\\juane\\Documents\\GitHub"}
+```
+
+Both always answer HTTP `200` for a well-formed `GET` — a child being
+missing or contract-rejected is real data in the response body
+(`allPresent`/`allReady: false`), not an HTTP-level error.
+
+**`GET /stats`** — `{"workspace": "<the server's own default workspace>"}`, `200`.
+
+Any other path, or any non-`GET` request, is `404`. There is no
+authentication — same as every other loopback-only internal API on the
+CM5 (see the systemd unit's own hardening for what it relies on instead).
+
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | ok — `family-status`: every expected child is present; `family-sync`: every expected child is sync-ready |
 | `1` | `family-status`: at least one expected child is missing; `family-sync`: at least one expected child is missing or rejected by the sync contract |
+| `2` | `serve`: the HTTP server failed to bind the requested address/port |
 
 ## Not yet wired in
 

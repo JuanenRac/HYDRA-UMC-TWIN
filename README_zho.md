@@ -30,12 +30,13 @@
 ### 关键特性：
 * 🧩 **家族就绪检查（v0）：** 真实的 `family-status` 子命令读取 3 个真实子项目各自真实的 `hydra-umc.project.json`，报告其是否存在/版本/成熟度/角色——对于一个自身尚未运行任何引擎的集成中枢来说，这是诚实的。详见下方"诚实说明"。
 * 🔒 **真实 v0 —— 状态同步契约：** `family-sync` 会先用一份真实、可测试的契约筛选每个子项目——最低成熟度（`functional`）和一个兼容的最高主版本号——然后才会将其视为可同步，对不成熟或版本不兼容的子项目给出真实理由并予以拒绝，而不是对着一个未经验证的状态形态直接同步。
+* 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace 路径]`（默认 `127.0.0.1:8111`）通过一个真实的阻塞式 `tiny_http` 服务器，把同样的 family-status/family-sync 逻辑以 `GET /family-status`、`GET /family-sync`、`GET /stats` 的形式对外提供——与部署到 CM5 上的 `systemd/hydra-umc-twin.service` 单元运行的是同一个二进制文件（仅限回环地址）。完整契约见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 🌐 **完整工厂仿真（计划中）：** 在统一的 3D 空间中复制机器人、工具和环境——依赖于先有真实的 Bevy 引擎集成。
 * ⚡ **硬件在环（HIL）（计划中）：** 将应用程序和 Studio 连接到仿真器，就像连接到真实控制器一样。
 * 📊 **磨损预测（计划中）：** 基于模拟的机械应力估算组件寿命。
 * 🛡️ **安全验证（计划中）：** 在物理执行之前测试复杂轨迹和避碰。
 
-**诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在有两个真实的子命令。`family-status [--workspace 路径]` 从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。`family-sync [--workspace 路径]` 更进一步：它会让每个已存在的子项目通过一份真实的状态同步契约（最低成熟度 `functional`、兼容的最高主版本号），并为每个子项目报告 `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)` 或 `MISSING`。目前还没有任何 Bevy 应用、渲染、物理帧循环、URDF 场景加载，也没有任何真实的网络同步传输层——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的内容请参见下方路线图。
+**诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在有三个真实的子命令。`family-status [--workspace 路径]` 从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。`family-sync [--workspace 路径]` 更进一步：它会让每个已存在的子项目通过一份真实的状态同步契约（最低成熟度 `functional`、兼容的最高主版本号），并为每个子项目报告 `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)` 或 `MISSING`。`serve` 则把两者都以真实的 HTTP JSON 形式对外提供，而不再局限于一次性的 CLI 调用。目前还没有任何 Bevy 应用、渲染、物理帧循环、URDF 场景加载，也没有任何真实的网络同步传输层——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，每个命令/端点请参见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)，尚待完成的内容请参见下方路线图。
 
 ---
 
@@ -271,6 +272,7 @@ Not every child is sync-ready - see the lines above.
 
 ## 📚 文档与社区
 
+- **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — 每一个 `family-status`/`family-sync`/`serve` 调用、从真实构建的发布版二进制文件中获取的真实输出、退出码表，以及 `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP JSON 契约。
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** —— 提交 Pull Request 所需的技术栈和编码规范。
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** —— 本社区所期望的行为准则。
 - **[SECURITY.md](SECURITY.md)** —— 如何报告漏洞，以及本项目真实的安全关注重点。

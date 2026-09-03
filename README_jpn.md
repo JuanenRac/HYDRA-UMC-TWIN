@@ -32,12 +32,13 @@ Rust と Bevy エンジンを用いて構築されており、EDITOR からの U
 ### 主な機能：
 * 🧩 **ファミリーレディネスチェック（v0）：** 実際の `family-status` サブコマンドが 3 つの実際の子プロジェクトそれぞれの実際の `hydra-umc.project.json` を読み取り、存在/バージョン/成熟度/役割を報告します——自分自身はまだ何のエンジンも動かしていない統合ハブとして正直な機能です。下記「正直な現状確認」を参照してください。
 * 🔒 **実装済み v0 —— 状態同期契約：** `family-sync` は、各子プロジェクトを同期可能とみなす前に、実際のテスト可能な契約——最低成熟度（`functional`）と互換性のある最大メジャーバージョン——でふるいにかけ、未成熟またはバージョン非互換の子プロジェクトを、検証されていない状態形状に対して同期する代わりに、実際の理由とともに拒否します。
+* 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace パス]`（デフォルト `127.0.0.1:8111`）は、同じ family-status/family-sync ロジックを、実際のブロッキング `tiny_http` サーバー経由で `GET /family-status`、`GET /family-sync`、`GET /stats` として公開します——デプロイされた CM5 の `systemd/hydra-umc-twin.service` ユニットが実行するのと同じバイナリです（ループバックのみ）。完全な契約は [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 * 🌐 **完全な工場シミュレーション（計画中）：** ロボット、工具、環境を統一された 3D 空間内で複製します——まず実際の Bevy エンジン統合が存在することが前提です。
 * ⚡ **ハードウェア・イン・ザ・ループ（HIL）（計画中）：** アプリと Studio を、あたかも実際のコントローラーであるかのようにシミュレーターに接続します。
 * 📊 **摩耗予測（計画中）：** シミュレートされた機械的応力に基づいてコンポーネントの寿命を推定します。
 * 🛡️ **安全検証（計画中）：** 物理的な実行の前に、複雑な軌道と衝突回避をテストします。
 
-**正直な現状確認 —— 今日実際に動くもの：** 引数なしの呼び出しは引き続き識別情報/バージョン/役割を表示しますが、今では実際のサブコマンドが 2 つあります。`family-status [--workspace パス]` はローカルチェックアウトから `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` それぞれの実際のマニフェストを読み取り、見つけたものを正直に報告します。`family-sync [--workspace パス]` はさらに一歩進みます——存在する各子プロジェクトを実際の状態同期契約（最低成熟度 `functional`、互換性のある最大メジャーバージョン）にかけ、子プロジェクトごとに `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)`、または `MISSING` を報告します。Bevy アプリ、レンダリング、物理ティックループ、URDF シーンの読み込み、そして実際のネットワーク同期トランスポートは、まだ何も存在しません——実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている作業は下記のロードマップを参照してください。
+**正直な現状確認 —— 今日実際に動くもの：** 引数なしの呼び出しは引き続き識別情報/バージョン/役割を表示しますが、今では実際のサブコマンドが 3 つあります。`family-status [--workspace パス]` はローカルチェックアウトから `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` それぞれの実際のマニフェストを読み取り、見つけたものを正直に報告します。`family-sync [--workspace パス]` はさらに一歩進みます——存在する各子プロジェクトを実際の状態同期契約（最低成熟度 `functional`、互換性のある最大メジャーバージョン）にかけ、子プロジェクトごとに `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)`、または `MISSING` を報告します。`serve` は、一度きりの CLI 呼び出しの代わりに、両方を実際の HTTP JSON 経由でも公開します。Bevy アプリ、レンダリング、物理ティックループ、URDF シーンの読み込み、そして実際のネットワーク同期トランスポートは、まだ何も存在しません——実際に出荷済みの内容は [`CHANGELOG.md`](CHANGELOG.md) を、すべてのコマンド/エンドポイントは [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を、まだ残っている作業は下記のロードマップを参照してください。
 
 ---
 
@@ -285,6 +286,7 @@ v0 ではマニフェストを読み取るための `serde`/`serde_json` のみ�
 
 ## 📚 ドキュメント & コミュニティ
 
+- **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — すべての `family-status`/`family-sync`/`serve` 呼び出し、ビルド済みリリースバイナリから実際に取得した出力、終了コード表、そして `GET /family-status`/`GET /family-sync`/`GET /stats` の HTTP JSON 契約。
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** —— プルリクエストのための技術スタックとコーディング指針。
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** —— このコミュニティで期待される行動規範。
 - **[SECURITY.md](SECURITY.md)** —— 脆弱性の報告方法と、このプロジェクトの実際のセキュリティ重点領域。
