@@ -42,6 +42,33 @@ fn query_param(url: &str, key: &str) -> Option<String> {
     None
 }
 
+/// Resolves a caller-supplied `?workspace=` override, or `None` if the
+/// request didn't pass one at all (the real default `workspace` applies
+/// then, unchanged). Found in an ecosystem-wide software-improvements
+/// audit: this override used to go straight to the filesystem reader
+/// with no validation at all - a typo'd or bogus path silently produced
+/// the exact same response as a real, empty family ("allPresent":
+/// false), with no way for an operator to tell "you gave me a bad path"
+/// from "the family genuinely isn't checked out here". Pointing this
+/// loopback-only internal API at a whole other real checkout root is a
+/// deliberate, tested feature (see the test below) - not something this
+/// closes - so this canonicalizes the override (resolving `..`/symlinks,
+/// same as the rest of this ecosystem's path-handling) and requires it
+/// to actually exist and be a real directory, returning a clear error
+/// instead of a misleading "everything missing" for anything else.
+fn resolve_workspace_override(url: &str) -> Result<Option<PathBuf>, String> {
+    let Some(raw) = query_param(url, "workspace") else {
+        return Ok(None);
+    };
+    let canonical = PathBuf::from(&raw)
+        .canonicalize()
+        .map_err(|_| format!("workspace override does not exist or is not accessible: {raw}"))?;
+    if !canonical.is_dir() {
+        return Err(format!("workspace override is not a directory: {raw}"));
+    }
+    Ok(Some(canonical))
+}
+
 /// Binds the real listening socket, split out from `run()` so a test can
 /// bind an OS-assigned port (`"127.0.0.1:0"`), read the real port back
 /// via `Server::server_addr()`, and only then start serving - without
@@ -65,9 +92,14 @@ pub fn run(server: Server, workspace: PathBuf) {
             continue;
         }
 
-        let effective_workspace = query_param(&url, "workspace")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| workspace.clone());
+        let effective_workspace = match resolve_workspace_override(&url) {
+            Ok(Some(resolved)) => resolved,
+            Ok(None) => workspace.clone(),
+            Err(message) => {
+                write_json(request, 400, &json!({"error": message}));
+                continue;
+            }
+        };
 
         match path.as_str() {
             "/family-status" => {
@@ -213,6 +245,37 @@ mod tests {
         );
         assert_eq!(status, 200);
         assert!(body.contains("\"allPresent\":true"));
+    }
+
+    #[test]
+    fn family_status_rejects_a_nonexistent_workspace_override_with_a_clear_error() {
+        // Found in an ecosystem-wide software-improvements audit: a
+        // bogus/typo'd ?workspace= used to silently produce the exact
+        // same response as a real, empty family - "allPresent": false -
+        // with no way to tell a bad path from a genuinely missing family.
+        let default_ws = tempdir();
+        let port = start_test_server(default_ws);
+        let bogus = std::env::temp_dir().join("hydra-umc-twin-this-path-does-not-exist-at-all");
+        let (status, body) = get(
+            port,
+            &format!("/family-status?workspace={}", bogus.display()),
+        );
+        assert_eq!(status, 400);
+        assert!(body.contains("does not exist"));
+    }
+
+    #[test]
+    fn family_status_rejects_a_workspace_override_that_is_a_file_not_a_directory() {
+        let default_ws = tempdir();
+        let file_path = default_ws.join("not-a-directory.txt");
+        std::fs::write(&file_path, b"just a file").unwrap();
+        let port = start_test_server(default_ws);
+        let (status, body) = get(
+            port,
+            &format!("/family-status?workspace={}", file_path.display()),
+        );
+        assert_eq!(status, 400);
+        assert!(body.contains("not a directory"));
     }
 
     #[test]

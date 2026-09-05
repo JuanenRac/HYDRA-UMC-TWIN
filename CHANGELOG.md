@@ -20,6 +20,20 @@ semantic-versioning judgment calls:
 
 ## Unreleased - strict child manifest versions
 
+- **`server.rs`'s `?workspace=` override is now validated** (new
+  `resolve_workspace_override()`) - found in an ecosystem-wide
+  software-improvements audit: it used to go straight to the filesystem
+  reader with no validation at all, so a typo'd or bogus path silently
+  produced the exact same response as a real, empty family
+  (`"allPresent": false`) - no way for an operator to tell "you gave me
+  a bad path" from "the family genuinely isn't checked out here".
+  Pointing this loopback-only internal API at a whole other real
+  checkout root stays a deliberate, tested feature - this closes the gap
+  by canonicalizing the override (resolving `..`/symlinks) and requiring
+  it to actually exist and be a real directory, returning a clear 400
+  for anything else instead of a misleading "everything missing". New
+  regression tests cover both a nonexistent path and one that's a file,
+  not a directory.
 - The state-sync gate now requires a complete numeric `MAJOR.MINOR.PATCH`
   child version before it assesses compatibility. Incomplete, extra-component
   or non-numeric versions fail as unparseable instead of being accepted from
