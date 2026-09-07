@@ -1,0 +1,34 @@
+# =============================================================================
+# HYDRA-UMC-TWIN - Local CM5 family-status/family-sync API systemd unit
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# --workspace points at a real root:root 0755 tree under /opt (see
+# install_twin.sh) holding just this node's real children's own
+# hydra-umc.project.json files - same real permission lesson learned
+# installing HYDRA-UMC-VISION-NODE (a symlink to the real sibling-repo
+# checkout root would be unreadable by this service's own unprivileged
+# account, since that root lives under the operator's home directory,
+# 0700 by Debian's own default).
+[Unit]
+Description=HYDRA-UMC-TWIN real family-status/family-sync API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hydra-umc-twin
+Group=hydra-umc-twin
+WorkingDirectory=/opt/hydra-umc/twin
+ExecStart=/opt/hydra-umc/twin/hydra-umc-twin serve --addr 127.0.0.1 --port 8111 --workspace /opt/hydra-umc/twin/workspace
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
