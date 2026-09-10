@@ -25,7 +25,7 @@ Bare invocation (no arguments) prints identity/version/role and exits `0`:
 
 ```
 $ hydra-umc-twin
-HYDRA-UMC-TWIN v0.0.3
+HYDRA-UMC-TWIN v0.0.5
 Physics-based Digital Twin engine for safe robotic simulation (integration parent).
 ```
 
