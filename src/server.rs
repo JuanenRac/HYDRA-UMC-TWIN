@@ -44,8 +44,8 @@ fn query_param(url: &str, key: &str) -> Option<String> {
 
 /// Resolves a caller-supplied `?workspace=` override, or `None` if the
 /// request didn't pass one at all (the real default `workspace` applies
-/// then, unchanged). Found in an ecosystem-wide software-improvements
-/// audit: this override used to go straight to the filesystem reader
+/// then, unchanged). Found while auditing the code: this override used to
+/// go straight to the filesystem reader
 /// with no validation at all - a typo'd or bogus path silently produced
 /// the exact same response as a real, empty family ("allPresent":
 /// false), with no way for an operator to tell "you gave me a bad path"
@@ -249,8 +249,8 @@ mod tests {
 
     #[test]
     fn family_status_rejects_a_nonexistent_workspace_override_with_a_clear_error() {
-        // Found in an ecosystem-wide software-improvements audit: a
-        // bogus/typo'd ?workspace= used to silently produce the exact
+        // Found while auditing the code: a bogus/typo'd ?workspace=
+        // used to silently produce the exact
         // same response as a real, empty family - "allPresent": false -
         // with no way to tell a bad path from a genuinely missing family.
         let default_ws = tempdir();
