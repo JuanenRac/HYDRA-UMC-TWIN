@@ -21,8 +21,8 @@ semantic-versioning judgment calls:
 ## Unreleased - strict child manifest versions
 
 - **`server.rs`'s `?workspace=` override is now validated** (new
-  `resolve_workspace_override()`) - found in an ecosystem-wide
-  software-improvements audit: it used to go straight to the filesystem
+  `resolve_workspace_override()`) - found while auditing
+  the code: it used to go straight to the filesystem
   reader with no validation at all, so a typo'd or bogus path silently
   produced the exact same response as a real, empty family
   (`"allPresent": false`) - no way for an operator to tell "you gave me
