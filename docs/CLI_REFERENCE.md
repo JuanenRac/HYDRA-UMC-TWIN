@@ -6,9 +6,9 @@ Twin's integration-parent role, not a physics/rendering engine itself yet:
 against its 3 real children (`src/family.rs`), reading each child's own
 `hydra-umc.project.json` manifest rather than a second hand-maintained list.
 Every example below was captured from a real, built release binary, run
-against this machine's real sibling checkouts under
-`C:\Users\juane\Documents\GitHub` — the output shown is real, not
-illustrative.
+against a real sibling-checkout workspace (`<workspace-root>` below
+stands for that real absolute path, not a placeholder value the binary
+itself prints) — the output shown is real, not illustrative.
 
 ## Usage
 
@@ -54,7 +54,7 @@ real reported version/maturity/role — read live from that child's own
 
 ```
 $ hydra-umc-twin family-status
-Digital Twin family status (workspace: C:\Users\juane\Documents\GitHub):
+Digital Twin family status (workspace: <workspace-root>):
   HYDRA-UMC-PHYSICS-REPLICA: v0.0.3, maturity=established, role=library
   HYDRA-UMC-HIL-BRIDGE: v0.0.3, maturity=established, role=service
   HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.5, maturity=established, role=tool
@@ -88,7 +88,7 @@ this ecosystem is still pre-1.0).
 
 ```
 $ hydra-umc-twin family-sync
-Digital Twin family sync contract (workspace: C:\Users\juane\Documents\GitHub):
+Digital Twin family sync contract (workspace: <workspace-root>):
   HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=established)
   HYDRA-UMC-HIL-BRIDGE: READY (v0.0.3, maturity=established)
   HYDRA-UMC-SYNTHETIC-DATA-GEN: READY (v0.0.5, maturity=established)
@@ -130,7 +130,7 @@ other two subcommands). This is the same binary
 
 ```
 $ hydra-umc-twin serve --addr 127.0.0.1 --port 8111
-[twin] HTTP API listening on 127.0.0.1:8111 (workspace=C:\Users\juane\Documents\GitHub)
+[twin] HTTP API listening on 127.0.0.1:8111 (workspace=<workspace-root>)
 [twin] GET /family-status, GET /family-sync, GET /stats
 ```
 
@@ -140,7 +140,7 @@ parameter that overrides the server's own default for that one request:
 
 ```bash
 $ curl http://127.0.0.1:8111/family-status
-{"allPresent":true,"children":[{"manifest":{"maturity":"established","name":"HYDRA-UMC-PHYSICS-REPLICA","role":"library","version":"0.0.3"},"name":"HYDRA-UMC-PHYSICS-REPLICA"},...],"workspace":"C:\\Users\\juane\\Documents\\GitHub"}
+{"allPresent":true,"children":[{"manifest":{"maturity":"established","name":"HYDRA-UMC-PHYSICS-REPLICA","role":"library","version":"0.0.3"},"name":"HYDRA-UMC-PHYSICS-REPLICA"},...],"workspace":"<workspace-root>"}
 ```
 
 Both always answer HTTP `200` for a well-formed `GET` — a child being
