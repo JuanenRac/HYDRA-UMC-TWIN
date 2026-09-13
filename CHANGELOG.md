@@ -41,6 +41,13 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.6] - H047: no more personal absolute paths in public docs
+
+- `docs/CLI_REFERENCE.md`'s own real captured CLI/HTTP output examples
+  named this machine's real local checkout path outright
+  (`C:\Users\juane\Documents\GitHub`) - replaced with `<workspace-root>`
+  throughout, keeping every example's actual output format unchanged.
+
 ## [0.0.5]
 
 - **Fixed CI**: `cargo fmt --check` was failing on `src/main.rs`/
