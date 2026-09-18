@@ -56,7 +56,16 @@ fn query_param(url: &str, key: &str) -> Option<String> {
 /// same as the rest of this ecosystem's path-handling) and requires it
 /// to actually exist and be a real directory, returning a clear error
 /// instead of a misleading "everything missing" for anything else.
-fn resolve_workspace_override(url: &str) -> Result<Option<PathBuf>, String> {
+/// `strict_root`, when set, additionally requires the resolved override
+/// to be the root itself or a real subdirectory of it - a deliberate,
+/// OPT-IN production hardening flag (`--strict-workspace-root`, see
+/// main.rs), never the default. Unset, `?workspace=` keeps pointing at
+/// any real, existing directory the process can read, exactly the
+/// tested, documented behavior above - this never changes that default.
+fn resolve_workspace_override(
+    url: &str,
+    strict_root: Option<&std::path::Path>,
+) -> Result<Option<PathBuf>, String> {
     let Some(raw) = query_param(url, "workspace") else {
         return Ok(None);
     };
@@ -65,6 +74,15 @@ fn resolve_workspace_override(url: &str) -> Result<Option<PathBuf>, String> {
         .map_err(|_| format!("workspace override does not exist or is not accessible: {raw}"))?;
     if !canonical.is_dir() {
         return Err(format!("workspace override is not a directory: {raw}"));
+    }
+    if let Some(root) = strict_root {
+        if !canonical.starts_with(root) {
+            return Err(format!(
+                "workspace override {} is outside the configured --strict-workspace-root {}",
+                canonical.display(),
+                root.display()
+            ));
+        }
     }
     Ok(Some(canonical))
 }
@@ -81,8 +99,10 @@ pub fn bind(addr: &str) -> std::io::Result<Server> {
 /// Runs the real, blocking HTTP server forever against an already-bound
 /// `server`. `workspace` is the default `check_family_status()`/
 /// `assess_family_sync()` target when a request doesn't override it via
-/// `?workspace=`.
-pub fn run(server: Server, workspace: PathBuf) {
+/// `?workspace=`. `strict_root`, when set, also bounds every
+/// `?workspace=` override to that root - see `resolve_workspace_override()`'s
+/// own doc comment.
+pub fn run(server: Server, workspace: PathBuf, strict_root: Option<PathBuf>) {
     for request in server.incoming_requests() {
         let url = request.url().to_string();
         let path = url.split('?').next().unwrap_or("").to_string();
@@ -92,7 +112,7 @@ pub fn run(server: Server, workspace: PathBuf) {
             continue;
         }
 
-        let effective_workspace = match resolve_workspace_override(&url) {
+        let effective_workspace = match resolve_workspace_override(&url, strict_root.as_deref()) {
             Ok(Some(resolved)) => resolved,
             Ok(None) => workspace.clone(),
             Err(message) => {
@@ -157,13 +177,17 @@ mod tests {
     /// HTTP client crate is a dependency here (matching this module's
     /// own "minimal, no extra deps" reasoning for picking `tiny_http`).
     fn start_test_server(workspace: PathBuf) -> u16 {
+        start_test_server_strict(workspace, None)
+    }
+
+    fn start_test_server_strict(workspace: PathBuf, strict_root: Option<PathBuf>) -> u16 {
         let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
         let port = server
             .server_addr()
             .to_ip()
             .expect("tiny_http always binds a real IP socket for an http:// server")
             .port();
-        thread::spawn(move || run(server, workspace));
+        thread::spawn(move || run(server, workspace, strict_root));
         port
     }
 
@@ -262,6 +286,51 @@ mod tests {
         );
         assert_eq!(status, 400);
         assert!(body.contains("does not exist"));
+    }
+
+    #[test]
+    fn strict_workspace_root_allows_an_override_inside_the_root() {
+        let root = tempdir().canonicalize().unwrap();
+        let child_ws = root.join("checkout-a");
+        std::fs::create_dir_all(&child_ws).unwrap();
+        for name in crate::family::EXPECTED_CHILDREN {
+            write_manifest(&child_ws, name, "functional");
+        }
+        let default_ws = tempdir();
+        let port = start_test_server_strict(default_ws, Some(root));
+        let (status, body) = get(
+            port,
+            &format!("/family-status?workspace={}", child_ws.display()),
+        );
+        assert_eq!(status, 200);
+        assert!(body.contains("\"allPresent\":true"));
+    }
+
+    #[test]
+    fn strict_workspace_root_rejects_an_override_outside_the_root() {
+        let root = tempdir().canonicalize().unwrap();
+        let outside_ws = tempdir(); // a real, existing directory - just not under root
+        let default_ws = tempdir();
+        let port = start_test_server_strict(default_ws, Some(root));
+        let (status, body) = get(
+            port,
+            &format!("/family-status?workspace={}", outside_ws.display()),
+        );
+        assert_eq!(status, 400);
+        assert!(body.contains("outside the configured --strict-workspace-root"));
+    }
+
+    #[test]
+    fn strict_workspace_root_does_not_affect_the_default_workspace_when_unset() {
+        // The override rejection above must never apply to the SERVER'S
+        // OWN default workspace, only to a caller-supplied ?workspace=
+        // override - a request with no override at all must still work
+        // normally even when --strict-workspace-root is configured.
+        let root = tempdir().canonicalize().unwrap();
+        let default_ws = tempdir(); // deliberately outside root
+        let port = start_test_server_strict(default_ws, Some(root));
+        let (status, _body) = get(port, "/family-status");
+        assert_eq!(status, 200);
     }
 
     #[test]

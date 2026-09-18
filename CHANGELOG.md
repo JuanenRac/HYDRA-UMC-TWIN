@@ -18,8 +18,17 @@ semantic-versioning judgment calls:
 
 ---
 
-## Unreleased - strict child manifest versions
+## [0.0.7] - Opt-in --strict-workspace-root, plus strict child manifest versions
 
+- **`--strict-workspace-root PATH`** (new, opt-in) - unset, `?workspace=`
+  keeps pointing at any real, existing directory the process can read
+  (the deliberate, tested behavior above, unchanged). Set, every
+  override must resolve inside `PATH` or the request gets a `400` naming
+  exactly that - a real production-hardening option for a deployment
+  that wants this loopback-only API bounded to one real checkout root,
+  without removing the override's own dev/test flexibility as the
+  default. A `PATH` that doesn't exist is a loud startup error, not a
+  silent always-reject. 3 new tests.
 - **`server.rs`'s `?workspace=` override is now validated** (new
   `resolve_workspace_override()`) - found while auditing
   the code: it used to go straight to the filesystem
