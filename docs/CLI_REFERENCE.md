@@ -153,6 +153,25 @@ Any other path, or any non-`GET` request, is `404`. There is no
 authentication — same as every other loopback-only internal API on the
 CM5 (see the systemd unit's own hardening for what it relies on instead).
 
+### `--strict-workspace-root PATH` (opt-in)
+
+Unset (the default), `?workspace=` can point at any real, existing
+directory the process can read — a deliberate, tested feature for
+pointing this loopback-only API at a different real checkout root (e.g.
+comparing two working trees during development). Set, every
+`?workspace=` override must resolve inside `PATH` (the root itself or a
+real subdirectory of it) or the request gets a `400` naming exactly
+that. A `PATH` that doesn't exist is a real, loud startup error (exit
+`2`), not a silent always-reject once the server is already listening.
+This never changes the server's own *default* workspace (the one
+`--workspace` sets) — only what a caller-supplied override is allowed to
+point at.
+
+```bash
+$ hydra-umc-twin serve --workspace /opt/hydra-umc/twin/workspace --strict-workspace-root /opt/hydra-umc/twin/workspace
+[twin] --strict-workspace-root set: ?workspace= overrides are bounded to /opt/hydra-umc/twin/workspace
+```
+
 ## Exit codes
 
 | Code | Meaning |

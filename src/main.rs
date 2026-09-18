@@ -141,6 +141,24 @@ fn run_serve(args: &[String]) -> ExitCode {
     let workspace: PathBuf = find_flag(args, "--workspace")
         .map(PathBuf::from)
         .unwrap_or_else(default_workspace);
+    // Opt-in production hardening: unset (the default), a `?workspace=`
+    // override can point at any real directory the process can read -
+    // the deliberate, tested behavior this API has always had, kept
+    // unchanged. Set, every override must resolve inside this root -
+    // see server.rs's own resolve_workspace_override() for the full
+    // rationale. Canonicalized at startup, not per-request: a root that
+    // doesn't exist is a real, loud startup error, not a silent
+    // always-reject once the server is already listening.
+    let strict_root: Option<PathBuf> = match find_flag(args, "--strict-workspace-root") {
+        Some(raw) => match PathBuf::from(&raw).canonicalize() {
+            Ok(canonical) => Some(canonical),
+            Err(e) => {
+                eprintln!("[twin] fatal: --strict-workspace-root {raw} does not exist or is not accessible: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
 
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
@@ -149,8 +167,12 @@ fn run_serve(args: &[String]) -> ExitCode {
                 "[twin] HTTP API listening on {bind_addr} (workspace={})",
                 workspace.display()
             );
+            match &strict_root {
+                Some(root) => eprintln!("[twin] --strict-workspace-root set: ?workspace= overrides are bounded to {}", root.display()),
+                None => eprintln!("[twin] --strict-workspace-root not set: ?workspace= overrides may point at any real, readable directory"),
+            }
             eprintln!("[twin] GET /family-status, GET /family-sync, GET /stats");
-            server::run(bound, workspace);
+            server::run(bound, workspace, strict_root);
             ExitCode::SUCCESS
         }
         Err(e) => {
