@@ -55,7 +55,7 @@ flowchart TB
 
 * **Warum diese Engine keine `hardware/`/`firmware/`/`os/`-Ordner hat.** Reine Software ohne eigene Platine; Quellordner werden nur aufgenommen, wenn ihre Implementierung sie erfordert.
 * **Warum `Cargo.toml` bewusst noch keine Bevy-Abhängigkeit hat.** Bevy ist eine schwere Grafik-Engine - lange Kompilierzeiten, benötigt eine GPU-/Grafik-Toolchain, die nicht immer verfügbar ist. v0 hat nur `serde`/`serde_json` hinzugefügt (zum Lesen der Manifeste der Kinder) - die echte Rendering-Arbeit wartet weiterhin darauf, dass eine echte GPU-/Grafik-Toolchain existiert, gegen die kompiliert werden kann.
-* **Warum `docker-compose.yml` existiert, bevor seine 3 Kinder ein Dockerfile haben.** Den Integrationsvertrag jetzt zu entscheiden und zu dokumentieren (welcher Dienst von welchem abhängt, welche Device-/Volume-Mounts jeder benötigt) verhindert, dass diese Form später ad hoc erfunden wird, auch wenn `docker compose up` erst vollständig gelingen kann, wenn jedes Kind sein eigenes Dockerfile veröffentlicht.
+* **Warum `docker-compose.blueprint.yml` existiert, bevor seine 3 Kinder ein Dockerfile haben.** Den Integrationsvertrag jetzt zu entscheiden und zu dokumentieren (welcher Dienst von welchem abhängt, welche Device-/Volume-Mounts jeder benötigt) verhindert, dass diese Form später ad hoc erfunden wird, auch wenn `docker compose up` erst vollständig gelingen kann, wenn jedes Kind sein eigenes Dockerfile veröffentlicht.
 * **Wie sich das ins restliche Ökosystem einfügt.** Der Integrations-Elternteil der Digital-Twin-&-Simulation-Familie - HYDRA-UMC-PHYSICS-REPLICA liefert ihm einen echten Physik-Solver, HYDRA-UMC-HIL-BRIDGE lässt echte Apps ihn steuern, als wäre er Hardware, und HYDRA-UMC-SYNTHETIC-DATA-GEN rendert Trainingsdatensätze über seine eigene Engine.
 * **Warum `family-status` das eigene Manifest jedes Kindes liest, statt eine handgepflegte Liste zu führen.** `hydra-umc.project.json` ist bereits die einzige Wahrheitsquelle, der Dashboard/Updater des Ökosystems vertrauen - eine zweite Liste hier würde in dem Moment auseinanderlaufen, in dem sich die echte Reife eines Kindes ändert und niemand daran denkt, sie zu aktualisieren.
 * **Warum ein fehlender Geschwister-Checkout ein echtes, ehrliches "nicht gefunden" ist, statt eines Absturzes.** Ein Integrations-Hub kann wirklich nicht wissen, ob ein Entwickler alle 3 Kinder lokal ausgecheckt hat - `manifest.rs` gibt für jeden echten Fehlerfall (fehlendes Repo, fehlende Datei, fehlerhaftes JSON) `None` zurück, damit `family-status` es klar melden kann, statt in Panik zu geraten.
@@ -91,7 +91,7 @@ HYDRA-UMC-TWIN/
 ├── build.sh / build.bat # Erhöht die Version, `cargo test`, dann `cargo build --release`
 ├── build-test.sh / build-test.bat # Nicht-versionierender Build-Check
 ├── run.sh / run.bat     # Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
-└── docker-compose.yml   # Integrations-Blueprint für die 3 Kinder unten
+└── docker-compose.blueprint.yml   # Integrations-Blueprint für die 3 Kinder unten
 ```
 
 ---
@@ -154,9 +154,9 @@ Beendet sich nur dann mit `0`, wenn jedes erwartete Kind `READY` ist; mit `1` f�
 
 **Wichtig:** `Cargo.toml` enthält absichtlich **noch keine Bevy-Abhängigkeit**. Bevy ist eine schwere Grafik-Engine (lange Kompilierzeiten, benötigt eine GPU/Grafik-Toolchain, die nicht immer verfügbar ist); v0 hat nur `serde`/`serde_json` zum Lesen von Manifesten hinzugefügt. Die echte `bevy`-Abhängigkeit (plus ein Physik-Backend und der gRPC/WebSocket-Client für HIL-BRIDGE) wird hinzugefügt, wenn die echte Rendering-/Engine-Arbeit beginnt.
 
-### Integration der 3 Kinder (`docker-compose.yml`)
+### Integration der 3 Kinder (`docker-compose.blueprint.yml`)
 
-Als Integrations-Elternteil dokumentiert `docker-compose.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar; die Datei ist die bestätigte Referenz für Topologie, Ports und Abhängigkeiten künftiger Dockerfiles.
+Als Integrations-Elternteil dokumentiert `docker-compose.blueprint.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar; die Datei ist die bestätigte Referenz für Topologie, Ports und Abhängigkeiten künftiger Dockerfiles.
 
 ---
 
