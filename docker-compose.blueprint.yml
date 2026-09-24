@@ -1,4 +1,9 @@
-# docker-compose.yml - HYDRA-UMC-TWIN (integration parent)
+# docker-compose.blueprint.yml - HYDRA-UMC-TWIN (integration parent)
+#
+# Deliberately NOT named docker-compose.yml: a plain `docker compose up`
+# picks that name up automatically and would fail on the missing
+# Dockerfiles below. Rename it (or pass `-f docker-compose.blueprint.yml`)
+# once each child has a real Dockerfile.
 #
 # Documents how the Digital Twin engine integrates its 3 children as
 # independent services once each one carries real business logic. This is

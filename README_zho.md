@@ -58,7 +58,7 @@ flowchart TB
 
 * **为什么本引擎没有 `hardware/`/`firmware/`/`os/` 文件夹。** 这是没有自有板卡的纯软件；源代码文件夹仅在实现需要时才包含。
 * **为什么 `Cargo.toml` 目前刻意不包含 Bevy 依赖。** Bevy 是一个较重的图形引擎——编译耗时长，需要并非总是可用的 GPU/图形工具链。v0 只添加了 `serde`/`serde_json`（用于读取子项目的清单）——真正的渲染工作仍在等待一个真实可用的 GPU/图形工具链出现后才能编译。
-* **为什么 `docker-compose.yml` 在其 3 个子项目尚未拥有 Dockerfile 之前就已存在。** 现在决定并记录集成契约（哪个服务依赖哪个服务、每个服务需要哪些设备/卷挂载），避免这一形态日后被临时拼凑出来，尽管在每个子项目发布各自的 Dockerfile 之前，`docker compose up` 尚无法完全成功。
+* **为什么 `docker-compose.blueprint.yml` 在其 3 个子项目尚未拥有 Dockerfile 之前就已存在。** 现在决定并记录集成契约（哪个服务依赖哪个服务、每个服务需要哪些设备/卷挂载），避免这一形态日后被临时拼凑出来，尽管在每个子项目发布各自的 Dockerfile 之前，`docker compose up` 尚无法完全成功。
 * **这如何融入生态系统的其余部分。** 作为 数字孪生与仿真 系列的集成父项目——HYDRA-UMC-PHYSICS-REPLICA 为其提供真实的物理求解器，HYDRA-UMC-HIL-BRIDGE 使真实应用程序能够像控制真实硬件一样控制它，而 HYDRA-UMC-SYNTHETIC-DATA-GEN 则通过其自身引擎渲染训练数据集。
 * **为何 `family-status` 读取每个子项目自身的清单，而不是一份手工维护的列表。** `hydra-umc.project.json` 已经是整个生态系统仪表盘和更新器都信任的唯一真相来源——在这里再维护第二份列表，只要某个子项目的真实成熟度发生变化而没人记得同步更新，就会立刻产生偏差。
 * **为何缺少某个兄弟项目的本地检出会得到一个真实、诚实的「未找到」，而非一个崩溃。** 一个集成中枢真的无法预先知道开发者是否在本地检出了全部 3 个子项目——`manifest.rs` 对每一种真实的失败情形（仓库缺失、清单缺失、JSON 格式错误）都返回 `None`，让 `family-status` 清楚地报告出来，而不是直接崩溃。
@@ -93,7 +93,7 @@ HYDRA-UMC-TWIN/
 ├── build.sh / build.bat # 递增版本号、`cargo test`，然后执行 `cargo build --release`
 ├── build-test.sh / build-test.bat # 不递增版本号的构建检查
 ├── run.sh / run.bat     # 运行编译后的 release 二进制文件（转发参数）
-└── docker-compose.yml   # 下方 3 个子项目的集成蓝图
+└── docker-compose.blueprint.yml   # 下方 3 个子项目的集成蓝图
 ```
 
 ---
@@ -166,9 +166,9 @@ Not every child is sync-ready - see the lines above.
 后端和面向 HIL-BRIDGE 的 gRPC/WebSocket 客户端）将在真正的渲染/引擎工作
 开始时添加。
 
-### 集成 3 个子项目（`docker-compose.yml`）
+### 集成 3 个子项目（`docker-compose.blueprint.yml`）
 
-作为集成父项目，`docker-compose.yml` 记录了本引擎如何将其 3 个子项目
+作为集成父项目，`docker-compose.blueprint.yml` 记录了本引擎如何将其 3 个子项目
 组合为一个技术栈：**PHYSICS-REPLICA**（求解器，每个物理帧被调用）、
 **HIL-BRIDGE**（真实与虚拟指令同步）、**SYNTHETIC-DATA-GEN**（离线批量
 数据集导出）。这 4 个项目在骨架阶段均尚未拥有 `Dockerfile`，因此今天
