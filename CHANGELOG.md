@@ -30,8 +30,7 @@ semantic-versioning judgment calls:
   default. A `PATH` that doesn't exist is a loud startup error, not a
   silent always-reject. 3 new tests.
 - **`server.rs`'s `?workspace=` override is now validated** (new
-  `resolve_workspace_override()`) - found while auditing
-  the code: it used to go straight to the filesystem
+  `resolve_workspace_override()`) - found on code review: it used to go straight to the filesystem
   reader with no validation at all, so a typo'd or bogus path silently
   produced the exact same response as a real, empty family
   (`"allPresent": false`) - no way for an operator to tell "you gave me
