@@ -4,7 +4,7 @@
 
 # ♊ HYDRA-UMC-TWIN
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | 🇫🇷 <b>Français</b> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | 🇫🇷 <b>Français</b> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 Jumeau numérique basé sur la physique et moteur de simulation haute fidélité
 
@@ -102,7 +102,7 @@ Nécessite la chaîne d'outils Rust (`cargo`/`rustc`, à installer via [rustup](
 
 ```bash
 # Linux / macOS
-./build.sh   # incrément de version compteur kilométrique, `cargo test` (31 tests), puis `cargo build --release`
+./build.sh   # incrément de version compteur kilométrique, `cargo test` (34 tests), puis `cargo build --release`
 ./run.sh     # exécute target/release/hydra-umc-twin, affiche nom + version + rôle
 ```
 

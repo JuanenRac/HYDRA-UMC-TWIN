@@ -4,7 +4,7 @@
 
 # ♊ HYDRA-UMC-TWIN
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>简体中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>简体中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 基于物理的数字孪生与高保真仿真引擎
 
@@ -105,7 +105,7 @@ HYDRA-UMC-TWIN/
 
 ```bash
 # Linux / macOS
-./build.sh   # 里程表式版本递增、`cargo test`（31 个测试），然后执行 `cargo build --release`
+./build.sh   # 里程表式版本递增、`cargo test`（34 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 

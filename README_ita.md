@@ -4,7 +4,7 @@
 
 # ♊ HYDRA-UMC-TWIN
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | 🇮🇹 <b>Italiano</b> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | 🇮🇹 <b>Italiano</b> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 Digital Twin basata sulla fisica e motore di simulazione ad alta fedeltà
 
@@ -103,7 +103,7 @@ Richiede il toolchain Rust (`cargo`/`rustc`, installabile via [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # bump di version contachilometri, `cargo test` (31 test), poi `cargo build --release`
+./build.sh   # bump di version contachilometri, `cargo test` (34 test), poi `cargo build --release`
 ./run.sh     # esegue target/release/hydra-umc-twin, stampa nome + version + ruolo
 ```
 

@@ -4,7 +4,7 @@
 
 # ♊ HYDRA-UMC-TWIN
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | 🇪🇸 <b>Español</b> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | 🇪🇸 <b>Español</b> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 Gemelo Digital Basado en Física y Motor de Simulación de Alta Fidelidad
 
@@ -102,7 +102,7 @@ Requiere el toolchain de Rust (`cargo`/`rustc`, instalar vía [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # bump de version cuentakilometros, `cargo test` (31 tests), luego `cargo build --release`
+./build.sh   # bump de version cuentakilometros, `cargo test` (34 tests), luego `cargo build --release`
 ./run.sh     # ejecuta target/release/hydra-umc-twin, imprime nombre + version + rol
 ```
 
