@@ -55,8 +55,8 @@ real reported version/maturity/role — read live from that child's own
 ```
 $ hydra-umc-twin family-status
 Digital Twin family status (workspace: <workspace-root>):
-  HYDRA-UMC-PHYSICS-REPLICA: v0.0.6, maturity=established, role=library
-  HYDRA-UMC-HIL-BRIDGE: v0.0.8, maturity=established, role=service
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.6, maturity=functional, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.8, maturity=functional, role=service
   HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.9, maturity=established, role=tool
 
 All 3 children present.
@@ -89,8 +89,8 @@ this ecosystem is still pre-1.0).
 ```
 $ hydra-umc-twin family-sync
 Digital Twin family sync contract (workspace: <workspace-root>):
-  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.6, maturity=established)
-  HYDRA-UMC-HIL-BRIDGE: READY (v0.0.8, maturity=established)
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.6, maturity=functional)
+  HYDRA-UMC-HIL-BRIDGE: READY (v0.0.8, maturity=functional)
   HYDRA-UMC-SYNTHETIC-DATA-GEN: READY (v0.0.9, maturity=established)
 
 All 3 children are sync-ready.
@@ -113,7 +113,7 @@ A child that *is* checked out but fails a contract gate is reported
 differently — `REJECTED (immature) - ...`, `REJECTED (incompatible
 version) - ...`, or `REJECTED (unparseable manifest) - ...` — naming the
 specific gate that failed (see `src/contract.rs`'s `assess()`); this
-machine's real siblings are all `established` at major version `0`, so none
+machine's real siblings are all at least `functional` at major version `0`, so none
 of those rejection paths could be captured from a real run today.
 
 ## `serve [--addr ADDR] [--port PORT] [--workspace PATH]`
@@ -140,7 +140,7 @@ parameter that overrides the server's own default for that one request:
 
 ```bash
 $ curl http://127.0.0.1:8111/family-status
-{"allPresent":true,"children":[{"manifest":{"maturity":"established","name":"HYDRA-UMC-PHYSICS-REPLICA","role":"library","version":"0.0.3"},"name":"HYDRA-UMC-PHYSICS-REPLICA"},...],"workspace":"<workspace-root>"}
+{"allPresent":true,"children":[{"manifest":{"maturity":"functional","name":"HYDRA-UMC-PHYSICS-REPLICA","role":"library","version":"0.0.3"},"name":"HYDRA-UMC-PHYSICS-REPLICA"},...],"workspace":"<workspace-root>"}
 ```
 
 Both always answer HTTP `200` for a well-formed `GET` — a child being

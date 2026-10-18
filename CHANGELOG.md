@@ -18,6 +18,11 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.9]
+
+- Maturity is functional: nothing here has been verified on real hardware yet.
+- The READMEs say, in the eight languages, what is planned and what has only been tested against fakes, emulators or fixtures, and carry a short safety and security status note.
+
 ## [0.0.8] - Sync contract accepts four-part versions and production maturity
 
 - **Four-component versions are accepted:** the sync contract rejected any child version with four components (`0.8.0.0`) as unparseable, which would have declared the whole family not syncable as soon as one child crossed 0.8.0. Three or four numeric components are now accepted.
