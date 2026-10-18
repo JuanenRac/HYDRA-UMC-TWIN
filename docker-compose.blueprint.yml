@@ -33,7 +33,7 @@ services:
       dockerfile: Dockerfile   # TODO: add once Bevy dependency lands for real
     container_name: hydra-umc-twin
     ports:
-      - "7878:7878"   # planned: HIL-BRIDGE gRPC/WebSocket ingress
+      - "8111:8111"   # family-status / family-sync HTTP API (serve --port 8111)
     depends_on:
       - physics-replica
       - hil-bridge

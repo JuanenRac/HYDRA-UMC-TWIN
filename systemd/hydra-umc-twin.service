@@ -3,8 +3,7 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-# --workspace points at a real root:root 0755 tree under /opt (see
-# install_twin.sh) holding just this node's real children's own
+# --workspace points at a real root:root 0755 tree under /opt holding just this node's real children's own
 # hydra-umc.project.json files - same real permission lesson learned
 # installing HYDRA-UMC-VISION-NODE (a symlink to the real sibling-repo
 # checkout root would be unreadable by this service's own unprivileged
@@ -20,7 +19,7 @@ Type=simple
 User=hydra-umc-twin
 Group=hydra-umc-twin
 WorkingDirectory=/opt/hydra-umc/twin
-ExecStart=/opt/hydra-umc/twin/hydra-umc-twin serve --addr 127.0.0.1 --port 8111 --workspace /opt/hydra-umc/twin/workspace
+ExecStart=/opt/hydra-umc/twin/hydra-umc-twin serve --addr 127.0.0.1 --port 8111 --workspace /opt/hydra-umc/twin/workspace --strict-workspace-root /opt/hydra-umc/twin/workspace
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

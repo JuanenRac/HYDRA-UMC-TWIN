@@ -31,12 +31,48 @@ fn write_json(request: tiny_http::Request, status: u16, body: &serde_json::Value
     let _ = request.respond(response);
 }
 
+fn percent_decode(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() => {
+                let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).ok();
+                match hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                    Some(b) => {
+                        out.push(b);
+                        i += 3;
+                    }
+                    None => {
+                        out.push(b'%');
+                        i += 1;
+                    }
+                }
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 fn query_param(url: &str, key: &str) -> Option<String> {
     let (_, query) = url.split_once('?')?;
     for pair in query.split('&') {
-        let (k, v) = pair.split_once('=')?;
-        if k == key {
-            return Some(v.to_string());
+        // A bare parameter without '=' is skipped, not a reason to stop
+        // looking for the one that was asked for.
+        let Some((k, v)) = pair.split_once('=') else {
+            continue;
+        };
+        if percent_decode(k) == key {
+            return Some(percent_decode(v));
         }
     }
     None
@@ -108,7 +144,7 @@ pub fn run(server: Server, workspace: PathBuf, strict_root: Option<PathBuf>) {
         let path = url.split('?').next().unwrap_or("").to_string();
 
         if request.method() != &Method::Get {
-            write_json(request, 404, &json!({"error": "not found"}));
+            write_json(request, 405, &json!({"error": "method not allowed"}));
             continue;
         }
 
@@ -231,7 +267,62 @@ mod tests {
             n
         ));
         std::fs::create_dir_all(&path).unwrap();
+        cleanup_registry().lock().unwrap().push(path.clone());
         path
+    }
+
+    /// Every directory a test creates is removed again when the test
+    /// process exits, so repeated runs leave nothing behind in the OS
+    /// temp directory.
+    fn cleanup_registry() -> &'static std::sync::Mutex<Vec<PathBuf>> {
+        static REGISTRY: std::sync::OnceLock<std::sync::Mutex<Vec<PathBuf>>> =
+            std::sync::OnceLock::new();
+        REGISTRY.get_or_init(|| {
+            extern "C" fn remove_all() {
+                if let Ok(paths) = cleanup_registry().lock() {
+                    for p in paths.iter() {
+                        let _ = std::fs::remove_dir_all(p);
+                    }
+                }
+            }
+            extern "C" {
+                fn atexit(cb: extern "C" fn()) -> i32;
+            }
+            unsafe {
+                atexit(remove_all);
+            }
+            std::sync::Mutex::new(Vec::new())
+        })
+    }
+
+    #[test]
+    fn workspace_param_is_found_after_a_bare_parameter_and_percent_decoded() {
+        assert_eq!(
+            query_param("/x?flag&workspace=a%20b%2Fc", "workspace").as_deref(),
+            Some("a b/c")
+        );
+        assert_eq!(query_param("/x?flag", "workspace"), None);
+    }
+
+    #[test]
+    fn non_get_methods_get_405() {
+        let ws = tempdir();
+        let port = start_test_server(ws);
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .write_all(
+                b"POST /family-status HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )
+            .unwrap();
+        // The server may keep the connection open after a non-GET request, so
+        // read the status line only instead of waiting for end of stream.
+        let mut buffer = [0u8; 64];
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let read = stream.read(&mut buffer).unwrap();
+        let text = String::from_utf8_lossy(&buffer[..read]).into_owned();
+        assert!(text.starts_with("HTTP/1.1 405"), "{text}");
     }
 
     #[test]

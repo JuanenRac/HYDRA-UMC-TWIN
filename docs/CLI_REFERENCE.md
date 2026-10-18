@@ -25,8 +25,8 @@ Bare invocation (no arguments) prints identity/version/role and exits `0`:
 
 ```
 $ hydra-umc-twin
-HYDRA-UMC-TWIN v0.0.5
-Physics-based Digital Twin engine for safe robotic simulation (integration parent).
+HYDRA-UMC-TWIN v0.0.8
+Digital Twin integration hub: family readiness and state-sync contract for PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN (physics engine planned).
 ```
 
 ## Workspace resolution
@@ -55,9 +55,9 @@ real reported version/maturity/role — read live from that child's own
 ```
 $ hydra-umc-twin family-status
 Digital Twin family status (workspace: <workspace-root>):
-  HYDRA-UMC-PHYSICS-REPLICA: v0.0.3, maturity=established, role=library
-  HYDRA-UMC-HIL-BRIDGE: v0.0.3, maturity=established, role=service
-  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.5, maturity=established, role=tool
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.6, maturity=established, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.8, maturity=established, role=service
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.9, maturity=established, role=tool
 
 All 3 children present.
 ```
@@ -89,9 +89,9 @@ this ecosystem is still pre-1.0).
 ```
 $ hydra-umc-twin family-sync
 Digital Twin family sync contract (workspace: <workspace-root>):
-  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=established)
-  HYDRA-UMC-HIL-BRIDGE: READY (v0.0.3, maturity=established)
-  HYDRA-UMC-SYNTHETIC-DATA-GEN: READY (v0.0.5, maturity=established)
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.6, maturity=established)
+  HYDRA-UMC-HIL-BRIDGE: READY (v0.0.8, maturity=established)
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: READY (v0.0.9, maturity=established)
 
 All 3 children are sync-ready.
 ```

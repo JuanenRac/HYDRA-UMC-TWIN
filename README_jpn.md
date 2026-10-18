@@ -10,8 +10,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Engine-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
-  <img src="https://img.shields.io/badge/Tech-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
+  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="Engine">
+  <img src="https://img.shields.io/%20(planned)-lightgrey.svg" alt="Physics">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="HIL">
   <img src="https://img.shields.io/badge/Stage-Established%20v0-brightgreen.svg" alt="Established v0 stage">
 </p>
@@ -24,10 +24,7 @@
 ファクトリー全体の高忠実度な物理ベースのレプリカを提供し、ロボット
 スウォームの安全なテスト、トレーニング、リアルタイム監視を可能にします。
 
-Rust と Bevy エンジンを用いて構築されており、EDITOR からの URDF モデル
-を直接取り込み、慣性、摩擦、モータートルクといった実世界の物理特性を
-エミュレートすることで、「ツイン上で動作すれば、現場でも動作する」こと
-を保証します。
+Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-REPLICA、HIL-BRIDGE、SYNTHETIC-DATA-GEN）のマニフェストを読み取り、それぞれが同期可能かどうかを確認します。慣性・摩擦・モータートルクをエミュレートする Bevy/URDF 物理エンジン（「ツインで動けば現場でも動く」）は計画段階で、まだ実装されていません。
 
 ### 主な機能：
 * 🧩 **ファミリーレディネスチェック（v0）：** 実際の `family-status` サブコマンドが 3 つの実際の子プロジェクトそれぞれの実際の `hydra-umc.project.json` を読み取り、存在/バージョン/成熟度/役割を報告します——自分自身はまだ何のエンジンも動かしていない統合ハブとして正直な機能です。下記「正直な現状確認」を参照してください。
@@ -59,7 +56,7 @@ flowchart TB
 ## 3. 🧱 アーキテクチャと設計上の決定
 
 * **本エンジンに `hardware/`/`firmware/`/`os/` フォルダがない理由。** 純粋なソフトウェアで独自の基板を持たず、ソースフォルダは実装に必要な場合だけ含めます。
-* **`Cargo.toml` が今のところ意図的に Bevy 依存関係を持たない理由。** Bevy は重量級のグラフィックスエンジンです——コンパイル時間が長く、常に利用可能とは限らない GPU/グラフィックスツールチェーンを必要とします。v0 では `serde`/`serde_json`（子プロジェクトのマニフェストを読み取るため）だけを追加しました——実際のレンダリング作業は、実際にビルド可能な GPU/グラフィックスツールチェーンが存在するようになるまで、引き続き待たれます。
+* **`Cargo.toml` が今のところ意図的に Bevy 依存関係を持たない理由。** Bevy は重量級のグラフィックスエンジンです——コンパイル時間が長く、常に利用可能とは限らない GPU/グラフィックスツールチェーンを必要とします。v0 では `serde`/`serde_json`/`tiny_http`（子プロジェクトのマニフェストを読み取るため）だけを追加しました——実際のレンダリング作業は、実際にビルド可能な GPU/グラフィックスツールチェーンが存在するようになるまで、引き続き待たれます。
 * **`docker-compose.blueprint.yml` が 3 つの子プロジェクトがまだ Dockerfile を持たないうちから存在する理由。** 統合契約（どのサービスがどのサービスに依存するか、それぞれがどのデバイス/ボリュームマウントを必要とするか）を今のうちに決定し文書化しておくことで、各子プロジェクトが独自の Dockerfile を公開するまで `docker compose up` が完全には成功しないとしても、この形が後から場当たり的に考案されることを防ぎます。
 * **エコシステムの他の部分との関係。** デジタルツインとシミュレーション ファミリーの統合親プロジェクトです——HYDRA-UMC-PHYSICS-REPLICA が実際の物理ソルバーを供給し、HYDRA-UMC-HIL-BRIDGE により実際のアプリがまるでハードウェアであるかのようにこれを制御でき、HYDRA-UMC-SYNTHETIC-DATA-GEN はこのエンジン自体を通じてトレーニングデータセットをレンダリングします。
 * **`family-status` が手作業で管理するリストではなく、各子プロジェクト自身のマニフェストを読み取る理由。** `hydra-umc.project.json` は、エコシステム全体のダッシュボードとアップデーターがすでに信頼している唯一の真実の情報源です——ここに第 2 のリストを持つと、子プロジェクトの実際の成熟度が変わった瞬間、誰も更新を忘れずに済むとは限らず、すぐに食い違いが生じてしまいます。
@@ -136,9 +133,9 @@ run.bat family-status
 
 ```text
 Digital Twin family status (workspace: /path/to/GitHub):
-  HYDRA-UMC-PHYSICS-REPLICA: v0.0.3, maturity=established, role=library
-  HYDRA-UMC-HIL-BRIDGE: v0.0.5, maturity=established, role=service
-  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.7, maturity=established, role=tool
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.6, maturity=established, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.8, maturity=established, role=service
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.9, maturity=established, role=tool
 
 All 3 children present.
 ```
@@ -158,7 +155,7 @@ All 3 children present.
 
 ```text
 Digital Twin family sync contract (workspace: /path/to/some/checkout):
-  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=functional)
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.6, maturity=functional)
   HYDRA-UMC-HIL-BRIDGE: REJECTED (incompatible version) - HYDRA-UMC-HIL-BRIDGE reports major version 1 - this Twin's sync contract is only verified up to major 0 (incompatible simulator version)
   HYDRA-UMC-SYNTHETIC-DATA-GEN: MISSING (not checked out)
 
@@ -172,7 +169,7 @@ Not every child is sync-ready - see the lines above.
 **重要：** `Cargo.toml` は今のところ意図的に**Bevy 依存関係を持ちません**。
 Bevy は重量級のグラフィックスエンジンです（コンパイル時間が長く、常に
 利用可能とは限らない GPU/グラフィックスツールチェーンを必要とします）。
-v0 ではマニフェストを読み取るための `serde`/`serde_json` のみを追加
+v0 ではマニフェストを読み取るための `serde`/`serde_json`/`tiny_http` のみを追加
 しました。実際の `bevy` 依存関係（および物理バックエンドと HIL-BRIDGE
 向けの gRPC/WebSocket クライアント）は、実際のレンダリング/エンジン
 作業が始まった際に追加されます。

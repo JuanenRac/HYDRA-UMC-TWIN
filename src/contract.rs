@@ -35,6 +35,7 @@ pub enum MaturityLevel {
     Scaffolding,
     Functional,
     Established,
+    Production,
 }
 
 impl MaturityLevel {
@@ -43,6 +44,7 @@ impl MaturityLevel {
             "scaffolding" => Some(MaturityLevel::Scaffolding),
             "functional" => Some(MaturityLevel::Functional),
             "established" => Some(MaturityLevel::Established),
+            "production" => Some(MaturityLevel::Production),
             _ => None,
         }
     }
@@ -86,17 +88,20 @@ impl SyncReadiness {
 }
 
 fn parse_major(version: &str) -> Option<u32> {
-    let mut components = version.split('.');
-    let major = components.next()?.parse().ok()?;
-    let minor: u32 = components.next()?.parse().ok()?;
-    let patch: u32 = components.next()?.parse().ok()?;
-    if components.next().is_some() {
+    // Three components, or four from 0.8.0 on (the manifest schema allows
+    // both); every component must be a plain number.
+    let parts: Vec<&str> = version.split('.').collect();
+    if parts.len() != 3 && parts.len() != 4 {
         return None;
     }
-    // Consume the parsed values to make the full three-component format an
-    // explicit contract, rather than accidentally accepting "0.anything".
-    let _ = (minor, patch);
-    Some(major)
+    let mut numbers = Vec::with_capacity(parts.len());
+    for part in &parts {
+        if part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        numbers.push(part.parse::<u32>().ok()?);
+    }
+    Some(numbers[0])
 }
 
 /// Assesses one child's manifest against the real sync contract above.
@@ -257,13 +262,31 @@ mod tests {
 
     #[test]
     fn incomplete_or_extra_version_components_are_rejected_honestly() {
-        for version in ["0", "0.1", "0.1.2.3", "0.x.1"] {
+        for version in ["0", "0.1", "0.1.2.3.4", "0.x.1", "0.1.", "0.-1.2"] {
             let m = manifest("HYDRA-UMC-PHYSICS-REPLICA", version, "functional");
             assert!(matches!(
                 assess(&m),
                 SyncReadiness::UnparseableManifest { .. }
             ));
         }
+    }
+
+    #[test]
+    fn four_component_versions_are_accepted() {
+        let m = manifest("HYDRA-UMC-PHYSICS-REPLICA", "0.8.0.0", "functional");
+        assert!(assess(&m).is_ready());
+        let m = manifest("HYDRA-UMC-PHYSICS-REPLICA", "1.8.0.3", "functional");
+        assert!(matches!(
+            assess(&m),
+            SyncReadiness::IncompatibleVersion { .. }
+        ));
+    }
+
+    #[test]
+    fn production_maturity_is_accepted_and_ranks_highest() {
+        let m = manifest("HYDRA-UMC-HIL-BRIDGE", "0.2.0", "production");
+        assert!(assess(&m).is_ready());
+        assert!(MaturityLevel::Established < MaturityLevel::Production);
     }
 
     #[test]

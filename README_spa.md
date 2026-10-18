@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Motor-Bevy%20%2F%20Rust-orange.svg" alt="Engine">
+  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="Engine">
   <img src="https://img.shields.io/badge/Tecnología-MuJoCo%20%2F%20PhysX-blue.svg" alt="Physics">
   <img src="https://img.shields.io/badge/Función-HIL%20Ready-green.svg" alt="HIL">
   <img src="https://img.shields.io/badge/Etapa-Establecido%20v0-brightgreen.svg" alt="Etapa establecido v0">
@@ -22,7 +22,7 @@
 
 **HYDRA-UMC-TWIN** es el corazón virtual del ecosistema. Proporciona una réplica de alta fidelidad basada en física de toda la micro-fábrica, permitiendo pruebas seguras, entrenamiento y monitorización en tiempo real de los enjambres robóticos.
 
-Construido usando Rust y el motor Bevy, consume directamente modelos URDF del EDITOR y emula propiedades físicas del mundo real como inercia, fricción y torque de motores para asegurar que "si funciona en el Twin, funciona en la planta".
+Escrito en Rust, hoy lee los manifiestos de sus tres hijos (PHYSICS-REPLICA, HIL-BRIDGE, SYNTHETIC-DATA-GEN) y comprueba si cada uno está listo para sincronizar. El motor físico Bevy/URDF que emularía inercia, fricción y par motor («si funciona en el Twin, funciona en la planta») está planificado, aún no implementado.
 
 ### Características Clave:
 * 🧩 **Chequeo de Disponibilidad de Familia (v0):** el subcomando real `family-status` lee el propio `hydra-umc.project.json` de cada uno de los 3 hijos reales y reporta presencia/versión/madurez/rol - honesto para un hub de integración que todavía no ejecuta ningún motor por sí mismo. Ver "Comprobación de honestidad" abajo.
@@ -54,7 +54,7 @@ flowchart TB
 ## 3. 🧱 ARQUITECTURA Y DECISIONES DE DISEÑO
 
 * **Por qué este motor no tiene carpetas `hardware/`/`firmware/`/`os/`.** Es software puro sin placa propia; las carpetas de código solo existen cuando su implementación las requiere.
-* **Por qué `Cargo.toml` deliberadamente no tiene aún dependencia de Bevy.** Bevy es un motor gráfico pesado - tiempos de compilación largos, necesita una GPU/toolchain gráfico que no siempre está disponible. v0 solo añadió `serde`/`serde_json` (para leer los manifiestos de los hijos) - el trabajo real de renderizado sigue esperando a que exista un toolchain de GPU/gráficos real contra el cual compilar.
+* **Por qué `Cargo.toml` deliberadamente no tiene aún dependencia de Bevy.** Bevy es un motor gráfico pesado - tiempos de compilación largos, necesita una GPU/toolchain gráfico que no siempre está disponible. v0 solo añadió `serde`/`serde_json`/`tiny_http` (para leer los manifiestos de los hijos) - el trabajo real de renderizado sigue esperando a que exista un toolchain de GPU/gráficos real contra el cual compilar.
 * **Por qué `docker-compose.blueprint.yml` existe antes de que sus 3 hijos tengan Dockerfile.** Decidir y documentar el contrato de integración (qué servicio depende de cuál, qué montajes de dispositivo/volumen necesita cada uno) ahora evita que esa forma se invente de manera improvisada más tarde, aunque `docker compose up` no pueda tener éxito completo hasta que cada hijo publique su propio Dockerfile.
 * **Cómo encaja en el resto del ecosistema.** El padre de integración de la familia Gemelo Digital y Simulación - HYDRA-UMC-PHYSICS-REPLICA le aporta un solucionador de física real, HYDRA-UMC-HIL-BRIDGE permite que apps reales lo controlen como si fuera hardware, y HYDRA-UMC-SYNTHETIC-DATA-GEN renderiza datasets de entrenamiento a través de su propio motor.
 * **Por qué `family-status` lee el manifiesto propio de cada hijo en vez de una lista mantenida a mano.** `hydra-umc.project.json` ya es la única fuente de verdad en la que confían el dashboard/updater del ecosistema - una segunda lista aquí se desincronizaría en cuanto la madurez real de un hijo cambiara y nadie recordara actualizarla.
@@ -102,7 +102,7 @@ Requiere el toolchain de Rust (`cargo`/`rustc`, instalar vía [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # bump de version cuentakilometros, `cargo test` (34 tests), luego `cargo build --release`
+./build.sh   # bump de version cuentakilometros, `cargo test` (38 tests), luego `cargo build --release`
 ./run.sh     # ejecuta target/release/hydra-umc-twin, imprime nombre + version + rol
 ```
 
@@ -126,9 +126,9 @@ run.bat family-status
 
 ```text
 Digital Twin family status (workspace: /ruta/a/GitHub):
-  HYDRA-UMC-PHYSICS-REPLICA: v0.0.3, maturity=established, role=library
-  HYDRA-UMC-HIL-BRIDGE: v0.0.5, maturity=established, role=service
-  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.7, maturity=established, role=tool
+  HYDRA-UMC-PHYSICS-REPLICA: v0.0.6, maturity=established, role=library
+  HYDRA-UMC-HIL-BRIDGE: v0.0.8, maturity=established, role=service
+  HYDRA-UMC-SYNTHETIC-DATA-GEN: v0.0.9, maturity=established, role=tool
 
 All 3 children present.
 ```
@@ -143,7 +143,7 @@ El subcomando real `family-sync` va más allá - también comprueba el contrato 
 
 ```text
 Digital Twin family sync contract (workspace: /ruta/a/algun/checkout):
-  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.3, maturity=functional)
+  HYDRA-UMC-PHYSICS-REPLICA: READY (v0.0.6, maturity=functional)
   HYDRA-UMC-HIL-BRIDGE: REJECTED (incompatible version) - HYDRA-UMC-HIL-BRIDGE reports major version 1 - this Twin's sync contract is only verified up to major 0 (incompatible simulator version)
   HYDRA-UMC-SYNTHETIC-DATA-GEN: MISSING (not checked out)
 
@@ -152,7 +152,7 @@ Not every child is sync-ready - see the lines above.
 
 Sale con `0` solo si todos los hijos esperados están `READY`; `1` para cualquier hijo `MISSING`/`REJECTED`.
 
-**Importante:** `Cargo.toml` deliberadamente **no lleva todavía la dependencia de Bevy**. Bevy es un motor gráfico pesado (compilación larga, necesita un toolchain de GPU/gráficos no siempre disponible); v0 solo añadió `serde`/`serde_json` para leer manifiestos. La dependencia real de `bevy` (más un backend de física y el cliente gRPC/WebSocket para HIL-BRIDGE) se añade cuando empiece el trabajo real de renderizado/motor.
+**Importante:** `Cargo.toml` deliberadamente **no lleva todavía la dependencia de Bevy**. Bevy es un motor gráfico pesado (compilación larga, necesita un toolchain de GPU/gráficos no siempre disponible); v0 solo añadió `serde`/`serde_json`/`tiny_http` para leer manifiestos. La dependencia real de `bevy` (más un backend de física y el cliente gRPC/WebSocket para HIL-BRIDGE) se añade cuando empiece el trabajo real de renderizado/motor.
 
 ### Integración de los 3 hijos (`docker-compose.blueprint.yml`)
 

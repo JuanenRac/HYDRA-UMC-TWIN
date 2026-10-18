@@ -29,7 +29,7 @@ use std::process::ExitCode;
 const PROJECT_NAME: &str = "HYDRA-UMC-TWIN";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const ROLE: &str =
-    "Physics-based Digital Twin engine for safe robotic simulation (integration parent).";
+    "Digital Twin integration hub: family readiness and state-sync contract for PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN (physics engine planned).";
 
 fn find_flag(args: &[String], flag: &str) -> Option<String> {
     args.iter()

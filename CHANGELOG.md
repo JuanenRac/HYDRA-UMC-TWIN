@@ -18,6 +18,16 @@ semantic-versioning judgment calls:
 
 ---
 
+## [0.0.8] - Sync contract accepts four-part versions and production maturity
+
+- **Four-component versions are accepted:** the sync contract rejected any child version with four components (`0.8.0.0`) as unparseable, which would have declared the whole family not syncable as soon as one child crossed 0.8.0. Three or four numeric components are now accepted.
+- **`production` maturity is recognised:** the highest maturity level a child can declare was refused as unrecognised; it is now accepted and ranks above `established`.
+- **`?workspace=` parsing:** a bare parameter before `workspace` (`?x&workspace=...`) silently made the request use the default workspace, and the value was never percent-decoded. Parameters without `=` are skipped and values are decoded.
+- **HTTP methods:** anything other than `GET` now answers `405` instead of `404`.
+- **Service hardening:** the systemd unit now starts the API with `--strict-workspace-root` bounded to its own workspace.
+- **Tests:** the HTTP tests remove the temporary directories they create; `Cargo.lock` is now tracked for reproducible builds (38 tests).
+- **Docs:** the README (all languages), badges, crate description and compose blueprint no longer present a Bevy/physics engine as existing: today the binary reads the children's manifests and checks sync readiness. Sample versions and the published port are corrected.
+
 ## [0.0.7] - Opt-in --strict-workspace-root, plus strict child manifest versions
 
 - **`--strict-workspace-root PATH`** (new, opt-in) - unset, `?workspace=`
