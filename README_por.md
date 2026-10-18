@@ -18,6 +18,16 @@
 
 ---
 
+## 📋 Num relance
+
+| | |
+|---|---|
+| Versão | `0.0.8` |
+| Maturidade | Estabelecido |
+| Tecnologia | Rust / tiny_http |
+| Destino | O Raspberry Pi CM5 de uma célula HYDRA-UMC |
+| Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
+
 ## 1. 🛠️ VISÃO TÉCNICA GERAL
 
 O **HYDRA-UMC-TWIN** é o coração virtual do ecossistema. Fornece uma réplica de alta fidelidade, baseada em física, de toda a microfábrica, permitindo testar, treinar e monitorizar em tempo real enxames de robôs com segurança.

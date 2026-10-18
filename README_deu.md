@@ -18,6 +18,16 @@
 
 ---
 
+## 📋 Auf einen Blick
+
+| | |
+|---|---|
+| Version | `0.0.8` |
+| Reifegrad | Etabliert |
+| Technik | Rust / tiny_http |
+| Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
+| Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
+
 ## 1. 🛠️ TECHNISCHER ÜBERBLICK
 
 **HYDRA-UMC-TWIN** ist das virtuelle Herz des Ökosystems. Es bietet ein High-Fidelity, physikbasiertes Replikat der gesamten Micro-Factory und ermöglicht so sicheres Testen, Training und Echtzeit-Überwachung von Roboterschwärmen.
