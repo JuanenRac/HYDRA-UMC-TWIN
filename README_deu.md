@@ -99,8 +99,8 @@ HYDRA-UMC-TWIN/
 │   ├── build_test.py    # Nicht-versionierender Build-Check
 │   └── ci_validate.py   # Manifest/CHANGELOG/Docs-Validierung, von CI genutzt
 ├── Cargo.toml           # Paket-Metadaten, Abhängigkeiten (serde/serde_json), Kilometerzähler-Version
-├── bump_version.py      # Kilometerzähler-artiger Versions-Bump (von build.sh/.bat verwendet)
-├── build.sh / build.bat # Erhöht die Version, `cargo test`, dann `cargo build --release`
+├── bump_version.py      # Versionserhöhung im Kilometerzähler-Stil (nur vom expliziten `bump`-Befehl ausgeführt)
+├── build.sh / build.bat # Validiert und baut (Bauen ändert nie die Version)
 ├── build-test.sh / build-test.bat # Nicht-versionierender Build-Check
 ├── run.sh / run.bat     # Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
 └── docker-compose.blueprint.yml   # Integrations-Blueprint für die 3 Kinder unten
@@ -114,7 +114,7 @@ Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https:/
 
 ```bash
 # Linux / macOS
-./build.sh   # Kilometerzähler-Versions-Bump, `cargo test` (38 Tests), dann `cargo build --release`
+./build.sh   # `cargo test` (38 Tests), dann `cargo build --release`
 ./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
 ```
 
@@ -124,7 +124,7 @@ build.bat
 run.bat
 ```
 
-`build.sh`/`build.bat` erhöhen die Version der eigenen `Cargo.toml` dieses Projekts nach der "Kilometerzähler"-Regel des Ökosystems (PATCH+1, mit Übertrag auf MINOR nach 9), führen die echte Testsuite aus und bauen dann eine Release-Binärdatei.
+`build.sh`/`build.bat` ändern die Version nie (nur `python tools/hydra_project_tool.py bump` erhöht sie), führen die echte Testsuite aus und bauen dann eine Release-Binärdatei.
 
 Der echte Subbefehl `family-status` prüft den echten lokalen Checkout:
 

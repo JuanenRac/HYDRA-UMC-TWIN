@@ -98,8 +98,8 @@ HYDRA-UMC-TWIN/
 │   ├── build_test.py    # 不递增版本号的构建检查
 │   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
 ├── Cargo.toml           # 包元数据、依赖项（serde/serde_json）、里程表版本号
-├── bump_version.py      # 里程表式版本递增（由 build.sh/.bat 使用）
-├── build.sh / build.bat # 递增版本号、`cargo test`，然后执行 `cargo build --release`
+├── bump_version.py      # 里程表式版本递增（仅由显式 `bump` 命令运行）
+├── build.sh / build.bat # 验证并构建（构建不会更改版本）
 ├── build-test.sh / build-test.bat # 不递增版本号的构建检查
 ├── run.sh / run.bat     # 运行编译后的 release 二进制文件（转发参数）
 └── docker-compose.blueprint.yml   # 下方 3 个子项目的集成蓝图
@@ -114,7 +114,7 @@ HYDRA-UMC-TWIN/
 
 ```bash
 # Linux / macOS
-./build.sh   # 里程表式版本递增、`cargo test`（34 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（34 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 
@@ -124,8 +124,7 @@ build.bat
 run.bat
 ```
 
-`build.sh`/`build.bat` 会按照生态系统的"里程表"规则（PATCH+1，超过 9
-时进位到 MINOR）递增本项目自身的 `Cargo.toml` 版本号，运行真实的测试
+`build.sh`/`build.bat` 不会更改版本号（只有 `python tools/hydra_project_tool.py bump` 才会提升），运行真实的测试
 套件，然后构建一个 release 二进制文件。
 
 真实的 `family-status` 子命令会检查真实的本地检出：

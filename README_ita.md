@@ -100,8 +100,8 @@ HYDRA-UMC-TWIN/
 │   ├── build_test.py    # Controllo build senza versionamento
 │   └── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
 ├── Cargo.toml           # Metadati del pacchetto, dipendenze (serde/serde_json), version contachilometri
-├── bump_version.py      # Bump di version tipo contachilometri (usato da build.sh/.bat)
-├── build.sh / build.bat # Bump della version, `cargo test`, poi `cargo build --release`
+├── bump_version.py      # Incremento di versione stile contachilometri (eseguito solo dal comando `bump` esplicito)
+├── build.sh / build.bat # Valida e compila (compilare non cambia mai la versione)
 ├── build-test.sh / build-test.bat # Controllo build senza versionamento
 ├── run.sh / run.bat     # Esegue il binario release compilato (inoltra gli argomenti)
 └── docker-compose.blueprint.yml   # Blueprint di integrazione dei 3 figli sotto
@@ -115,7 +115,7 @@ Richiede il toolchain Rust (`cargo`/`rustc`, installabile via [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # bump di version contachilometri, `cargo test` (34 test), poi `cargo build --release`
+./build.sh   # `cargo test` (34 test), poi `cargo build --release`
 ./run.sh     # esegue target/release/hydra-umc-twin, stampa nome + version + ruolo
 ```
 
@@ -125,7 +125,7 @@ build.bat
 run.bat
 ```
 
-`build.sh`/`build.bat` incrementano la version del proprio `Cargo.toml` di questo progetto seguendo la regola "contachilometri" dell'ecosistema (PATCH+1, con riporto a MINOR superato 9), eseguono la vera suite di test, e poi costruiscono un binario release.
+`build.sh`/`build.bat` non cambiano mai la versione (solo `python tools/hydra_project_tool.py bump` la alza), eseguono la vera suite di test, e poi costruiscono un binario release.
 
 Il vero sottocomando `family-status` controlla il vero checkout locale:
 
