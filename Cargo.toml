@@ -4,7 +4,7 @@ version = "0.0.9"
 edition = "2021"
 description = "Digital Twin integration hub: family readiness and state-sync contract for PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN (physics engine planned)."
 authors = ["JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>"]
-license = "GPL-3.0-only"
+license = "GPL-3.0-or-later"
 readme = "README.md"
 
 # v0: real family-readiness check (`family-status` subcommand) - reads
