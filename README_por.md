@@ -112,7 +112,7 @@ Requer a cadeia de ferramentas Rust (`cargo`/`rustc`, instalada via [rustup](htt
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (34 testes) e depois `cargo build --release`
+./build.sh   # `cargo test` (44 testes) e depois `cargo build --release`
 ./run.sh     # executa target/release/hydra-umc-twin, imprime nome + versão + papel
 ```
 

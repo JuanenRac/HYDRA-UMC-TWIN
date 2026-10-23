@@ -114,7 +114,7 @@ Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https:/
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (38 Tests), dann `cargo build --release`
+./build.sh   # `cargo test` (44 Tests), dann `cargo build --release`
 ./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
 ```
 

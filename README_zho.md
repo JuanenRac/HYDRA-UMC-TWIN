@@ -114,7 +114,7 @@ HYDRA-UMC-TWIN/
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（34 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（44 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 

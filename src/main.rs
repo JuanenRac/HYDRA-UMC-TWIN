@@ -68,6 +68,8 @@ fn run_family_status(args: &[String]) -> ExitCode {
                 "  {}: v{}, maturity={}, role={}",
                 status.name, m.version, m.maturity, m.role
             );
+        } else if let Some(problem) = &status.problem {
+            println!("  {}: UNUSABLE - {}", status.name, problem);
         } else {
             println!(
                 "  {}: NOT FOUND (expected at {})",
@@ -81,7 +83,9 @@ fn run_family_status(args: &[String]) -> ExitCode {
         println!("All {} children present.", statuses.len());
         ExitCode::SUCCESS
     } else {
-        println!("Some children are missing - see NOT FOUND lines above.");
+        println!(
+            "Some children are missing or unusable - see the NOT FOUND and UNUSABLE lines above."
+        );
         ExitCode::from(1)
     }
 }
@@ -101,6 +105,9 @@ fn run_family_sync(args: &[String]) -> ExitCode {
         match &status.outcome {
             FamilySyncOutcome::Missing => {
                 println!("  {}: MISSING (not checked out)", status.name);
+            }
+            FamilySyncOutcome::Unusable { reason } => {
+                println!("  {}: UNUSABLE - {reason}", status.name);
             }
             FamilySyncOutcome::Assessed(SyncReadiness::Ready(snapshot)) => {
                 println!(

@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A manifest that is there but wrong is reported as what it is, not as "NOT FOUND"**: `family-status` and `family-sync` read each child's manifest with `read_child_manifest_checked`, which tells a missing checkout (still `NOT FOUND` / `MISSING`) from a file that cannot be read or is not a manifest (malformed JSON, a missing field, a `schema_version` whose major is not 1) and from one that is not the project's own (a manifest of another project copied into the directory, or another `ecosystem`). The first two print `UNUSABLE - <reason>`; the status JSON carries a `problem` for them and the sync JSON an `Unusable { reason }` outcome, and neither counts as ready. A manifest without `ecosystem` or `schema_version` (an older one) is still accepted. 6 new tests (44 in all).
 - The manifest declares the health route of the service (`/stats`), so the service registry, the ecosystem status of the server and the watchdog know where to probe it.
 - Building no longer changes the version; raising it is the explicit `bump` command (`python tools/hydra_project_tool.py bump`). The build scripts only report the version they built, and CI fails if a build script runs a bump.
 - The banner follows the animated style of the ecosystem banners, with the name, the kind and the technologies of the project.

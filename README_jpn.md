@@ -115,7 +115,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（34 件のテスト）、その後 `cargo build --release`
+./build.sh   # 、`cargo test`（44 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 
