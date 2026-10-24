@@ -24,7 +24,7 @@
 
 | | |
 |---|---|
-| Versión | `0.0.9` |
+| Versión | `0.1.0` |
 | Madurez | Funcional |
 | Tecnología | Rust / tiny_http |
 | Destino | La Raspberry Pi CM5 de una celda HYDRA-UMC |

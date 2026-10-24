@@ -24,7 +24,7 @@
 
 | | |
 |---|---|
-| Version | `0.0.9` |
+| Version | `0.1.0` |
 | Maturité | Fonctionnel |
 | Technologie | Rust / tiny_http |
 | Cible | Le Raspberry Pi CM5 d'une cellule HYDRA-UMC |

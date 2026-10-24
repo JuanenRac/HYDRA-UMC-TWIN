@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.1.0] - The server takes requests on several threads and interlock certificates
 
 - **The children are checked by asking them to work, not by reading their manifests.** `family-health` (`src/health.rs`) runs the built binary of HYDRA-UMC-PHYSICS-REPLICA on a two-joint probe URDF and requires the pose of the second joint to be (cos 0.5, sin 0.5, 0) within 1e-6, and calls `GET /stats` of the running HIL bridge, which must answer 200 with its own role. A child that cannot be run or reached (no built binary, nothing listening, no answer within `--timeout-ms`, a child that does not end is killed) is `UNREACHABLE`, one that answers wrongly is `UNHEALTHY`, and SYNTHETIC-DATA-GEN, a Python project with nothing to run, is `NOT PROBED` and never reported as healthy. `serve --health-probes` adds `GET /family-health` (off by default; the binary and the address come from the configuration, never from the request, a `?workspace=` is ignored; answers are cached for `--health-cache-ms`, default 5000). 16 new tests (77 in all: fake children, a service that never answers, a binary that never ends, and the real binary of the sibling checkout when it is built), and run by hand against the real HIL bridge.
 
