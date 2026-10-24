@@ -244,6 +244,20 @@ fn run_serve(args: &[String]) -> ExitCode {
         }
     };
 
+    // How many requests are served at once (default 8): a slow one holds one worker, not the server.
+    let workers: usize = match find_flag(args, "--workers") {
+        Some(raw) => match raw.parse::<usize>() {
+            Ok(n) if (1..=256).contains(&n) => n,
+            _ => {
+                eprintln!(
+                    "[twin] fatal: --workers must be a whole number from 1 to 256, got {raw}"
+                );
+                return ExitCode::from(2);
+            }
+        },
+        None => server::DEFAULT_WORKERS,
+    };
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -260,7 +274,8 @@ fn run_serve(args: &[String]) -> ExitCode {
                 Some(c) => eprintln!("[twin] POST /interlock/certify signs risk reports with key {} (public key {})", c.signer.key_id(), c.signer.public_key_hex()),
                 None => eprintln!("[twin] POST /interlock/certify is off: no --signing-key-file and --certify-token-file"),
             }
-            server::run_with_certifier(bound, workspace, strict_root, certifier);
+            eprintln!("[twin] serving with {workers} worker thread(s)");
+            server::run_with_workers(bound, workspace, strict_root, certifier, workers);
             ExitCode::SUCCESS
         }
         Err(e) => {

@@ -283,73 +283,120 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
     }
 }
 
+/// How many requests are served at once. One request that is slow (a `?workspace=` on a network file system that does not answer, a
+/// client that sends its body one byte a minute) holds one worker, never the whole server.
+pub const DEFAULT_WORKERS: usize = 8;
+
+/// Everything a request needs, shared by the workers.
+struct Context {
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+}
+
 /// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
+#[cfg(test)]
 pub fn run_with_certifier(
     server: Server,
     workspace: PathBuf,
     strict_root: Option<PathBuf>,
     certifier: Option<Certifier>,
 ) {
+    run_with_workers(server, workspace, strict_root, certifier, DEFAULT_WORKERS);
+}
+
+/// The same server with `workers` threads (at least one) taking requests from the one listening socket.
+pub fn run_with_workers(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+    workers: usize,
+) {
+    let server = std::sync::Arc::new(server);
+    let context = std::sync::Arc::new(Context {
+        workspace,
+        strict_root,
+        certifier,
+    });
+    let mut handles = Vec::new();
+    for _ in 1..workers.max(1) {
+        let (server, context) = (server.clone(), context.clone());
+        handles.push(std::thread::spawn(move || serve_loop(&server, &context)));
+    }
+    serve_loop(&server, &context);
+    for handle in handles {
+        let _ = handle.join();
+    }
+}
+
+fn serve_loop(server: &Server, context: &Context) {
     for request in server.incoming_requests() {
-        let url = request.url().to_string();
-        let path = url.split('?').next().unwrap_or("").to_string();
+        handle_request(request, context);
+    }
+}
 
-        if request.method() == &Method::Post && path == "/interlock/certify" {
-            handle_certify(request, certifier.as_ref());
-            continue;
+fn handle_request(request: tiny_http::Request, context: &Context) {
+    let workspace = &context.workspace;
+    let url = request.url().to_string();
+    let path = url.split('?').next().unwrap_or("").to_string();
+
+    if request.method() == &Method::Post && path == "/interlock/certify" {
+        handle_certify(request, context.certifier.as_ref());
+        return;
+    }
+
+    if request.method() != &Method::Get {
+        write_json(request, 405, &json!({"error": "method not allowed"}));
+        return;
+    }
+
+    let effective_workspace = match resolve_workspace_override(&url, context.strict_root.as_deref())
+    {
+        Ok(Some(resolved)) => resolved,
+        Ok(None) => workspace.clone(),
+        Err(message) => {
+            write_json(request, 400, &json!({"error": message}));
+            return;
         }
+    };
 
-        if request.method() != &Method::Get {
-            write_json(request, 405, &json!({"error": "method not allowed"}));
-            continue;
+    match path.as_str() {
+        "/family-status" => {
+            let statuses = check_family_status(&effective_workspace);
+            let all_present = statuses.iter().all(|s| s.is_present());
+            write_json(
+                request,
+                200,
+                &json!({
+                    "workspace": effective_workspace.display().to_string(),
+                    "children": statuses,
+                    "allPresent": all_present,
+                }),
+            );
         }
-
-        let effective_workspace = match resolve_workspace_override(&url, strict_root.as_deref()) {
-            Ok(Some(resolved)) => resolved,
-            Ok(None) => workspace.clone(),
-            Err(message) => {
-                write_json(request, 400, &json!({"error": message}));
-                continue;
-            }
-        };
-
-        match path.as_str() {
-            "/family-status" => {
-                let statuses = check_family_status(&effective_workspace);
-                let all_present = statuses.iter().all(|s| s.is_present());
-                write_json(
-                    request,
-                    200,
-                    &json!({
-                        "workspace": effective_workspace.display().to_string(),
-                        "children": statuses,
-                        "allPresent": all_present,
-                    }),
-                );
-            }
-            "/family-sync" => {
-                let statuses = assess_family_sync(&effective_workspace);
-                let all_ready = statuses.iter().all(|s| s.outcome.is_ready());
-                write_json(
-                    request,
-                    200,
-                    &json!({
-                        "workspace": effective_workspace.display().to_string(),
-                        "children": statuses,
-                        "allReady": all_ready,
-                    }),
-                );
-            }
-            "/stats" => {
-                write_json(
-                    request,
-                    200,
-                    &json!({"workspace": workspace.display().to_string()}),
-                );
-            }
-            _ => {
-                write_json(request, 404, &json!({"error": "not found"}));
-            }
+        "/family-sync" => {
+            let statuses = assess_family_sync(&effective_workspace);
+            let all_ready = statuses.iter().all(|s| s.outcome.is_ready());
+            write_json(
+                request,
+                200,
+                &json!({
+                    "workspace": effective_workspace.display().to_string(),
+                    "children": statuses,
+                    "allReady": all_ready,
+                }),
+            );
+        }
+        "/stats" => {
+            write_json(
+                request,
+                200,
+                &json!({"workspace": workspace.display().to_string()}),
+            );
+        }
+        _ => {
+            write_json(request, 404, &json!({"error": "not found"}));
         }
     }
 }
@@ -789,5 +836,36 @@ mod tests {
         let ws = tempdir();
         let port = start_test_server(ws);
         assert_eq!(post_certify(port, &auth(), REPORT).0, 404);
+    }
+
+    #[test]
+    fn a_client_that_holds_a_connection_open_without_finishing_its_request_does_not_stop_the_others(
+    ) {
+        let workspace = tempdir();
+        let port = start_test_server(workspace);
+        // connect and send half a request line, never the rest: this connection is stuck for as long as it stays open
+        let mut stuck = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stuck.write_all(b"GET /stats HT").unwrap();
+        let mut other = Vec::new();
+        for _ in 0..3 {
+            let stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                .unwrap();
+            other.push(stream);
+        }
+        for stream in &mut other {
+            stream
+                .write_all(b"GET /stats HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+                .unwrap();
+        }
+        for stream in &mut other {
+            let mut raw = String::new();
+            stream
+                .read_to_string(&mut raw)
+                .expect("the other clients are answered while one is stuck");
+            assert!(raw.starts_with("HTTP/1.1 200"), "{raw}");
+        }
+        drop(stuck);
     }
 }

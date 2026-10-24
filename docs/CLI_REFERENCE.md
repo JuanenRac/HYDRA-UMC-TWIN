@@ -149,7 +149,13 @@ missing or contract-rejected is real data in the response body
 
 **`GET /stats`** — `{"workspace": "<the server's own default workspace>"}`, `200`.
 
-Any other path, or any non-`GET` request, is `404`. There is no
+Any other path is `404`, and any non-`GET` request (but the certify route) is `405`.
+
+`serve --workers N` (default 8, from 1 to 256) is how many requests are served at once: a request that is slow (a
+`?workspace=` on a network file system that does not answer, a client that sends half a request and stays) holds
+one worker, not the whole server.
+
+There is no
 authentication — same as every other loopback-only internal API on the
 CM5 (see the systemd unit's own hardening for what it relies on instead).
 
