@@ -287,11 +287,45 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
 /// client that sends its body one byte a minute) holds one worker, never the whole server.
 pub const DEFAULT_WORKERS: usize = 8;
 
+/// `GET /family-health`: the active probes of `health.rs`. They run a child binary and call a service, so the route exists only when
+/// the server is started with `--health-probes`, uses only what the configuration says (never a parameter of the request) and answers
+/// from a cache for `cache_ms`, so a client that asks in a loop cannot make the server run a process in a loop.
+pub struct HealthRoute {
+    pub config: crate::health::HealthConfig,
+    pub cache_ms: u64,
+    cache: std::sync::Mutex<Option<(std::time::Instant, Vec<crate::health::ChildHealth>)>>,
+}
+
+impl HealthRoute {
+    pub fn new(config: crate::health::HealthConfig, cache_ms: u64) -> Self {
+        Self {
+            config,
+            cache_ms,
+            cache: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// The report, from the cache when it is younger than `cache_ms`. The lock is held while the probes run, so callers that arrive
+    /// together share one run.
+    fn report(&self, workspace: &std::path::Path) -> (Vec<crate::health::ChildHealth>, bool) {
+        let mut cache = self.cache.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some((at, report)) = cache.as_ref() {
+            if at.elapsed() < std::time::Duration::from_millis(self.cache_ms) {
+                return (report.clone(), true);
+            }
+        }
+        let report = crate::health::check_family_health(workspace, &self.config);
+        *cache = Some((std::time::Instant::now(), report.clone()));
+        (report, false)
+    }
+}
+
 /// Everything a request needs, shared by the workers.
 struct Context {
     workspace: PathBuf,
     strict_root: Option<PathBuf>,
     certifier: Option<Certifier>,
+    health: Option<HealthRoute>,
 }
 
 /// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
@@ -306,6 +340,7 @@ pub fn run_with_certifier(
 }
 
 /// The same server with `workers` threads (at least one) taking requests from the one listening socket.
+#[cfg(test)]
 pub fn run_with_workers(
     server: Server,
     workspace: PathBuf,
@@ -313,11 +348,24 @@ pub fn run_with_workers(
     certifier: Option<Certifier>,
     workers: usize,
 ) {
+    run_with_options(server, workspace, strict_root, certifier, workers, None);
+}
+
+/// The whole configuration of the server: the optional parts (the certificate signer, the active health probes) are `None` when off.
+pub fn run_with_options(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+    workers: usize,
+    health: Option<HealthRoute>,
+) {
     let server = std::sync::Arc::new(server);
     let context = std::sync::Arc::new(Context {
         workspace,
         strict_root,
         certifier,
+        health,
     });
     let mut handles = Vec::new();
     for _ in 1..workers.max(1) {
@@ -388,6 +436,28 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
                 }),
             );
         }
+        "/family-health" => match &context.health {
+            // the workspace of the probes is the one the server was started with: a `?workspace=` of the request does not choose what runs
+            Some(route) => {
+                let (children, cached) = route.report(workspace);
+                let all_healthy = crate::health::all_probed_healthy(&children);
+                write_json(
+                    request,
+                    200,
+                    &json!({
+                        "workspace": workspace.display().to_string(),
+                        "children": children,
+                        "allHealthy": all_healthy,
+                        "cached": cached,
+                    }),
+                );
+            }
+            None => write_json(
+                request,
+                404,
+                &json!({"error": "the active health probes are off; start the server with --health-probes"}),
+            ),
+        },
         "/stats" => {
             write_json(
                 request,
@@ -867,5 +937,76 @@ mod tests {
             assert!(raw.starts_with("HTTP/1.1 200"), "{raw}");
         }
         drop(stuck);
+    }
+
+    fn start_test_server_with_health(workspace: PathBuf, route: HealthRoute) -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
+        let port = server.server_addr().to_ip().unwrap().port();
+        thread::spawn(move || {
+            run_with_options(server, workspace, None, None, DEFAULT_WORKERS, Some(route))
+        });
+        port
+    }
+
+    #[test]
+    fn the_health_route_is_off_unless_the_server_is_started_with_the_probes() {
+        let port = start_test_server(tempdir());
+        let (status, body) = get(port, "/family-health");
+        assert_eq!(status, 404);
+        assert!(body.contains("--health-probes"), "{body}");
+    }
+
+    #[test]
+    fn the_health_route_reports_each_child_and_answers_from_the_cache_inside_the_window() {
+        let ws = tempdir();
+        let closed = {
+            let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            l.local_addr().unwrap().to_string()
+        };
+        let route = HealthRoute::new(
+            crate::health::HealthConfig {
+                hil_bridge_addr: closed,
+                timeout: std::time::Duration::from_millis(500),
+                ..crate::health::HealthConfig::default()
+            },
+            60_000,
+        );
+        let port = start_test_server_with_health(ws.clone(), route);
+        let (status, body) = get(port, "/family-health");
+        assert_eq!(status, 200, "{body}");
+        let first: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(first["allHealthy"], false);
+        assert_eq!(first["cached"], false);
+        let children = first["children"].as_array().unwrap();
+        assert_eq!(children.len(), 3);
+        assert_eq!(children[0]["probe"]["state"], "unreachable");
+        assert_eq!(children[1]["probe"]["state"], "unreachable");
+        assert_eq!(children[2]["probe"]["state"], "not_probed");
+        let (_, again) = get(port, "/family-health");
+        let second: serde_json::Value = serde_json::from_str(&again).unwrap();
+        assert_eq!(second["cached"], true);
+    }
+
+    #[test]
+    fn a_workspace_in_the_query_does_not_choose_what_the_probes_run() {
+        let ws = tempdir();
+        let elsewhere = tempdir();
+        let route = HealthRoute::new(
+            crate::health::HealthConfig {
+                hil_bridge_addr: "127.0.0.1:1".to_string(),
+                timeout: std::time::Duration::from_millis(300),
+                ..crate::health::HealthConfig::default()
+            },
+            0,
+        );
+        let port = start_test_server_with_health(ws.clone(), route);
+        let query = elsewhere
+            .display()
+            .to_string()
+            .replace('\\', "%5C")
+            .replace(':', "%3A");
+        let (_, body) = get(port, &format!("/family-health?workspace={query}"));
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["workspace"], ws.display().to_string());
     }
 }

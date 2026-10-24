@@ -41,6 +41,7 @@ Written in Rust, today it reads the manifests of its three children (PHYSICS-REP
 * 🔒 **Real v0 - State-Sync Contract:** `family-sync` gates each child on a real, testable contract - minimum maturity (`functional`) and a maximum compatible major version - before ever treating it as sync-ready, refusing an immature or incompatible-version child with a real reason instead of syncing against an unverified state shape.
 * 🔏 **Interlock certificates:** `POST /interlock/certify` signs a risk report (joint, position, `collision_imminent`, `distance_m`) with the Ed25519 key of the twin and returns a certificate that HYDRA-UMC-HIL-BRIDGE accepts for that command only (fresh, single use) before it sends anything to real hardware. The route exists only when the server starts with `--signing-key-file` and `--certify-token-file` (or `HYDRA_UMC_TWIN_CERTIFY_TOKEN`): without the token nobody can ask for a signature, without a key the route answers `404`, and one without the other does not start. `keygen --key-file PATH` makes a key (never over an existing file) and prints the public key to give to the bridge. Until the physics engine exists, the twin signs the report of the caller that holds the token (the physics replica), not one it computed itself: a certificate is only as good as its source. The format is in `docs/INTERLOCK_CERTIFICATE.md`. *(implemented, tried against the real bridge binary)*
 * 🔌 **HTTP JSON API (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PATH]` (default `127.0.0.1:8111`) exposes the exact same family-status/family-sync logic over `GET /family-status`, `GET /family-sync`, `GET /stats` via a real blocking `tiny_http` server - the same binary a deployed CM5's `systemd/hydra-umc-twin.service` unit runs (loopback-only). See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full contract.
+* 🩺 **Active health check of the children (v0):** `family-health` does not believe the manifests: it runs the built PHYSICS-REPLICA binary on a probe URDF and compares the pose with the exact one, and calls `GET /stats` of the running HIL bridge (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). A child that cannot be run or reached, or that answers wrongly, is reported as such; SYNTHETIC-DATA-GEN has nothing to run and is reported as not probed. `serve --health-probes` adds `GET /family-health` (off by default, answers cached, never chooses what runs from the request). *(implemented)*
 * 🌐 **Full Factory Simulation (planned):** replicates robots, tools, and the environment in a unified 3D space - depends on the real Bevy engine integration.
 * ⚡ **Hardware-in-the-Loop (HIL) (planned):** connect Apps and Studios to the simulator as if it were a real controller.
 * 📊 **Wear Prediction (planned):** estimates component lifespan based on simulated mechanical stress.
@@ -90,6 +91,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # Real family-readiness check + combined sync outcome
 │   ├── contract.rs       # Real state-sync contract (maturity + version ceiling)
 │   ├── certificate.rs    # Ed25519 interlock certificates: the signed text, signing, nonces, key generation
+│   ├── health.rs         # Active probes of the children: runs the PHYSICS-REPLICA binary, calls the HIL bridge
 │   ├── server.rs         # Plain JSON/HTTP surface (tiny_http, blocking, no async runtime)
 │   └── main.rs           # Entry point + real `family-status`/`family-sync` subcommands
 ├── docs/                # Documentation and physics tuning
@@ -116,7 +118,7 @@ Requires the Rust toolchain (`cargo`/`rustc`, install via [rustup](https://rustu
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (44 tests), then `cargo build --release`
+./build.sh   # `cargo test` (77 tests), then `cargo build --release`
 ./run.sh     # runs target/release/hydra-umc-twin, prints name + version + role
 ```
 

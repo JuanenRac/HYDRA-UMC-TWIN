@@ -41,6 +41,7 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 * 🔒 **実装済み v0 —— 状態同期契約：** `family-sync` は、各子プロジェクトを同期可能とみなす前に、実際のテスト可能な契約——最低成熟度（`functional`）と互換性のある最大メジャーバージョン——でふるいにかけ、未成熟またはバージョン非互換の子プロジェクトを、検証されていない状態形状に対して同期する代わりに、実際の理由とともに拒否します。
 * 🔏 **インターロック証明書:** `POST /interlock/certify` は、リスク報告(関節、位置、`collision_imminent`、`distance_m`)に双子の Ed25519 鍵で署名し、HYDRA-UMC-HIL-BRIDGE が実機に何かを送る前に、そのコマンドに限って(新しく、一度だけ)受け入れる証明書を返します。このルートは、サーバーが `--signing-key-file` と `--certify-token-file`(または `HYDRA_UMC_TWIN_CERTIFY_TOKEN`)付きで起動したときだけ存在します。トークンがなければ誰も署名を要求できず、鍵がなければルートは `404` を返し、どちらか一方だけでは起動しません。`keygen --key-file パス` は鍵を作り(既存のファイルには決して上書きしません)、ブリッジに渡す公開鍵を表示します。物理エンジンができるまで、双子はトークンを持つ呼び出し側(物理レプリカ)の報告に署名するだけで、自分で計算した報告ではありません。証明書の価値はその出どころ次第です。形式は `docs/INTERLOCK_CERTIFICATE.md` にあります。*(実装済み、実際のブリッジのバイナリで試験済み)*
 * 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace パス]`（デフォルト `127.0.0.1:8111`）は、同じ family-status/family-sync ロジックを、実際のブロッキング `tiny_http` サーバー経由で `GET /family-status`、`GET /family-sync`、`GET /stats` として公開します——デプロイされた CM5 の `systemd/hydra-umc-twin.service` ユニットが実行するのと同じバイナリです（ループバックのみ）。完全な契約は [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
+* 🩺 **子プロジェクトの能動的な健全性チェック (v0):** `family-health` はマニフェストを信用しません。ビルド済みの PHYSICS-REPLICA バイナリをテスト用 URDF で実行して姿勢を正確な値と比較し、稼働中の HIL ブリッジの `GET /stats` を呼び出します(`--physics-replica-bin`、`--hil-bridge-addr`、`--timeout-ms`)。実行できない・到達できない、または誤った応答を返す子はその旨が報告され、実行するものがない SYNTHETIC-DATA-GEN は未プローブとして報告されます。`serve --health-probes` で `GET /family-health` が加わります(既定ではオフ、応答はキャッシュされ、リクエストが実行内容を選ぶことはありません)。*(実装済み)*
 * 🌐 **完全な工場シミュレーション（計画中）：** ロボット、工具、環境を統一された 3D 空間内で複製します——まず実際の Bevy エンジン統合が存在することが前提です。
 * ⚡ **ハードウェア・イン・ザ・ループ（HIL）（計画中）：** アプリと Studio を、あたかも実際のコントローラーであるかのようにシミュレーターに接続します。
 * 📊 **摩耗予測（計画中）：** シミュレートされた機械的応力に基づいてコンポーネントの寿命を推定します。
@@ -90,6 +91,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # 実際のレディネスチェック + 統合された同期結果
 │   ├── contract.rs       # 実際の状態同期契約（成熟度 + バージョン上限）
 │   ├── certificate.rs    # Ed25519 インターロック証明書:署名対象のテキスト、署名、nonce、鍵の生成
+│   ├── health.rs         # 子プロジェクトの能動プローブ:PHYSICS-REPLICA のバイナリを実行し、HIL ブリッジを呼び出す
 │   ├── server.rs         # シンプルなJSON/HTTPサーフェス(tiny_http、ブロッキング、非同期ランタイムなし)
 │   └── main.rs           # エントリポイント + 実際の `family-status`/`family-sync` サブコマンド
 ├── docs/                # ドキュメントと物理チューニング
@@ -117,7 +119,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（44 件のテスト）、その後 `cargo build --release`
+./build.sh   # 、`cargo test`（77 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 

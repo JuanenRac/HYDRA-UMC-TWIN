@@ -41,6 +41,7 @@ In Rust geschrieben, liest es heute die Manifeste seiner drei Kinder (PHYSICS-RE
 * 🔒 **Echtes v0 - Zustands-Sync-Vertrag:** `family-sync` filtert jedes Kind nach einem echten, testbaren Vertrag - Mindestreife (`functional`) und eine maximal kompatible Hauptversion - bevor es überhaupt als sync-bereit behandelt wird, und weist ein unreifes oder versionsinkompatibles Kind mit einem echten Grund ab, statt gegen eine unverifizierte Zustandsform zu synchronisieren.
 * 🔏 **Verriegelungszertifikate:** `POST /interlock/certify` signiert einen Risikobericht (Gelenk, Position, `collision_imminent`, `distance_m`) mit dem Ed25519-Schlüssel des Zwillings und liefert ein Zertifikat, das HYDRA-UMC-HIL-BRIDGE nur für genau diesen Befehl akzeptiert (aktuell, einmalig verwendbar), bevor es etwas an echte Hardware schickt. Die Route gibt es nur, wenn der Server mit `--signing-key-file` und `--certify-token-file` (oder `HYDRA_UMC_TWIN_CERTIFY_TOKEN`) startet: ohne das Token kann niemand eine Signatur anfordern, ohne Schlüssel antwortet die Route `404`, und eines ohne das andere startet nicht. `keygen --key-file PFAD` erzeugt einen Schlüssel (nie über eine vorhandene Datei) und gibt den öffentlichen Schlüssel aus, der der Bridge gegeben wird. Solange es die Physik-Engine nicht gibt, signiert der Zwilling den Bericht des Aufrufers mit dem Token (der Physik-Replik), keinen selbst berechneten: ein Zertifikat ist nur so gut wie seine Quelle. Das Format steht in `docs/INTERLOCK_CERTIFICATE.md`. *(implementiert, gegen die echte Bridge-Binärdatei erprobt)*
 * 🔌 **HTTP-JSON-API (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PFAD]` (Standard `127.0.0.1:8111`) stellt genau dieselbe family-status/family-sync-Logik über `GET /family-status`, `GET /family-sync`, `GET /stats` per echtem, blockierendem `tiny_http`-Server bereit - dieselbe Binärdatei, die die Einheit `systemd/hydra-umc-twin.service` auf einer bereitgestellten CM5 ausführt (nur Loopback). Siehe [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für den vollständigen Vertrag.
+* 🩺 **Aktive Gesundheitsprüfung der Kinder (v0):** `family-health` glaubt den Manifesten nicht: Es führt die gebaute PHYSICS-REPLICA-Binärdatei auf einer Test-URDF aus und vergleicht die Pose mit der exakten und ruft `GET /stats` der laufenden HIL-Brücke auf (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). Ein Kind, das sich nicht starten oder erreichen lässt oder falsch antwortet, wird als solches gemeldet; SYNTHETIC-DATA-GEN hat nichts auszuführen und gilt als nicht geprüft. `serve --health-probes` fügt `GET /family-health` hinzu (standardmäßig aus, Antworten zwischengespeichert, die Anfrage wählt nie, was ausgeführt wird). *(umgesetzt)*
 * 🌐 **Vollständige Fabriksimulation (geplant):** repliziert Roboter, Werkzeuge und die Umgebung in einem einheitlichen 3D-Raum - setzt voraus, dass zuerst eine echte Bevy-Engine-Integration existiert.
 * ⚡ **Hardware-in-the-Loop (HIL) (geplant):** Verbinden Sie Apps und Studios mit dem Simulator, als wäre er ein echter Controller.
 * 📊 **Verschleißvorhersage (geplant):** schätzt die Lebensdauer von Komponenten basierend auf simuliertem mechanischem Stress.
@@ -90,6 +91,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # Echter Bereitschaftscheck + kombiniertes Sync-Ergebnis
 │   ├── contract.rs       # Echter Zustands-Sync-Vertrag (Reife + Versionsobergrenze)
 │   ├── certificate.rs    # Ed25519-Verriegelungszertifikate: der signierte Text, die Signatur, die Nonces, die Schlüsselerzeugung
+│   ├── health.rs         # Aktive Sonden der Kinder: startet die Binärdatei von PHYSICS-REPLICA, ruft die HIL-Brücke auf
 │   ├── server.rs         # Einfache JSON/HTTP-Oberfläche (tiny_http, blockierend, ohne Async-Runtime)
 │   └── main.rs           # Einstiegspunkt + echte `family-status`/`family-sync`-Subbefehle
 ├── docs/                # Dokumentation und Physikanpassung
@@ -116,7 +118,7 @@ Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https:/
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (44 Tests), dann `cargo build --release`
+./build.sh   # `cargo test` (77 Tests), dann `cargo build --release`
 ./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
 ```
 

@@ -17,6 +17,7 @@
 mod certificate;
 mod contract;
 mod family;
+mod health;
 mod manifest;
 mod server;
 
@@ -31,6 +32,10 @@ const PROJECT_NAME: &str = "HYDRA-UMC-TWIN";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const ROLE: &str =
     "Digital Twin integration hub: family readiness and state-sync contract for PHYSICS-REPLICA, HIL-BRIDGE and SYNTHETIC-DATA-GEN (physics engine planned).";
+
+fn has_flag(args: &[String], flag: &str) -> bool {
+    args.iter().any(|a| a == flag)
+}
 
 fn find_flag(args: &[String], flag: &str) -> Option<String> {
     args.iter()
@@ -139,6 +144,76 @@ fn run_family_sync(args: &[String]) -> ExitCode {
         ExitCode::SUCCESS
     } else {
         println!("Not every child is sync-ready - see the lines above.");
+        ExitCode::from(1)
+    }
+}
+
+/// The probes of `health.rs` from `--physics-replica-bin`, `--hil-bridge-addr` and `--timeout-ms` (or HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN and
+/// HYDRA_UMC_TWIN_HIL_ADDR).
+fn load_health_config(args: &[String]) -> Result<health::HealthConfig, String> {
+    let mut config = health::HealthConfig::default();
+    if let Some(path) = find_flag(args, "--physics-replica-bin")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN").ok())
+        .filter(|p| !p.trim().is_empty())
+    {
+        config.physics_replica_bin = Some(PathBuf::from(path));
+    }
+    if let Some(addr) = find_flag(args, "--hil-bridge-addr")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_HIL_ADDR").ok())
+        .filter(|a| !a.trim().is_empty())
+    {
+        config.hil_bridge_addr = addr;
+    }
+    if let Some(raw) = find_flag(args, "--timeout-ms") {
+        let ms: u64 = raw
+            .parse()
+            .ok()
+            .filter(|ms| (100..=60_000).contains(ms))
+            .ok_or_else(|| {
+                format!("--timeout-ms must be a whole number from 100 to 60000, got {raw}")
+            })?;
+        config.timeout = std::time::Duration::from_millis(ms);
+    }
+    Ok(config)
+}
+
+fn run_family_health(args: &[String]) -> ExitCode {
+    let workspace: PathBuf = find_flag(args, "--workspace")
+        .map(PathBuf::from)
+        .unwrap_or_else(default_workspace);
+    let config = match load_health_config(args) {
+        Ok(config) => config,
+        Err(message) => {
+            eprintln!("family-health: {message}");
+            return ExitCode::from(2);
+        }
+    };
+    println!(
+        "Digital Twin family health (workspace: {}, HIL bridge at {}):",
+        workspace.display(),
+        config.hil_bridge_addr
+    );
+    let children = health::check_family_health(&workspace, &config);
+    for child in &children {
+        match &child.probe {
+            health::Probe::Healthy { detail } => println!("  {}: HEALTHY - {detail}", child.name),
+            health::Probe::Unhealthy { reason } => {
+                println!("  {}: UNHEALTHY - {reason}", child.name)
+            }
+            health::Probe::Unreachable { reason } => {
+                println!("  {}: UNREACHABLE - {reason}", child.name)
+            }
+            health::Probe::NotProbed { reason } => {
+                println!("  {}: NOT PROBED - {reason}", child.name)
+            }
+        }
+    }
+    println!();
+    if health::all_probed_healthy(&children) {
+        println!("Every child that can be probed is healthy.");
+        ExitCode::SUCCESS
+    } else {
+        println!("Not every child was found healthy - see the lines above.");
         ExitCode::from(1)
     }
 }
@@ -258,6 +333,34 @@ fn run_serve(args: &[String]) -> ExitCode {
         None => server::DEFAULT_WORKERS,
     };
 
+    // The active probes (`GET /family-health`) run a child binary and call a service: off unless asked for.
+    let health_route = if has_flag(args, "--health-probes")
+        || env::var("HYDRA_UMC_TWIN_HEALTH_PROBES")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+    {
+        let config = match load_health_config(args) {
+            Ok(config) => config,
+            Err(message) => {
+                eprintln!("[twin] fatal: {message}");
+                return ExitCode::from(2);
+            }
+        };
+        let cache_ms: u64 = match find_flag(args, "--health-cache-ms") {
+            None => 5_000,
+            Some(raw) => match raw.parse::<u64>() {
+                Ok(ms) if ms <= 3_600_000 => ms,
+                _ => {
+                    eprintln!("[twin] fatal: --health-cache-ms must be a whole number of milliseconds up to 3600000, got {raw}");
+                    return ExitCode::from(2);
+                }
+            },
+        };
+        Some(server::HealthRoute::new(config, cache_ms))
+    } else {
+        None
+    };
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -274,8 +377,29 @@ fn run_serve(args: &[String]) -> ExitCode {
                 Some(c) => eprintln!("[twin] POST /interlock/certify signs risk reports with key {} (public key {})", c.signer.key_id(), c.signer.public_key_hex()),
                 None => eprintln!("[twin] POST /interlock/certify is off: no --signing-key-file and --certify-token-file"),
             }
+            match &health_route {
+                Some(route) => eprintln!(
+                    "[twin] GET /family-health runs the active probes (PHYSICS-REPLICA binary: {}; HIL bridge at {}; answers cached for {} ms)",
+                    route
+                        .config
+                        .physics_replica_bin
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "the one built next to the workspace".to_string()),
+                    route.config.hil_bridge_addr,
+                    route.cache_ms
+                ),
+                None => eprintln!("[twin] GET /family-health is off: start with --health-probes to run the active probes"),
+            }
             eprintln!("[twin] serving with {workers} worker thread(s)");
-            server::run_with_workers(bound, workspace, strict_root, certifier, workers);
+            server::run_with_options(
+                bound,
+                workspace,
+                strict_root,
+                certifier,
+                workers,
+                health_route,
+            );
             ExitCode::SUCCESS
         }
         Err(e) => {
@@ -291,6 +415,7 @@ fn main() -> ExitCode {
     match args.first().map(|s| s.as_str()) {
         Some("family-status") => run_family_status(&args[1..]),
         Some("family-sync") => run_family_sync(&args[1..]),
+        Some("family-health") => run_family_health(&args[1..]),
         Some("serve") => run_serve(&args[1..]),
         Some("keygen") => run_keygen(&args[1..]),
         _ => {

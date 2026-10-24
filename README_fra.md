@@ -41,6 +41,7 @@
 * 🔒 **Réel v0 - Contrat de synchronisation d'état :** `family-sync` filtre chaque enfant selon un contrat réel et testable - maturité minimale (`functional`) et une version majeure maximale compatible - avant de le traiter comme prêt à synchroniser, refusant un enfant immature ou à version incompatible avec une vraie raison plutôt que de synchroniser contre une forme d'état non vérifiée.
 * 🔏 **Certificats d'interverrouillage :** `POST /interlock/certify` signe un rapport de risque (articulation, position, `collision_imminent`, `distance_m`) avec la clé Ed25519 du jumeau et renvoie un certificat que HYDRA-UMC-HIL-BRIDGE n'accepte que pour cette commande (récent, à usage unique) avant d'envoyer quoi que ce soit au matériel réel. La route n'existe que si le serveur démarre avec `--signing-key-file` et `--certify-token-file` (ou `HYDRA_UMC_TWIN_CERTIFY_TOKEN`) : sans le jeton personne ne peut demander de signature, sans clé la route répond `404`, et l'un sans l'autre ne démarre pas. `keygen --key-file CHEMIN` crée une clé (jamais par-dessus un fichier existant) et affiche la clé publique à donner au bridge. Tant que le moteur de physique n'existe pas, le jumeau signe le rapport de l'appelant qui détient le jeton (le réplicateur de physique), pas un rapport qu'il a calculé lui-même : un certificat vaut ce que vaut sa source. Le format est dans `docs/INTERLOCK_CERTIFICATE.md`. *(implémenté, essayé contre le vrai binaire du bridge)*
 * 🔌 **API JSON HTTP (v0) :** `serve [--addr ADDR] [--port PORT] [--workspace CHEMIN]` (par défaut `127.0.0.1:8111`) expose exactement la même logique family-status/family-sync via `GET /family-status`, `GET /family-sync`, `GET /stats` par un vrai serveur `tiny_http` bloquant - le même binaire que l'unité `systemd/hydra-umc-twin.service` exécute sur une CM5 déployée (loopback uniquement). Voir [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) pour le contrat complet.
+* 🩺 **Contrôle actif de la santé des enfants (v0) :** `family-health` ne croit pas les manifestes : il exécute le binaire compilé de PHYSICS-REPLICA sur un URDF de test et compare la pose à la pose exacte, et appelle `GET /stats` du pont HIL en marche (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). Un enfant qu'on ne peut ni exécuter ni joindre, ou qui répond mal, est signalé comme tel ; SYNTHETIC-DATA-GEN n'a rien à exécuter et est signalé comme non sondé. `serve --health-probes` ajoute `GET /family-health` (désactivé par défaut, réponses mises en cache, la requête ne choisit jamais ce qui s'exécute). *(implémenté)*
 * 🌐 **Simulation complète de l'usine (prévu) :** réplique les robots, les outils et l'environnement dans un espace 3D unifié - dépend qu'une véritable intégration du moteur Bevy existe d'abord.
 * ⚡ **Hardware-in-the-Loop (HIL) (prévu) :** connectez les applications et les studios au simulateur comme s'il s'agissait d'un contrôleur réel.
 * 📊 **Prédiction de l'usure (prévu) :** estime la durée de vie des composants en fonction des contraintes mécaniques simulées.
@@ -90,6 +91,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # Vraie vérification de disponibilité + résultat de sync combiné
 │   ├── contract.rs       # Vrai contrat de sync d'état (maturité + plafond de version)
 │   ├── certificate.rs    # Certificats d'interverrouillage Ed25519 : le texte signé, la signature, les nonces, la génération de clés
+│   ├── health.rs         # Sondes actives des enfants : lance le binaire de PHYSICS-REPLICA, appelle le pont HIL
 │   ├── server.rs         # Surface JSON/HTTP simple (tiny_http, bloquant, sans runtime async)
 │   └── main.rs           # Point d'entrée + vrais sous-commandes `family-status`/`family-sync`
 ├── docs/                # Documentation et réglage physique
@@ -116,7 +118,7 @@ Nécessite la chaîne d'outils Rust (`cargo`/`rustc`, à installer via [rustup](
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (44 tests), puis `cargo build --release`
+./build.sh   # `cargo test` (77 tests), puis `cargo build --release`
 ./run.sh     # exécute target/release/hydra-umc-twin, affiche nom + version + rôle
 ```
 

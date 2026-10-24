@@ -41,6 +41,7 @@ Escrito em Rust, hoje lê os manifestos dos seus três filhos (PHYSICS-REPLICA, 
 * 🔒 **v0 real - contrato de sincronização de estado:** o `family-sync` condiciona cada filho a um contrato real e testável - maturidade mínima (`functional`) e uma versão major máxima compatível - antes de o tratar como pronto para sincronizar, recusando um filho imaturo ou de versão incompatível com um motivo real em vez de sincronizar contra uma forma de estado não verificada.
 * 🔏 **Certificados de interbloqueio:** `POST /interlock/certify` assina um relatório de risco (articulação, posição, `collision_imminent`, `distance_m`) com a chave Ed25519 do gémeo e devolve um certificado que o HYDRA-UMC-HIL-BRIDGE só aceita para esse comando (atual, de uso único) antes de enviar o que quer que seja ao hardware real. A rota só existe se o servidor arrancar com `--signing-key-file` e `--certify-token-file` (ou `HYDRA_UMC_TWIN_CERTIFY_TOKEN`): sem o token ninguém pode pedir uma assinatura, sem chave a rota responde `404`, e um sem o outro não arranca. `keygen --key-file CAMINHO` cria uma chave (nunca sobre um ficheiro existente) e imprime a chave pública a dar ao bridge. Enquanto não existir o motor de física, o gémeo assina o relatório de quem chama com o token (a réplica de física), não um calculado por si: um certificado vale o que valer a sua fonte. O formato está em `docs/INTERLOCK_CERTIFICATE.md`. *(implementado, experimentado com o binário real do bridge)*
 * 🔌 **API JSON sobre HTTP (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PATH]` (por defeito `127.0.0.1:8111`) expõe exatamente a mesma lógica de family-status/family-sync através de `GET /family-status`, `GET /family-sync` e `GET /stats`, com um servidor `tiny_http` bloqueante real - o mesmo binário que a unidade `systemd/hydra-umc-twin.service` de uma CM5 instalada executa (apenas em loopback). Consulte o [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para o contrato completo.
+* 🩺 **Verificação ativa da saúde dos filhos (v0):** `family-health` não acredita nos manifestos: executa o binário compilado do PHYSICS-REPLICA sobre um URDF de teste e compara a pose com a exata, e chama `GET /stats` da ponte HIL em execução (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). Um filho que não se consegue executar nem alcançar, ou que responde mal, é indicado como tal; o SYNTHETIC-DATA-GEN não tem nada para executar e é indicado como não sondado. `serve --health-probes` acrescenta `GET /family-health` (desligado por omissão, respostas em cache, o pedido nunca escolhe o que se executa). *(implementado)*
 * 🌐 **Simulação completa da fábrica (planeada):** replica robôs, ferramentas e o ambiente num espaço 3D unificado - depende da integração real do motor Bevy.
 * ⚡ **Hardware-in-the-Loop (HIL) (planeado):** liga Apps e Studios ao simulador como se fosse um controlador real.
 * 📊 **Previsão de desgaste (planeada):** estima a vida útil dos componentes a partir do esforço mecânico simulado.
@@ -88,6 +89,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # Verificação real de prontidão da família + resultado combinado de sincronização
 │   ├── contract.rs       # Contrato real de sincronização de estado (maturidade + teto de versão)
 │   ├── certificate.rs    # Certificados de interbloqueio Ed25519: o texto assinado, a assinatura, os nonces, a geração de chaves
+│   ├── health.rs         # Sondas ativas dos filhos: executa o binário do PHYSICS-REPLICA, chama a ponte HIL
 │   ├── server.rs         # Superfície JSON/HTTP simples (tiny_http, bloqueante, sem runtime assíncrono)
 │   └── main.rs           # Ponto de entrada + subcomandos reais `family-status`/`family-sync`
 ├── docs/                # Documentação e ajuste da física
@@ -114,7 +116,7 @@ Requer a cadeia de ferramentas Rust (`cargo`/`rustc`, instalada via [rustup](htt
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (44 testes) e depois `cargo build --release`
+./build.sh   # `cargo test` (77 testes) e depois `cargo build --release`
 ./run.sh     # executa target/release/hydra-umc-twin, imprime nome + versão + papel
 ```
 

@@ -41,6 +41,7 @@ Scritto in Rust, oggi legge i manifesti dei suoi tre figli (PHYSICS-REPLICA, HIL
 * 🔒 **Reale v0 - Contratto di sincronizzazione dello stato:** `family-sync` filtra ogni figlio secondo un contratto reale e testabile - maturità minima (`functional`) e una versione major massima compatibile - prima di trattarlo come pronto per la sincronizzazione, rifiutando un figlio immaturo o con versione incompatibile con una vera motivazione invece di sincronizzare contro una forma di stato non verificata.
 * 🔏 **Certificati di interblocco:** `POST /interlock/certify` firma un rapporto di rischio (articolazione, posizione, `collision_imminent`, `distance_m`) con la chiave Ed25519 del gemello e restituisce un certificato che HYDRA-UMC-HIL-BRIDGE accetta solo per quel comando (recente, a uso singolo) prima di inviare qualcosa all'hardware reale. La rotta esiste solo se il server parte con `--signing-key-file` e `--certify-token-file` (o `HYDRA_UMC_TWIN_CERTIFY_TOKEN`): senza il token nessuno può chiedere una firma, senza chiave la rotta risponde `404`, e l'uno senza l'altra non parte. `keygen --key-file PERCORSO` crea una chiave (mai sopra un file esistente) e stampa la chiave pubblica da dare al bridge. Finché non esiste il motore di fisica, il gemello firma il rapporto di chi chiama con il token (la replica di fisica), non uno calcolato da sé: un certificato vale quanto la sua fonte. Il formato è in `docs/INTERLOCK_CERTIFICATE.md`. *(implementato, provato contro il vero binario del bridge)*
 * 🔌 **API JSON via HTTP (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PERCORSO]` (default `127.0.0.1:8111`) espone la stessa identica logica family-status/family-sync tramite `GET /family-status`, `GET /family-sync`, `GET /stats` attraverso un vero server `tiny_http` bloccante - lo stesso binario che l'unità `systemd/hydra-umc-twin.service` esegue su una CM5 distribuita (solo loopback). Vedi [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) per il contratto completo.
+* 🩺 **Controllo attivo della salute dei figli (v0):** `family-health` non si fida dei manifesti: esegue il binario compilato di PHYSICS-REPLICA su un URDF di prova e ne confronta la posa con quella esatta, e chiama `GET /stats` del ponte HIL in esecuzione (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). Un figlio che non si può eseguire né raggiungere, o che risponde in modo errato, viene segnalato come tale; SYNTHETIC-DATA-GEN non ha nulla da eseguire e risulta non sondato. `serve --health-probes` aggiunge `GET /family-health` (spento per impostazione predefinita, risposte in cache, la richiesta non sceglie mai cosa viene eseguito). *(implementato)*
 * 🌐 **Simulazione completa della fabbrica (previsto):** replica robot, strumenti e l'ambiente in uno spazio 3D unificato - dipende dall'esistenza preventiva di una vera integrazione del motore Bevy.
 * ⚡ **Hardware-in-the-loop (HIL) (previsto):** collega App e Studio al simulatore come se fosse un vero controller.
 * 📊 **Previsione dell'usura (previsto):** stima la durata dei componenti in base allo stress meccanico simulato.
@@ -91,6 +92,7 @@ HYDRA-UMC-TWIN/
 │   ├── family.rs         # Vero controllo di disponibilità + esito di sync combinato
 │   ├── contract.rs       # Vero contratto di sync di stato (maturità + tetto di version)
 │   ├── certificate.rs    # Certificati di interblocco Ed25519: il testo firmato, la firma, i nonce, la generazione delle chiavi
+│   ├── health.rs         # Sonde attive dei figli: esegue il binario di PHYSICS-REPLICA, chiama il ponte HIL
 │   ├── server.rs         # Superficie JSON/HTTP semplice (tiny_http, bloccante, senza runtime async)
 │   └── main.rs           # Entry point + veri sottocomandi `family-status`/`family-sync`
 ├── docs/                # Documentazione e ottimizzazione fisica
@@ -117,7 +119,7 @@ Richiede il toolchain Rust (`cargo`/`rustc`, installabile via [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (44 test), poi `cargo build --release`
+./build.sh   # `cargo test` (77 test), poi `cargo build --release`
 ./run.sh     # esegue target/release/hydra-umc-twin, stampa nome + version + ruolo
 ```
 

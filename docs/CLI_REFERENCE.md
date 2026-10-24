@@ -116,6 +116,16 @@ specific gate that failed (see `src/contract.rs`'s `assess()`); this
 machine's real siblings are all at least `functional` at major version `0`, so none
 of those rejection paths could be captured from a real run today.
 
+### `family-health [--workspace PATH] [--physics-replica-bin PATH] [--hil-bridge-addr HOST:PORT] [--timeout-ms N]`
+
+The active check: instead of reading what each child says about itself it asks the child to do something and checks the answer.
+
+- **HYDRA-UMC-PHYSICS-REPLICA** — its built binary (`--physics-replica-bin`, or `HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN`, or the one under `target/release` or `target/debug` of the child in the workspace) is run as `fk --urdf <probe> --joints turn=0.5 --json` on a two-joint probe URDF; the pose of the second joint must be (cos 0.5, sin 0.5, 0) within 1e-6.
+- **HYDRA-UMC-HIL-BRIDGE** — `GET /stats` at `--hil-bridge-addr` (default `127.0.0.1:8113`, or `HYDRA_UMC_TWIN_HIL_ADDR`) must answer `200` with a JSON body whose `role` is the bridge's own.
+- **HYDRA-UMC-SYNTHETIC-DATA-GEN** — a Python project with no service or binary to run: `NOT PROBED`, never `HEALTHY`.
+
+Each line is `HEALTHY`, `UNHEALTHY` (it ran or answered, and the answer was wrong), `UNREACHABLE` (no binary, nothing listening, no answer within `--timeout-ms`, 100 to 60000, default 5000; a child that does not end is killed) or `NOT PROBED`. Exit `0` when no probed child is unhealthy or unreachable, `1` otherwise, `2` for a bad option.
+
 ## `serve [--addr ADDR] [--port PORT] [--workspace PATH]`
 
 Starts a real, blocking HTTP JSON server (`src/server.rs`, `tiny_http`, no
@@ -148,6 +158,8 @@ missing or contract-rejected is real data in the response body
 (`allPresent`/`allReady: false`), not an HTTP-level error.
 
 **`GET /stats`** — `{"workspace": "<the server's own default workspace>"}`, `200`.
+
+**`GET /family-health`** (only with `serve --health-probes`, or `HYDRA_UMC_TWIN_HEALTH_PROBES=1`; otherwise `404`) — the report of `family-health` as `{"workspace", "children": [{"name", "probe": {"state": "healthy|unhealthy|unreachable|not_probed", ...}}], "allHealthy", "cached"}`. It runs a binary and calls a service, so the binary and the address are the ones of the configuration (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`), a `?workspace=` of the request is ignored, and the answer is cached for `--health-cache-ms` (default 5000) so a client that asks in a loop cannot make the server run a process in a loop. `allHealthy` is true when no probed child failed.
 
 Any other path is `404`, and any non-`GET` request (but the certify route) is `405`.
 
@@ -184,7 +196,9 @@ $ hydra-umc-twin serve --workspace /opt/hydra-umc/twin/workspace --strict-worksp
 |------|---------|
 | `0` | ok — `family-status`: every expected child is present; `family-sync`: every expected child is sync-ready |
 | `1` | `family-status`: at least one expected child is missing; `family-sync`: at least one expected child is missing or rejected by the sync contract |
-| `2` | `serve`: the HTTP server failed to bind the requested address/port |
+| `2` | `serve`: the HTTP server failed to bind the requested address/port, or an option is invalid |
+
+`family-health` exits `0` when no probed child is unhealthy or unreachable and `1` otherwise.
 
 ## Not yet wired in
 
