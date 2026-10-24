@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use serde_json::json;
 use tiny_http::{Header, Method, Response, Server};
 
+use crate::certificate::{random_nonce, RiskInput, Signer};
 use crate::family::{assess_family_sync, check_family_status};
 
 fn json_header() -> Header {
@@ -138,10 +139,165 @@ pub fn bind(addr: &str) -> std::io::Result<Server> {
 /// `?workspace=`. `strict_root`, when set, also bounds every
 /// `?workspace=` override to that root - see `resolve_workspace_override()`'s
 /// own doc comment.
+#[cfg(test)]
 pub fn run(server: Server, workspace: PathBuf, strict_root: Option<PathBuf>) {
+    run_with_certifier(server, workspace, strict_root, None);
+}
+
+/// What `POST /interlock/certify` needs: the key that signs and the token a caller must hold to ask for a signature.
+pub struct Certifier {
+    pub signer: Signer,
+    pub token: String,
+}
+
+/// The largest body `POST /interlock/certify` reads: a report is a few hundred bytes of JSON.
+const MAX_CERTIFY_BODY_BYTES: u64 = 4 * 1024;
+
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    let mut diff = a.len() ^ b.len();
+    for i in 0..a.len().max(b.len()) {
+        let x = a.get(i).copied().unwrap_or(0);
+        let y = b.get(i).copied().unwrap_or(0);
+        diff |= (x ^ y) as usize;
+    }
+    diff == 0
+}
+
+fn bearer_matches(request: &tiny_http::Request, expected: &str) -> bool {
+    request
+        .headers()
+        .iter()
+        .find(|h| {
+            h.field
+                .as_str()
+                .as_str()
+                .eq_ignore_ascii_case("authorization")
+        })
+        .and_then(|h| h.value.as_str().split_once(' '))
+        .map(|(scheme, presented)| {
+            scheme == "Bearer" && constant_time_eq(presented.trim().as_bytes(), expected.as_bytes())
+        })
+        .unwrap_or(false)
+}
+
+fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>) {
+    use std::io::Read;
+    let Some(certifier) = certifier else {
+        write_json(
+            request,
+            404,
+            &json!({"error": "signing is not configured on this server"}),
+        );
+        return;
+    };
+    if !bearer_matches(&request, &certifier.token) {
+        let response = tiny_http::Response::from_string(
+            json!({"error": "a valid bearer token is required to ask for a certificate"})
+                .to_string(),
+        )
+        .with_status_code(401)
+        .with_header(json_header())
+        .with_header(Header::from_bytes(&b"WWW-Authenticate"[..], &b"Bearer"[..]).unwrap());
+        let _ = request.respond(response);
+        return;
+    }
+    // a web page can send a "simple" cross-site POST to a loopback port: refuse anything from a browser, and anything not declared as JSON
+    let mut json_content_type = false;
+    for h in request.headers() {
+        let name = h.field.as_str().as_str();
+        if name.eq_ignore_ascii_case("origin") {
+            write_json(
+                request,
+                403,
+                &json!({"error": "requests carrying an Origin header are refused"}),
+            );
+            return;
+        }
+        if name.eq_ignore_ascii_case("content-type") {
+            json_content_type = h
+                .value
+                .as_str()
+                .to_ascii_lowercase()
+                .split(';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                == "application/json";
+        }
+    }
+    if !json_content_type {
+        write_json(
+            request,
+            415,
+            &json!({"error": "Content-Type must be application/json"}),
+        );
+        return;
+    }
+    let mut raw = Vec::new();
+    if request
+        .as_reader()
+        .take(MAX_CERTIFY_BODY_BYTES + 1)
+        .read_to_end(&mut raw)
+        .is_err()
+    {
+        write_json(
+            request,
+            400,
+            &json!({"error": "could not read the request body"}),
+        );
+        return;
+    }
+    if raw.len() as u64 > MAX_CERTIFY_BODY_BYTES {
+        write_json(
+            request,
+            413,
+            &json!({"error": format!("request body is larger than {MAX_CERTIFY_BODY_BYTES} bytes")}),
+        );
+        return;
+    }
+    let input: RiskInput = match serde_json::from_slice(&raw) {
+        Ok(input) => input,
+        Err(e) => {
+            write_json(
+                request,
+                400,
+                &json!({"error": format!("malformed risk report: {e}")}),
+            );
+            return;
+        }
+    };
+    let issued_at_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let nonce = match random_nonce() {
+        Ok(nonce) => nonce,
+        Err(e) => {
+            write_json(request, 500, &json!({"error": e}));
+            return;
+        }
+    };
+    match certifier.signer.certify(&input, issued_at_ms, &nonce) {
+        Ok(certificate) => write_json(request, 200, &serde_json::to_value(&certificate).unwrap()),
+        Err(e) => write_json(request, 400, &json!({"error": e.to_string()})),
+    }
+}
+
+/// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
+pub fn run_with_certifier(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+) {
     for request in server.incoming_requests() {
         let url = request.url().to_string();
         let path = url.split('?').next().unwrap_or("").to_string();
+
+        if request.method() == &Method::Post && path == "/interlock/certify" {
+            handle_certify(request, certifier.as_ref());
+            continue;
+        }
 
         if request.method() != &Method::Get {
             write_json(request, 405, &json!({"error": "method not allowed"}));
@@ -467,12 +623,171 @@ mod tests {
         assert_eq!(status, 200);
         assert!(body.contains("\"workspace\""));
     }
-
     #[test]
     fn unknown_path_is_404() {
         let ws = tempdir();
         let port = start_test_server(ws);
         let (status, _) = get(port, "/nope");
         assert_eq!(status, 404);
+    }
+
+    const CERTIFY_TOKEN: &str = "a-certify-token-of-sixteen+";
+
+    fn start_certifying_server() -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
+        let port = server
+            .server_addr()
+            .to_ip()
+            .expect("a real IP socket")
+            .port();
+        let certifier = Certifier {
+            signer: Signer::from_seed([7u8; 32]),
+            token: CERTIFY_TOKEN.to_string(),
+        };
+        let ws = tempdir();
+        thread::spawn(move || run_with_certifier(server, ws, None, Some(certifier)));
+        port
+    }
+
+    fn post_certify(port: u16, extra_headers: &str, body: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect must succeed");
+        let request = format!(
+            "POST /interlock/certify HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, resp_body) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status: u16 = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, resp_body.to_string())
+    }
+
+    fn auth() -> String {
+        format!("Authorization: Bearer {CERTIFY_TOKEN}\r\nContent-Type: application/json\r\n")
+    }
+
+    const REPORT: &str =
+        r#"{"joint":"shoulder","position":0.5,"collision_imminent":false,"distance_m":0.4}"#;
+
+    #[test]
+    fn a_caller_with_the_token_gets_a_certificate_that_verifies() {
+        let port = start_certifying_server();
+        let (status, body) = post_certify(port, &auth(), REPORT);
+        assert_eq!(status, 200, "{body}");
+        let cert: crate::certificate::Certificate = serde_json::from_str(&body).unwrap();
+        let signer = Signer::from_seed([7u8; 32]);
+        let public = ed25519_dalek::VerifyingKey::from_bytes(
+            &crate::certificate::decode_hex(&signer.public_key_hex())
+                .unwrap()
+                .try_into()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(cert.verifies_under(&public));
+        assert_eq!((cert.joint.as_str(), cert.position), ("shoulder", 0.5));
+        assert!(
+            cert.issued_at_ms > 1_600_000_000_000,
+            "milliseconds, not seconds"
+        );
+    }
+
+    #[test]
+    fn two_certificates_never_share_a_nonce() {
+        let port = start_certifying_server();
+        let a: crate::certificate::Certificate =
+            serde_json::from_str(&post_certify(port, &auth(), REPORT).1).unwrap();
+        let b: crate::certificate::Certificate =
+            serde_json::from_str(&post_certify(port, &auth(), REPORT).1).unwrap();
+        assert_ne!(a.nonce, b.nonce);
+    }
+
+    #[test]
+    fn without_the_token_or_with_a_wrong_one_nothing_is_signed() {
+        let port = start_certifying_server();
+        assert_eq!(
+            post_certify(port, "Content-Type: application/json\r\n", REPORT).0,
+            401
+        );
+        assert_eq!(
+            post_certify(port, "Authorization: Bearer wrong-token-of-sixteen+\r\nContent-Type: application/json\r\n", REPORT).0,
+            401
+        );
+        assert_eq!(
+            post_certify(
+                port,
+                "Authorization: Basic abc\r\nContent-Type: application/json\r\n",
+                REPORT
+            )
+            .0,
+            401
+        );
+    }
+
+    #[test]
+    fn a_browser_request_or_a_body_that_is_not_json_is_refused() {
+        let port = start_certifying_server();
+        assert_eq!(
+            post_certify(
+                port,
+                &format!("{}Origin: http://evil.example\r\n", auth()),
+                REPORT
+            )
+            .0,
+            403
+        );
+        assert_eq!(
+            post_certify(
+                port,
+                &format!("Authorization: Bearer {CERTIFY_TOKEN}\r\nContent-Type: text/plain\r\n"),
+                REPORT
+            )
+            .0,
+            415
+        );
+    }
+
+    #[test]
+    fn malformed_and_unsignable_reports_are_400_and_oversized_is_413() {
+        let port = start_certifying_server();
+        assert_eq!(post_certify(port, &auth(), "not json").0, 400);
+        assert_eq!(post_certify(port, &auth(), r#"{"joint":"j"}"#).0, 400);
+        assert_eq!(
+            post_certify(
+                port,
+                &auth(),
+                r#"{"joint":"","position":1,"collision_imminent":false,"distance_m":1}"#
+            )
+            .0,
+            400
+        );
+        assert_eq!(
+            post_certify(
+                port,
+                &auth(),
+                r#"{"joint":"j","position":1e999,"collision_imminent":false,"distance_m":1}"#
+            )
+            .0,
+            400
+        );
+        let big = format!(
+            r#"{{"joint":"{}","position":1,"collision_imminent":false,"distance_m":1}}"#,
+            "j".repeat(5000)
+        );
+        assert_eq!(post_certify(port, &auth(), &big).0, 413);
+    }
+
+    #[test]
+    fn a_server_without_a_key_answers_404_whatever_the_caller_holds() {
+        let ws = tempdir();
+        let port = start_test_server(ws);
+        assert_eq!(post_certify(port, &auth(), REPORT).0, 404);
     }
 }

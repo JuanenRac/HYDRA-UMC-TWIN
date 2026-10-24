@@ -28,3 +28,6 @@ serde_json = "1"
 # - not axum/actix-web, which would pull in a full async runtime (tokio)
 # for a handful of small, low-traffic loopback endpoints.
 tiny_http = "0.12"
+# The interlock certificates (src/certificate.rs): Ed25519 signing, and the operating system's randomness for nonces and for a new key.
+ed25519-dalek = "2"
+getrandom = "0.2"

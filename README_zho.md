@@ -39,6 +39,7 @@
 ### 关键特性：
 * 🧩 **家族就绪检查（v0）：** 真实的 `family-status` 子命令读取 3 个真实子项目各自真实的 `hydra-umc.project.json`，报告其是否存在/版本/成熟度/角色——对于一个自身尚未运行任何引擎的集成中枢来说，这是诚实的。详见下方"诚实说明"。
 * 🔒 **真实 v0 —— 状态同步契约：** `family-sync` 会先用一份真实、可测试的契约筛选每个子项目——最低成熟度（`functional`）和一个兼容的最高主版本号——然后才会将其视为可同步，对不成熟或版本不兼容的子项目给出真实理由并予以拒绝，而不是对着一个未经验证的状态形态直接同步。
+* 🔏 **联锁证书:** `POST /interlock/certify` 用孪生体的 Ed25519 密钥对风险报告(关节、位置、`collision_imminent`、`distance_m`)签名,并返回一份证书;HYDRA-UMC-HIL-BRIDGE 在向真实硬件发送任何内容之前,只会为该条命令接受它(时效内、仅限一次)。只有服务器以 `--signing-key-file` 和 `--certify-token-file`(或 `HYDRA_UMC_TWIN_CERTIFY_TOKEN`)启动时该路由才存在:没有令牌,任何人都无法请求签名;没有密钥,该路由返回 `404`;缺一个都无法启动。`keygen --key-file 路径` 生成密钥(绝不覆盖已有文件)并打印要交给桥接的公钥。在物理引擎出现之前,孪生体签署的是持有令牌的调用方(物理复制体)提交的报告,而不是它自己计算的:证书的价值取决于其来源。格式见 `docs/INTERLOCK_CERTIFICATE.md`。*(已实现,已针对真实的桥接二进制程序试过)*
 * 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace 路径]`（默认 `127.0.0.1:8111`）通过一个真实的阻塞式 `tiny_http` 服务器，把同样的 family-status/family-sync 逻辑以 `GET /family-status`、`GET /family-sync`、`GET /stats` 的形式对外提供——与部署到 CM5 上的 `systemd/hydra-umc-twin.service` 单元运行的是同一个二进制文件（仅限回环地址）。完整契约见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 🌐 **完整工厂仿真（计划中）：** 在统一的 3D 空间中复制机器人、工具和环境——依赖于先有真实的 Bevy 引擎集成。
 * ⚡ **硬件在环（HIL）（计划中）：** 将应用程序和 Studio 连接到仿真器，就像连接到真实控制器一样。
@@ -87,6 +88,7 @@ HYDRA-UMC-TWIN/
 │   ├── manifest.rs       # 真实的、具防御性的兄弟项目自身清单读取器
 │   ├── family.rs         # 真实的就绪检查 + 综合同步结果
 │   ├── contract.rs       # 真实的状态同步契约（成熟度 + 版本上限）
+│   ├── certificate.rs    # Ed25519 联锁证书:被签名的文本、签名、nonce、密钥生成
 │   ├── server.rs         # 简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
 │   └── main.rs           # 入口点 + 真实的 `family-status`/`family-sync` 子命令
 ├── docs/                # 文档与物理调参

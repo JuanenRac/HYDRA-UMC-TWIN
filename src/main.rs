@@ -14,6 +14,7 @@
 //! "real" means here, and their own module docs for what is still out of
 //! scope (the real Bevy engine and physics backend).
 
+mod certificate;
 mod contract;
 mod family;
 mod manifest;
@@ -142,6 +143,73 @@ fn run_family_sync(args: &[String]) -> ExitCode {
     }
 }
 
+/// The key and the token of `POST /interlock/certify`, from `--signing-key-file` / `--certify-token-file` (or HYDRA_UMC_TWIN_CERTIFY_TOKEN).
+/// Neither: the route is off. One without the other is an error, so a half-configured server never starts.
+fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> {
+    let key_file = find_flag(args, "--signing-key-file")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_SIGNING_KEY_FILE").ok());
+    let token = match find_flag(args, "--certify-token-file") {
+        Some(path) => Some(
+            std::fs::read_to_string(&path)
+                .map_err(|e| format!("cannot read --certify-token-file: {e}"))?
+                .trim()
+                .to_string(),
+        ),
+        None => env::var("HYDRA_UMC_TWIN_CERTIFY_TOKEN")
+            .ok()
+            .map(|t| t.trim().to_string()),
+    };
+    match (key_file, token) {
+        (None, None) => Ok(None),
+        (Some(_), None) => Err("--signing-key-file needs --certify-token-file (or HYDRA_UMC_TWIN_CERTIFY_TOKEN): without a token anyone who reaches the port could ask for a signature".into()),
+        (None, Some(_)) => Err("a certify token needs --signing-key-file".into()),
+        (Some(path), Some(token)) => {
+            if token.chars().count() < 16 {
+                return Err("the certify token must have at least 16 characters".into());
+            }
+            let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read --signing-key-file: {e}"))?;
+            let signer = certificate::Signer::from_seed_hex(&text)?;
+            Ok(Some(server::Certifier { signer, token }))
+        }
+    }
+}
+
+/// `keygen --key-file PATH`: write a new signing key (never over an existing file) and print the public key to give to the bridge.
+fn run_keygen(args: &[String]) -> ExitCode {
+    let Some(path) = find_flag(args, "--key-file") else {
+        eprintln!("usage: hydra-umc-twin keygen --key-file PATH");
+        return ExitCode::from(2);
+    };
+    let seed = match certificate::random_seed_hex() {
+        Ok(seed) => seed,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ExitCode::from(1);
+        }
+    };
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let written = options.open(&path).and_then(|mut file| {
+        use std::io::Write;
+        writeln!(file, "{seed}")
+    });
+    if let Err(e) = written {
+        eprintln!("error: cannot create {path} (an existing key is never overwritten): {e}");
+        return ExitCode::from(1);
+    }
+    let signer =
+        certificate::Signer::from_seed_hex(&seed).expect("a freshly generated seed is valid");
+    println!("signing key written to {path}");
+    println!("key id:     {}", signer.key_id());
+    println!("public key: {}", signer.public_key_hex());
+    ExitCode::SUCCESS
+}
+
 fn run_serve(args: &[String]) -> ExitCode {
     let addr = find_flag(args, "--addr").unwrap_or_else(|| "127.0.0.1".to_string());
     let port = find_flag(args, "--port").unwrap_or_else(|| "8111".to_string());
@@ -167,6 +235,15 @@ fn run_serve(args: &[String]) -> ExitCode {
         None => None,
     };
 
+    // The interlock certificates (certificate.rs): off unless a signing key AND a token for the callers that ask for a signature are given.
+    let certifier = match load_certifier(args) {
+        Ok(certifier) => certifier,
+        Err(message) => {
+            eprintln!("[twin] fatal: {message}");
+            return ExitCode::from(2);
+        }
+    };
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -179,7 +256,11 @@ fn run_serve(args: &[String]) -> ExitCode {
                 None => eprintln!("[twin] --strict-workspace-root not set: ?workspace= overrides may point at any real, readable directory"),
             }
             eprintln!("[twin] GET /family-status, GET /family-sync, GET /stats");
-            server::run(bound, workspace, strict_root);
+            match &certifier {
+                Some(c) => eprintln!("[twin] POST /interlock/certify signs risk reports with key {} (public key {})", c.signer.key_id(), c.signer.public_key_hex()),
+                None => eprintln!("[twin] POST /interlock/certify is off: no --signing-key-file and --certify-token-file"),
+            }
+            server::run_with_certifier(bound, workspace, strict_root, certifier);
             ExitCode::SUCCESS
         }
         Err(e) => {
@@ -196,6 +277,7 @@ fn main() -> ExitCode {
         Some("family-status") => run_family_status(&args[1..]),
         Some("family-sync") => run_family_sync(&args[1..]),
         Some("serve") => run_serve(&args[1..]),
+        Some("keygen") => run_keygen(&args[1..]),
         _ => {
             println!("{PROJECT_NAME} v{VERSION}");
             println!("{ROLE}");

@@ -39,6 +39,7 @@ Written in Rust, today it reads the manifests of its three children (PHYSICS-REP
 ### Key Features:
 * 🧩 **Family Readiness Check (v0):** the real `family-status` subcommand reads each of the 3 real children's own `hydra-umc.project.json` and reports presence/version/maturity/role - honest for an integration hub that runs no engine itself yet. See "Honesty check" below.
 * 🔒 **Real v0 - State-Sync Contract:** `family-sync` gates each child on a real, testable contract - minimum maturity (`functional`) and a maximum compatible major version - before ever treating it as sync-ready, refusing an immature or incompatible-version child with a real reason instead of syncing against an unverified state shape.
+* 🔏 **Interlock certificates:** `POST /interlock/certify` signs a risk report (joint, position, `collision_imminent`, `distance_m`) with the Ed25519 key of the twin and returns a certificate that HYDRA-UMC-HIL-BRIDGE accepts for that command only (fresh, single use) before it sends anything to real hardware. The route exists only when the server starts with `--signing-key-file` and `--certify-token-file` (or `HYDRA_UMC_TWIN_CERTIFY_TOKEN`): without the token nobody can ask for a signature, without a key the route answers `404`, and one without the other does not start. `keygen --key-file PATH` makes a key (never over an existing file) and prints the public key to give to the bridge. Until the physics engine exists, the twin signs the report of the caller that holds the token (the physics replica), not one it computed itself: a certificate is only as good as its source. The format is in `docs/INTERLOCK_CERTIFICATE.md`. *(implemented, tried against the real bridge binary)*
 * 🔌 **HTTP JSON API (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PATH]` (default `127.0.0.1:8111`) exposes the exact same family-status/family-sync logic over `GET /family-status`, `GET /family-sync`, `GET /stats` via a real blocking `tiny_http` server - the same binary a deployed CM5's `systemd/hydra-umc-twin.service` unit runs (loopback-only). See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full contract.
 * 🌐 **Full Factory Simulation (planned):** replicates robots, tools, and the environment in a unified 3D space - depends on the real Bevy engine integration.
 * ⚡ **Hardware-in-the-Loop (HIL) (planned):** connect Apps and Studios to the simulator as if it were a real controller.
@@ -88,6 +89,7 @@ HYDRA-UMC-TWIN/
 │   ├── manifest.rs       # Real, defensive reader for a sibling's own manifest
 │   ├── family.rs         # Real family-readiness check + combined sync outcome
 │   ├── contract.rs       # Real state-sync contract (maturity + version ceiling)
+│   ├── certificate.rs    # Ed25519 interlock certificates: the signed text, signing, nonces, key generation
 │   ├── server.rs         # Plain JSON/HTTP surface (tiny_http, blocking, no async runtime)
 │   └── main.rs           # Entry point + real `family-status`/`family-sync` subcommands
 ├── docs/                # Documentation and physics tuning

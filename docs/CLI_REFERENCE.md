@@ -188,3 +188,9 @@ actual state-sync transport between this Twin and its children yet (see
 `src/family.rs`'s and `src/contract.rs`'s own module docs). `SyncSnapshot`
 is a real, typed fixture representing what a future sync transport would
 exchange, not live simulation tick data.
+
+## `keygen --key-file PATH` and `POST /interlock/certify`
+
+`keygen` writes a new Ed25519 signing key (one line of 64 hexadecimal characters, mode 0600 on Unix) and prints its key id and public key. It never
+overwrites a file. `serve --signing-key-file PATH --certify-token-file PATH` (or `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` and `HYDRA_UMC_TWIN_CERTIFY_TOKEN`) turns on
+`POST /interlock/certify`; see `docs/INTERLOCK_CERTIFICATE.md` for the format, the vector and what the bridge checks.
