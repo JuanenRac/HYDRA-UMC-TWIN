@@ -115,7 +115,10 @@ HYDRA-UMC-TWIN/
 │   └── hydra-umc-twin.service # Unità systemd della API locale family-status/sync sulla CM5
 ├── tools/
 │   ├── build_test.py    # Controllo build senza versionamento
-│   └── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
+│   ├── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
+│   ├── _doc_policy.py   # Regole di documentazione condivise dalla famiglia (copia di quella di HYDRA-UMC-SDK, mantenuta sincronizzata)
+│   ├── _readme_parity.py # Verifica che gli otto README abbiano la stessa struttura (copia di quella di HYDRA-UMC-SDK, mantenuta sincronizzata)
+│   └── hydra_project_tool.py # Gli stessi comandi in ogni repository: validate, test, ci, version, status, bump
 ├── Cargo.toml           # Metadati del pacchetto, dipendenze (serde/serde_json), version contachilometri
 ├── bump_version.py      # Incremento di versione stile contachilometri (eseguito solo dal comando `bump` esplicito)
 ├── build.sh / build.bat # Valida e compila (compilare non cambia mai la versione)
