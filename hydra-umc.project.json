@@ -20,6 +20,7 @@
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
   },
   "service": {
+    "port": 8111,
     "systemd_unit": "hydra-umc-twin.service",
     "health_path": "/stats"
   }
