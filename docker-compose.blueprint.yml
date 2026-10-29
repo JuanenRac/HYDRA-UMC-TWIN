@@ -22,7 +22,7 @@
 #   twin (this repo)  -- owns the Bevy viewport + physics tick loop
 #     depends_on: physics-replica, hil-bridge
 #   physics-replica    -- MuJoCo/PhysX solver, called every physics tick
-#   hil-bridge          -- gRPC/WebSocket sync with real HYDRA-UMC controllers
+#   hil-bridge          -- HTTP JSON API (POST /route, POST /mirror, GET /stats) in front of real HYDRA-UMC controllers
 #   synthetic-data-gen -- offline batch job, reads the twin's scene/render
 #                          output on demand (not part of the live tick loop)
 
@@ -51,10 +51,10 @@ services:
   hil-bridge:
     build:
       context: ../HYDRA-UMC-HIL-BRIDGE
-      dockerfile: Dockerfile   # TODO: add once gRPC/WebSocket server lands
+      dockerfile: Dockerfile   # TODO: add once the container image is built
     container_name: hydra-umc-hil-bridge
     ports:
-      - "50051:50051"   # planned: gRPC to real HYDRA-UMC controllers
+      - "127.0.0.1:8113:8113"   # the HTTP JSON API of the bridge (serve --port 8113), loopback only; inside a container the bridge must be started with --addr 0.0.0.0
     environment:
       - HYDRA_TWIN_ROLE=hil-sync
 

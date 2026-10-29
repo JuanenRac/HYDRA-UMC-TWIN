@@ -207,7 +207,7 @@ Not every child is sync-ready - see the lines above.
 
 Sale con `0` solo si todos los hijos esperados están `READY`; `1` para cualquier hijo `MISSING`/`REJECTED`.
 
-**Importante:** `Cargo.toml` deliberadamente **no lleva todavía la dependencia de Bevy**. Bevy es un motor gráfico pesado (compilación larga, necesita un toolchain de GPU/gráficos no siempre disponible); v0 solo añadió `serde`/`serde_json`/`tiny_http` para leer manifiestos. La dependencia real de `bevy` (más un backend de física y el cliente gRPC/WebSocket para HIL-BRIDGE) se añade cuando empiece el trabajo real de renderizado/motor.
+**Importante:** `Cargo.toml` deliberadamente **no lleva todavía la dependencia de Bevy**. Bevy es un motor gráfico pesado (compilación larga, necesita un toolchain de GPU/gráficos no siempre disponible); v0 solo añadió `serde`/`serde_json`/`tiny_http` para leer manifiestos. La dependencia real de `bevy` (más un backend de física y el cliente HTTP para HIL-BRIDGE) se añade cuando empiece el trabajo real de renderizado/motor.
 
 ### Integración de los 3 hijos (`docker-compose.blueprint.yml`)
 
