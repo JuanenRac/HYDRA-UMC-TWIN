@@ -1,0 +1,536 @@
+{
+  "repo": "HYDRA-UMC-TWIN",
+  "ecosystem": "hydra",
+  "svg": "en",
+  "exempt": [
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "LICENSE",
+    "LICENSE.md",
+    "Cargo.lock",
+    "test.bat"
+  ],
+  "cards": [
+    {
+      "name": "src/",
+      "span": 3,
+      "accent": "a",
+      "rows": [
+        {
+          "name": "manifest.rs",
+          "desc": {
+            "en": "Real, defensive reader for a sibling's own",
+            "es": "Lector real y defensivo del manifiesto",
+            "de": "Echter, defensiver Reader für das eigene",
+            "fr": "Lecteur réel et défensif du manifeste",
+            "it": "Lettore reale e difensivo del manifesto",
+            "ja": "兄弟プロジェクト自身のマニフェストの実際の防",
+            "zh": "真实的、具防御性的兄弟项目自身清单读取器",
+            "pt": "Leitor real e defensivo do manifesto de um"
+          },
+          "tree_desc": {
+            "en": "Real, defensive reader for a sibling's own manifest",
+            "es": "Lector real y defensivo del manifiesto propio de un hermano",
+            "de": "Echter, defensiver Reader für das eigene Manifest eines Geschwisters",
+            "fr": "Lecteur réel et défensif du manifeste propre d'un frère",
+            "it": "Lettore reale e difensivo del manifesto proprio di un fratello",
+            "ja": "兄弟プロジェクト自身のマニフェストの実際の防御的リーダー",
+            "zh": "真实的、具防御性的兄弟项目自身清单读取器",
+            "pt": "Leitor real e defensivo do manifesto de um irmão"
+          }
+        },
+        {
+          "name": "family.rs",
+          "desc": {
+            "en": "Real family-readiness check + combined sync",
+            "es": "Chequeo real de disponibilidad + resultado",
+            "de": "Echter Bereitschaftscheck + kombiniertes",
+            "fr": "Vraie vérification de disponibilité +",
+            "it": "Vero controllo di disponibilità + esito di",
+            "ja": "実際のレディネスチェック + 統合された同期",
+            "zh": "真实的就绪检查 + 综合同步结果",
+            "pt": "Verificação real de prontidão da família +"
+          },
+          "tree_desc": {
+            "en": "Real family-readiness check + combined sync outcome",
+            "es": "Chequeo real de disponibilidad + resultado de sync combinado",
+            "de": "Echter Bereitschaftscheck + kombiniertes Sync-Ergebnis",
+            "fr": "Vraie vérification de disponibilité + résultat de sync combiné",
+            "it": "Vero controllo di disponibilità + esito di sync combinato",
+            "ja": "実際のレディネスチェック + 統合された同期結果",
+            "zh": "真实的就绪检查 + 综合同步结果",
+            "pt": "Verificação real de prontidão da família + resultado combinado de sincronização"
+          }
+        },
+        {
+          "name": "contract.rs",
+          "desc": {
+            "en": "Real state-sync contract",
+            "es": "Contrato real de sync de estado",
+            "de": "Echter Zustands-Sync-Vertrag",
+            "fr": "Vrai contrat de sync d'état",
+            "it": "Vero contratto di sync di stato",
+            "ja": "実際の状態同期契約（成熟度 + バージョン上",
+            "zh": "真实的状态同步契约（成熟度 + 版本上限）",
+            "pt": "Contrato real de sincronização de estado"
+          },
+          "tree_desc": {
+            "en": "Real state-sync contract (maturity + version ceiling)",
+            "es": "Contrato real de sync de estado (madurez + techo de version)",
+            "de": "Echter Zustands-Sync-Vertrag (Reife + Versionsobergrenze)",
+            "fr": "Vrai contrat de sync d'état (maturité + plafond de version)",
+            "it": "Vero contratto di sync di stato (maturità + tetto di version)",
+            "ja": "実際の状態同期契約（成熟度 + バージョン上限）",
+            "zh": "真实的状态同步契约（成熟度 + 版本上限）",
+            "pt": "Contrato real de sincronização de estado (maturidade + teto de versão)"
+          }
+        },
+        {
+          "name": "certificate.rs",
+          "desc": {
+            "en": "Ed25519 interlock certificates",
+            "es": "Certificados de interbloqueo Ed25519",
+            "de": "Ed25519-Verriegelungszertifikate",
+            "fr": "Certificats d'interverrouillage Ed25519",
+            "it": "Certificati di interblocco Ed25519",
+            "ja": "Ed25519 インターロック証明書:署名対",
+            "zh": "Ed25519 联锁证书:被签名的文本",
+            "pt": "Certificados de interbloqueio Ed25519"
+          },
+          "tree_desc": {
+            "en": "Ed25519 interlock certificates: the signed text, signing, nonces, key generation",
+            "es": "Certificados de interbloqueo Ed25519: el texto firmado, la firma, los nonces, la generación de claves",
+            "de": "Ed25519-Verriegelungszertifikate: der signierte Text, die Signatur, die Nonces, die Schlüsselerzeugung",
+            "fr": "Certificats d'interverrouillage Ed25519 : le texte signé, la signature, les nonces, la génération de clés",
+            "it": "Certificati di interblocco Ed25519: il testo firmato, la firma, i nonce, la generazione delle chiavi",
+            "ja": "Ed25519 インターロック証明書:署名対象のテキスト、署名、nonce、鍵の生成",
+            "zh": "Ed25519 联锁证书:被签名的文本、签名、nonce、密钥生成",
+            "pt": "Certificados de interbloqueio Ed25519: o texto assinado, a assinatura, os nonces, a geração de chaves"
+          }
+        },
+        {
+          "name": "health.rs",
+          "desc": {
+            "en": "Active probes of the children",
+            "es": "Sondas activas de los hijos",
+            "de": "Aktive Sonden der Kinder",
+            "fr": "Sondes actives des enfants",
+            "it": "Sonde attive dei figli",
+            "ja": "子プロジェクトの能動プローブ:PHYSICS",
+            "zh": "子项目的主动探测:运行 PHYSICS-RE",
+            "pt": "Sondas ativas dos filhos"
+          },
+          "tree_desc": {
+            "en": "Active probes of the children: runs the PHYSICS-REPLICA binary, calls the HIL bridge",
+            "es": "Sondas activas de los hijos: ejecuta el binario de PHYSICS-REPLICA, llama al puente HIL",
+            "de": "Aktive Sonden der Kinder: startet die Binärdatei von PHYSICS-REPLICA, ruft die HIL-Brücke auf",
+            "fr": "Sondes actives des enfants : lance le binaire de PHYSICS-REPLICA, appelle le pont HIL",
+            "it": "Sonde attive dei figli: esegue il binario di PHYSICS-REPLICA, chiama il ponte HIL",
+            "ja": "子プロジェクトの能動プローブ:PHYSICS-REPLICA のバイナリを実行し、HIL ブリッジを呼び出す",
+            "zh": "子项目的主动探测:运行 PHYSICS-REPLICA 的二进制文件,调用 HIL 网桥",
+            "pt": "Sondas ativas dos filhos: executa o binário do PHYSICS-REPLICA, chama a ponte HIL"
+          }
+        },
+        {
+          "name": "server.rs",
+          "desc": {
+            "en": "Plain JSON/HTTP surface",
+            "es": "Superficie JSON/HTTP plana",
+            "de": "Einfache JSON/HTTP-Oberfläche",
+            "fr": "Surface JSON/HTTP simple",
+            "it": "Superficie JSON/HTTP semplice",
+            "ja": "シンプルなJSON/HTTPサーフェス(ti",
+            "zh": "简洁的 JSON/HTTP 接口(tiny_",
+            "pt": "Superfície JSON/HTTP simples"
+          },
+          "tree_desc": {
+            "en": "Plain JSON/HTTP surface (tiny_http, blocking, no async runtime)",
+            "es": "Superficie JSON/HTTP plana (tiny_http, bloqueante, sin runtime async)",
+            "de": "Einfache JSON/HTTP-Oberfläche (tiny_http, blockierend, ohne Async-Runtime)",
+            "fr": "Surface JSON/HTTP simple (tiny_http, bloquant, sans runtime async)",
+            "it": "Superficie JSON/HTTP semplice (tiny_http, bloccante, senza runtime async)",
+            "ja": "シンプルなJSON/HTTPサーフェス(tiny_http、ブロッキング、非同期ランタイムなし)",
+            "zh": "简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)",
+            "pt": "Superfície JSON/HTTP simples (tiny_http, bloqueante, sem runtime assíncrono)"
+          }
+        },
+        {
+          "name": "main.rs",
+          "desc": {
+            "en": "Entry point +",
+            "es": "Entry point + subcomandos reales",
+            "de": "Einstiegspunkt + echte",
+            "fr": "Point d'entrée + vrais sous-commandes",
+            "it": "Entry point + veri sottocomandi",
+            "ja": "エントリポイント + 実際の `family",
+            "zh": "入口点 + 真实的 `family-stat",
+            "pt": "Ponto de entrada + subcomandos reais"
+          },
+          "tree_desc": {
+            "en": "Entry point + real `family-status`/`family-sync` subcommands",
+            "es": "Entry point + subcomandos reales `family-status`/`family-sync`",
+            "de": "Einstiegspunkt + echte `family-status`/`family-sync`-Subbefehle",
+            "fr": "Point d'entrée + vrais sous-commandes `family-status`/`family-sync`",
+            "it": "Entry point + veri sottocomandi `family-status`/`family-sync`",
+            "ja": "エントリポイント + 実際の `family-status`/`family-sync` サブコマンド",
+            "zh": "入口点 + 真实的 `family-status`/`family-sync` 子命令",
+            "pt": "Ponto de entrada + subcomandos reais `family-status`/`family-sync`"
+          }
+        }
+      ],
+      "tree_head": {
+        "en": "source code",
+        "es": "código fuente",
+        "de": "Quellcode",
+        "fr": "code source",
+        "it": "codice sorgente",
+        "ja": "ソースコード",
+        "zh": "源代码",
+        "pt": "código-fonte"
+      },
+      "sub": {
+        "en": "source code",
+        "es": "código fuente",
+        "de": "Quellcode",
+        "fr": "code source",
+        "it": "codice sorgente",
+        "ja": "ソースコード",
+        "zh": "源代码",
+        "pt": "código-fonte"
+      }
+    },
+    {
+      "name": {
+        "en": "folders",
+        "es": "carpetas",
+        "de": "Ordner",
+        "fr": "dossiers",
+        "it": "cartelle",
+        "ja": "フォルダ",
+        "zh": "文件夹",
+        "pt": "pastas"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "b",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "docs/",
+          "desc": {
+            "en": "Documentation and physics tuning",
+            "es": "Documentación y ajuste de física",
+            "de": "Dokumentation und Physikanpassung",
+            "fr": "Documentation et réglage physique",
+            "it": "Documentazione e ottimizzazione fisica",
+            "ja": "ドキュメントと物理チューニング",
+            "zh": "文档与物理调参",
+            "pt": "Documentação e ajuste da física"
+          },
+          "tree_desc": {
+            "en": "Documentation and physics tuning",
+            "es": "Documentación y ajuste de física",
+            "de": "Dokumentation und Physikanpassung",
+            "fr": "Documentation et réglage physique",
+            "it": "Documentazione e ottimizzazione fisica",
+            "ja": "ドキュメントと物理チューニング",
+            "zh": "文档与物理调参",
+            "pt": "Documentação e ajuste da física"
+          }
+        },
+        {
+          "name": "images/",
+          "desc": {
+            "en": "Media and diagrams",
+            "es": "Medios y diagramas",
+            "de": "Medien und Diagramme",
+            "fr": "Médias et diagrammes",
+            "it": "Media e diagrammi",
+            "ja": "メディアと図表",
+            "zh": "媒体与图表",
+            "pt": "Multimédia e diagramas"
+          },
+          "tree_desc": {
+            "en": "Media and diagrams",
+            "es": "Medios y diagramas",
+            "de": "Medien und Diagramme",
+            "fr": "Médias et diagrammes",
+            "it": "Media e diagrammi",
+            "ja": "メディアと図表",
+            "zh": "媒体与图表",
+            "pt": "Multimédia e diagramas"
+          }
+        },
+        {
+          "name": "systemd/",
+          "desc": {
+            "en": "service unit",
+            "es": "unidad de servicio",
+            "de": "Dienst-Unit",
+            "fr": "unité de service",
+            "it": "unità di servizio",
+            "ja": "サービスユニット",
+            "zh": "服务单元",
+            "pt": "unidade de serviço"
+          },
+          "tree_desc": {
+            "en": "service unit",
+            "es": "unidad de servicio",
+            "de": "Dienst-Unit",
+            "fr": "unité de service",
+            "it": "unità di servizio",
+            "ja": "サービスユニット",
+            "zh": "服务单元",
+            "pt": "unidade de serviço"
+          }
+        },
+        {
+          "name": "tools/",
+          "desc": {
+            "en": "project tools and CI checks",
+            "es": "herramientas del proyecto y comprobaciones",
+            "de": "Projektwerkzeuge und CI-Prüfungen",
+            "fr": "outils du projet et vérifications de la CI",
+            "it": "strumenti del progetto e controlli della CI",
+            "ja": "プロジェクトのツールと CI の検査",
+            "zh": "项目工具和 CI 检查",
+            "pt": "ferramentas do projeto e verificações da CI"
+          },
+          "tree_desc": {
+            "en": "project tools and CI checks",
+            "es": "herramientas del proyecto y comprobaciones del CI",
+            "de": "Projektwerkzeuge und CI-Prüfungen",
+            "fr": "outils du projet et vérifications de la CI",
+            "it": "strumenti del progetto e controlli della CI",
+            "ja": "プロジェクトのツールと CI の検査",
+            "zh": "项目工具和 CI 检查",
+            "pt": "ferramentas do projeto e verificações da CI"
+          }
+        },
+        {
+          "name": ".github/",
+          "desc": {
+            "en": "CI workflow and issue templates",
+            "es": "flujo de CI y plantillas de incidencias",
+            "de": "CI-Workflow und Issue-Vorlagen",
+            "fr": "workflow de CI et modèles de tickets",
+            "it": "workflow di CI e modelli di segnalazione",
+            "ja": "CI ワークフローと Issue テンプレート",
+            "zh": "CI 工作流和 Issue 模板",
+            "pt": "fluxo de CI e modelos de problemas"
+          }
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "project files",
+        "es": "ficheros del proyecto",
+        "de": "Projektdateien",
+        "fr": "fichiers du projet",
+        "it": "file del progetto",
+        "ja": "プロジェクトのファイル",
+        "zh": "项目文件",
+        "pt": "ficheiros do projeto"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "c",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "Cargo.toml",
+          "desc": {
+            "en": "crate metadata",
+            "es": "Metadatos del paquete, dependencias",
+            "de": "Crate-Metadaten",
+            "fr": "Métadonnées du paquet, dépendances",
+            "it": "Metadati del pacchetto, dipendenze",
+            "ja": "クレートのメタデータ",
+            "zh": "crate 元数据",
+            "pt": "metadados do crate"
+          },
+          "tree_desc": {
+            "en": "crate metadata",
+            "es": "Metadatos del paquete, dependencias (serde/serde_json), version cuentakilometros",
+            "de": "Crate-Metadaten",
+            "fr": "Métadonnées du paquet, dépendances (serde/serde_json), version compteur kilométrique",
+            "it": "Metadati del pacchetto, dipendenze (serde/serde_json), version contachilometri",
+            "ja": "クレートのメタデータ",
+            "zh": "crate 元数据",
+            "pt": "metadados do crate"
+          }
+        },
+        {
+          "name": "bump_version.py",
+          "desc": {
+            "en": "explicit version bump",
+            "es": "Incremento de versión tipo cuentakilómetros",
+            "de": "ausdrückliche Versionserhöhung",
+            "fr": "Incrément de version type compteur",
+            "it": "Incremento di versione stile contachilometri",
+            "ja": "明示的なバージョン更新",
+            "zh": "显式提升版本",
+            "pt": "Subida de versão ao estilo conta-quilómetros"
+          },
+          "tree_desc": {
+            "en": "explicit version bump",
+            "es": "Incremento de versión tipo cuentakilómetros (solo lo ejecuta el comando `bump` explícito)",
+            "de": "ausdrückliche Versionserhöhung",
+            "fr": "Incrément de version type compteur kilométrique (exécuté seulement par la commande `bump` explicite)",
+            "it": "Incremento di versione stile contachilometri (eseguito solo dal comando `bump` esplicito)",
+            "ja": "明示的なバージョン更新",
+            "zh": "显式提升版本",
+            "pt": "Subida de versão ao estilo conta-quilómetros (executada só pelo comando `bump` explícito)"
+          }
+        },
+        {
+          "name": "build.sh / build.bat",
+          "desc": {
+            "en": "Validate and build",
+            "es": "Valida y compila",
+            "de": "Validiert und baut",
+            "fr": "Valide et compile",
+            "it": "Valida e compila",
+            "ja": "バージョンを増加させ、`cargo test",
+            "zh": "验证并构建（构建不会更改版本）",
+            "pt": "Valida e compila"
+          },
+          "tree_desc": {
+            "en": "Validate and build (building never changes the version)",
+            "es": "Valida y compila (compilar nunca cambia la versión)",
+            "de": "Validiert und baut (Bauen ändert nie die Version)",
+            "fr": "Valide et compile (compiler ne change jamais la version)",
+            "it": "Valida e compila (compilare non cambia mai la versione)",
+            "ja": "バージョンを増加させ、`cargo test`、その後 `cargo build --release` を実行",
+            "zh": "验证并构建（构建不会更改版本）",
+            "pt": "Valida e compila (compilar nunca altera a versão)"
+          }
+        },
+        {
+          "name": "build-test.sh / build-test.bat",
+          "desc": {
+            "en": "Non-versioning build check",
+            "es": "Comprobación de compilación sin versionado",
+            "de": "Nicht-versionierender Build-Check",
+            "fr": "Vérification de build sans versionnage",
+            "it": "Controllo build senza versionamento",
+            "ja": "バージョンを増やさないビルドチェック",
+            "zh": "不递增版本号的构建检查",
+            "pt": "Verificação de compilação sem subir versão"
+          },
+          "tree_desc": {
+            "en": "Non-versioning build check (no CHANGELOG/version bump)",
+            "es": "Comprobación de compilación sin versionado",
+            "de": "Nicht-versionierender Build-Check",
+            "fr": "Vérification de build sans versionnage",
+            "it": "Controllo build senza versionamento",
+            "ja": "バージョンを増やさないビルドチェック",
+            "zh": "不递增版本号的构建检查",
+            "pt": "Verificação de compilação sem subir versão (sem CHANGELOG/versão)"
+          }
+        },
+        {
+          "name": "run.sh / run.bat",
+          "desc": {
+            "en": "Runs the compiled release binary",
+            "es": "Ejecuta el binario release compilado",
+            "de": "Führt die kompilierte Release-Binärdatei aus",
+            "fr": "Exécute le binaire release compilé",
+            "it": "Esegue il binario release compilato",
+            "ja": "コンパイル済みの release バイナリを",
+            "zh": "运行编译后的 release 二进制文件",
+            "pt": "Executa o binário de lançamento compilado"
+          },
+          "tree_desc": {
+            "en": "Runs the compiled release binary (forwards arguments)",
+            "es": "Ejecuta el binario release compilado (reenvía argumentos)",
+            "de": "Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)",
+            "fr": "Exécute le binaire release compilé (relaie les arguments)",
+            "it": "Esegue il binario release compilato (inoltra gli argomenti)",
+            "ja": "コンパイル済みの release バイナリを実行（引数を転送）",
+            "zh": "运行编译后的 release 二进制文件（转发参数）",
+            "pt": "Executa o binário de lançamento compilado (reencaminha os argumentos)"
+          }
+        },
+        {
+          "name": "docker-compose.blueprint.yml",
+          "desc": {
+            "en": "Integration blueprint for the 3 children",
+            "es": "Blueprint de integración de los 3 hijos de",
+            "de": "Integrations-Blueprint für die 3 Kinder",
+            "fr": "Plan d'intégration des 3 enfants ci-dessous",
+            "it": "Blueprint di integrazione dei 3 figli sotto",
+            "ja": "下記 3 つの子プロジェクトの統合ブループリ",
+            "zh": "下方 3 个子项目的集成蓝图",
+            "pt": "Plano de integração para os 3 filhos abaixo"
+          },
+          "tree_desc": {
+            "en": "Integration blueprint for the 3 children below",
+            "es": "Blueprint de integración de los 3 hijos de abajo",
+            "de": "Integrations-Blueprint für die 3 Kinder unten",
+            "fr": "Plan d'intégration des 3 enfants ci-dessous",
+            "it": "Blueprint di integrazione dei 3 figli sotto",
+            "ja": "下記 3 つの子プロジェクトの統合ブループリント",
+            "zh": "下方 3 个子项目的集成蓝图",
+            "pt": "Plano de integração para os 3 filhos abaixo"
+          }
+        },
+        {
+          "name": "CHANGELOG.md",
+          "desc": {
+            "en": "what changed in each version",
+            "es": "qué cambió en cada versión",
+            "de": "was sich in jeder Version geändert hat",
+            "fr": "ce qui a changé à chaque version",
+            "it": "cosa è cambiato in ogni versione",
+            "ja": "各バージョンの変更点",
+            "zh": "每个版本的变更",
+            "pt": "o que mudou em cada versão"
+          }
+        },
+        {
+          "name": "bump_manifest_version.py",
+          "desc": {
+            "en": "syncs the manifest version",
+            "es": "sincroniza la versión del manifiesto",
+            "de": "gleicht die Manifest-Version an",
+            "fr": "synchronise la version du manifeste",
+            "it": "sincronizza la versione del manifesto",
+            "ja": "マニフェストのバージョンを同期",
+            "zh": "同步清单版本",
+            "pt": "sincroniza a versão do manifesto"
+          }
+        },
+        {
+          "name": "hydra-umc.project.json",
+          "desc": {
+            "en": "manifest: version, maturity, family",
+            "es": "manifiesto: versión, madurez, familia",
+            "de": "Manifest: Version, Reifegrad, Familie",
+            "fr": "manifeste : version, maturité, famille",
+            "it": "manifesto: versione, maturità, famiglia",
+            "ja": "マニフェスト：バージョン、成熟度、ファミリー",
+            "zh": "清单：版本、成熟度、系列",
+            "pt": "manifesto: versão, maturidade, família"
+          }
+        },
+        {
+          "name": "test.sh",
+          "desc": {
+            "en": "runs the tests",
+            "es": "ejecuta las pruebas",
+            "de": "führt die Tests aus",
+            "fr": "lance les tests",
+            "it": "esegue i test",
+            "ja": "テストを実行",
+            "zh": "运行测试",
+            "pt": "executa os testes"
+          }
+        }
+      ]
+    }
+  ]
+}

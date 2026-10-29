@@ -1,24 +1,34 @@
+<!-- =============================================================================
+HYDRA-UMC-TWIN - Digital Twin integration hub
+Copyright (C) JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+GPL-3.0-or-later - see LICENSE
+============================================================================= -->
+
 <p align="center">
   <img src="images/HYDRA_UMC_BANNER.svg" alt="HYDRA-UMC-TWIN banner" width="100%">
 </p>
 
-# ♊ HYDRA-UMC-TWIN
+# 🪞 HYDRA-UMC-TWIN
 
 <p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | 🇩🇪 <b>Deutsch</b> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 Physikbasierter Digitaler Zwilling & High-Fidelity Simulations-Engine
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Lizenz-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="Engine">
-  <img src="https://img.shields.io/%20(planned)-lightgrey.svg" alt="Physics">
-  <img src="https://img.shields.io/badge/Funktion-HIL%20Ready-green.svg" alt="HIL">
-  <img src="https://img.shields.io/badge/Stufe-Funktional%20v0-yellow.svg" alt="Funktionale v0-Stufe">
+  <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
+  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
+  <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
+  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
+  <img src="https://img.shields.io/badge/Tests-77%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Version-0.1.0-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
 ---
 
 > **Stand von Sicherheit (Safety) und Security:** Dieses Ökosystem ist kein zertifiziertes Sicherheitssystem. Es gibt noch keinen Hardware-E-STOP-Pfad, keine von der Firmware durchgesetzten Grenzen oder Verriegelungen und keinen verifizierten Bewegungsbefehl; Firmware-Images werden mit CRC32 und einem HMAC-SHA256 mit gemeinsamem Schlüssel geprüft, nicht mit einer asymmetrischen Signatur; TLS und gegenseitiges TLS sind optional und standardmäßig aus; noch keine eigene Platine wurde bestückt oder getestet. Lesen Sie die [Sicherheitsbasis](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) und das [Bedrohungsmodell](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md), bevor Sie sich für die Sicherheit einer Person auf eine Aussage hier verlassen.
+
+---
 
 ## 📋 Auf einen Blick
 
@@ -26,9 +36,12 @@
 |---|---|
 | Version | `0.1.0` |
 | Reifegrad | Funktionsfähig |
+| Tests | 77 (`cargo test`) |
 | Technik | Rust / tiny_http |
 | Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
+
+**Springe zu:** [Überblick](#-überblick) · [Architektur](#-architektur) · [Sicherheit und Schutz](#-sicherheit-und-schutz) · [Konfiguration](#-konfiguration) · [Schnellstart](#-schnellstart) · [Tests](#-tests) · [Struktur des Repositorys](#-struktur-des-repositorys) · [Verwandte Projekte](#-verwandte-projekte)
 
 ## 🚦 Projektstatus
 
@@ -39,11 +52,11 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 | Bereich | Stand | Was das hier bedeutet |
 |---|---|---|
 | Software | 🟡 | Funktioniert für seinen Hauptzweck; die Ehrlichkeitsprüfung oben nennt, was noch fehlt |
-| Tests | 🟠 | Für dieses Repository ist noch keine Testanzahl vermerkt |
+| Tests | 🟢 | 77 automatische Tests, bei jeder Änderung ausgeführt |
 | Echte Hardware | 🔴 | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 | Dokumentation | 🟢 | README in acht Sprachen, bei jeder Änderung gegen das Manifest geprüft |
 
-## 1. 🛠️ TECHNISCHER ÜBERBLICK
+## 🎯 Überblick
 
 **HYDRA-UMC-TWIN** soll das virtuelle Herz des Ökosystems werden: eine physikbasierte Nachbildung der Mikrofabrik zum sicheren Testen, Trainieren und Überwachen von Roboterschwärmen. Nichts davon existiert bisher.
 
@@ -62,9 +75,18 @@ In Rust geschrieben, liest es heute die Manifeste seiner drei Kinder (PHYSICS-RE
 
 **Ehrlichkeitscheck - was heute wirklich läuft:** Der argumentlose Aufruf gibt weiterhin Identität/Version/Rolle aus, es gibt jetzt aber drei echte Subbefehle. `family-status [--workspace PFAD]` liest die echten eigenen Manifeste von `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` aus einem lokalen Checkout und meldet ehrlich, was er findet. `family-sync [--workspace PFAD]` geht einen Schritt weiter: Es lässt jedes vorhandene Kind durch einen echten Zustands-Sync-Vertrag laufen (Mindestreife `functional`, maximal kompatible Hauptversion) und meldet pro Kind `READY`, `REJECTED (immature)`, `REJECTED (incompatible version)` oder `MISSING`. `serve` stellt beides über echtes HTTP JSON bereit statt über einmalige CLI-Aufrufe. Es gibt noch keine Bevy-App, kein Rendering, keine Physik-Tick-Schleife, kein Laden von URDF-Szenen und keinen echten Netzwerk-Sync-Transport - siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was geliefert wurde, [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für jeden Befehl/Endpunkt, und die Roadmap unten für das, was noch aussteht.
 
----
+## 🧩 Rolle in HYDRA-UMC
 
-## 2. 🔄 TWIN-ARCHITEKTUR
+**HYDRA-UMC-TWIN** ist der Integrationsknoten der Digital-Twin-Familie. Er liest die Manifeste seiner drei Kinder, meldet, ob die Familie bereit und im Gleichschritt ist, prüft deren Gesundheit und signiert Interlock-Zertifikate, die der Hardware-in-the-Loop-Brücke sagen, dass ein Risikobericht vom Twin stammt. Die Physik-Engine selbst ist noch geplant.
+
+## 🏛️ Architektur
+
+<p align="center">
+  <img src="images/architecture.svg" alt="HYDRA-UMC-TWIN architecture" width="100%">
+</p>
+
+<details>
+<summary>Textversion des Diagramms (Mermaid)</summary>
 
 ```mermaid
 flowchart TB
@@ -76,9 +98,9 @@ flowchart TB
     TWIN --> DATA["SYNTHETIC-DATA-GEN"]
 ```
 
----
+</details>
 
-## 3. 🧱 ARCHITEKTUR & DESIGNENTSCHEIDUNGEN
+### ARCHITEKTUR & DESIGNENTSCHEIDUNGEN
 
 * **Warum diese Engine keine `hardware/`/`firmware/`/`os/`-Ordner hat.** Reine Software ohne eigene Platine; Quellordner werden nur aufgenommen, wenn ihre Implementierung sie erfordert.
 * **Warum `Cargo.toml` bewusst noch keine Bevy-Abhängigkeit hat.** Bevy ist eine schwere Grafik-Engine - lange Kompilierzeiten, benötigt eine GPU-/Grafik-Toolchain, die nicht immer verfügbar ist. v0 hat nur `serde`/`serde_json`/`tiny_http` hinzugefügt (zum Lesen der Manifeste der Kinder) - die echte Rendering-Arbeit wartet weiterhin darauf, dass eine echte GPU-/Grafik-Toolchain existiert, gegen die kompiliert werden kann.
@@ -89,46 +111,47 @@ flowchart TB
 * **Warum `family-sync` sowohl nach Reife ALS AUCH nach einer Versionsobergrenze filtert, nicht nur nach "ist es da".** `family-status` beantwortet bereits "ist dieses Kind ausgecheckt und was behauptet es über sich selbst" - aber ein ausgechecktes Kind mit `scaffolding`-Reife hat noch keinen echten Zustand, der eine Synchronisation wert wäre, und ein Kind, das die von diesem Twin verifizierte maximale Hauptversion überschritten hat, könnte seine eigene Zustandsform auf eine Weise geändert haben, die dieser Twin noch nicht kennt. Beides sind echte Gründe, die Synchronisation zu verweigern, verschieden von "fehlend" - daher prüft und meldet `contract.rs` sie getrennt, statt alles in ein generisches "nicht bereit" zu vermengen.
 * **Warum die Reife in `contract::assess()` vor der Versionskompatibilität geprüft wird.** Die Versionsnummer eines unreifen Kindes ist noch kein aussagekräftiges Signal - die Reife zuerst zu prüfen bedeutet, dass der gemeldete Ablehnungsgrund immer das grundlegendste Gate benennt, das tatsächlich fehlgeschlagen ist, statt dass eine Versionsinkompatibilität ein grundlegenderes Problem à la "dieses Kind ist noch nicht echt" verdeckt.
 
----
+## 🔒 Sicherheit und Schutz
 
-## 📂 VERZEICHNISSTRUKTUR
+| Bedrohung | Abwehr | Wo |
+|---|---|---|
+| Ein Risikobericht, geschrieben von dem, der den Roboter bewegen will | Der Bericht reist als Zertifikat, signiert mit dem Ed25519-Schlüssel des Twins; die Brücke hält nur den öffentlichen Teil, wer sie erreicht, kann also keines ausstellen | `src/certificate.rs`, `docs/INTERLOCK_CERTIFICATE.md` |
+| Jeder, der den Twin um eine Signatur bittet | `POST /interlock/certify` gibt es nur, wenn der Twin mit Signaturschlüssel und Zertifizierungs-Token startet; sein Body ist auf 4 KiB begrenzt und `keygen` überschreibt nie eine Datei und schreibt sie unter Unix mit Modus 0600 | `src/server.rs`, `src/main.rs` |
 
-Reine Software-Engine ohne eigenes Hardware-Design - daher hat dieses
-Projekt keine Ordner `hardware/`, `firmware/` oder `os/` (siehe die
-Ordnerstruktur-Richtlinie).
+**Was er nie tut:** Physik simulieren, noch nicht. Bis die Engine existiert, signiert der Twin den Bericht des Aufrufers mit Zertifizierungs-Token; ein Zertifikat ist also so gut wie die Quelle des Berichts.
 
-```text
-HYDRA-UMC-TWIN/
-├── src/
-│   ├── manifest.rs       # Echter, defensiver Reader für das eigene Manifest eines Geschwisters
-│   ├── family.rs         # Echter Bereitschaftscheck + kombiniertes Sync-Ergebnis
-│   ├── contract.rs       # Echter Zustands-Sync-Vertrag (Reife + Versionsobergrenze)
-│   ├── certificate.rs    # Ed25519-Verriegelungszertifikate: der signierte Text, die Signatur, die Nonces, die Schlüsselerzeugung
-│   ├── health.rs         # Aktive Sonden der Kinder: startet die Binärdatei von PHYSICS-REPLICA, ruft die HIL-Brücke auf
-│   ├── server.rs         # Einfache JSON/HTTP-Oberfläche (tiny_http, blockierend, ohne Async-Runtime)
-│   └── main.rs           # Einstiegspunkt + echte `family-status`/`family-sync`-Subbefehle
-├── docs/                # Dokumentation und Physikanpassung
-├── build/               # Build-Notizen/Artefakte (die eigentliche cargo-Ausgabe liegt in target/, per .gitignore ausgeschlossen)
-├── images/              # Medien und Diagramme
-├── systemd/
-│   └── hydra-umc-twin.service # systemd-Unit der lokalen CM5-family-status/sync-API
-├── tools/
-│   ├── build_test.py    # Nicht-versionierender Build-Check
-│   ├── ci_validate.py   # Manifest/CHANGELOG/Docs-Validierung, von CI genutzt
-│   ├── _doc_policy.py   # Von der Familie geteilte Dokumentationsregeln (Kopie der von HYDRA-UMC-SDK, synchron gehalten)
-│   ├── _readme_parity.py # Prüfung, dass die acht READMEs dieselbe Struktur haben (Kopie der von HYDRA-UMC-SDK, synchron gehalten)
-│   └── hydra_project_tool.py # Dieselben Befehle in jedem Repository: validate, test, ci, version, status, bump
-├── Cargo.toml           # Paket-Metadaten, Abhängigkeiten (serde/serde_json), Kilometerzähler-Version
-├── bump_version.py      # Versionserhöhung im Kilometerzähler-Stil (nur vom expliziten `bump`-Befehl ausgeführt)
-├── build.sh / build.bat # Validiert und baut (Bauen ändert nie die Version)
-├── build-test.sh / build-test.bat # Nicht-versionierender Build-Check
-├── run.sh / run.bat     # Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
-└── docker-compose.blueprint.yml   # Integrations-Blueprint für die 3 Kinder unten
+## ⚙️ Konfiguration
+
+| Variable | Standard | Was sie festlegt |
+|---|---|---|
+| `--addr` | `127.0.0.1` | Adresse der HTTP-API |
+| `--port` | `8111` | Port der HTTP-API |
+| `--workspace` | der Ordner, der dieses Repository enthält | wo die Geschwister-Repositories gesucht werden |
+| `--physics-replica-bin` / `HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN` | keiner | Binärdatei des Physik-Replikats, die die Gesundheitsprüfung startet |
+| `--hil-bridge-addr` / `HYDRA_UMC_TWIN_HIL_ADDR` | keiner | Host:Port der Hardware-in-the-Loop-Brücke, die geprüft wird |
+| `--timeout-ms` | `5000` | Zeit, die jede Gesundheitsprüfung hat |
+| `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | keiner | Ed25519-Schlüssel, der das Signieren von Zertifikaten einschaltet |
+| `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | keiner | Token, den `POST /interlock/certify` verlangt |
+
+## 🚀 Schnellstart
+
+Benötigt die stabile Rust-Toolchain (Edition 2021) mit `cargo`.
+
+```bash
+./build.sh  # Linux, macOS (build.bat on Windows)
+./run.sh family-status
+./run.sh family-sync
+./run.sh serve --port 8111
+./run.sh keygen --key-file twin.key
 ```
 
----
+## 🧪 Tests
 
-## 🏗️ BUILD UND RUN
+77 automatische Tests laufen mit `cargo test`. Sie brauchen weder Hardware noch etwas außerhalb dieses Rechners.
+
+Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das Manifest, die Dokumente, die acht READMEs und die Bilder.
+
+## 🏗️ Build und Veröffentlichung
 
 Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https://rustup.rs)) und Python 3.10+ (nur für `bump_version.py`).
 
@@ -190,15 +213,56 @@ Beendet sich nur dann mit `0`, wenn jedes erwartete Kind `READY` ist; mit `1` f�
 
 Als Integrations-Elternteil dokumentiert `docker-compose.blueprint.yml`, wie diese Engine ihre 3 Kinder zu einem Stack zusammensetzt: **PHYSICS-REPLICA** (Solver, bei jedem Physik-Tick aufgerufen), **HIL-BRIDGE** (Real-vs-Virtual-Befehlssynchronisation) und **SYNTHETIC-DATA-GEN** (Offline-Batch-Datensatzexport). Keines der 4 Projekte hat in dieser Skelett-Phase bereits ein `Dockerfile`, daher ist `docker compose up` heute nicht ausführbar; die Datei ist die bestätigte Referenz für Topologie, Ports und Abhängigkeiten künftiger Dockerfiles.
 
----
+## 📂 Struktur des Repositorys
 
-## 🚀 FAHRPLAN
+<p align="center">
+  <img src="images/repository-structure.svg" alt="Repository structure of HYDRA-UMC-TWIN" width="100%">
+</p>
+
+<details>
+<summary>Textversion des Baums</summary>
+
+```text
+HYDRA-UMC-TWIN/
+├── src/                             Quellcode
+│   ├── manifest.rs                  Echter, defensiver Reader für das eigene Manifest eines Geschwisters
+│   ├── family.rs                    Echter Bereitschaftscheck + kombiniertes Sync-Ergebnis
+│   ├── contract.rs                  Echter Zustands-Sync-Vertrag (Reife + Versionsobergrenze)
+│   ├── certificate.rs               Ed25519-Verriegelungszertifikate: der signierte Text, die Signatur, die Nonces, die Schlüsselerzeugung
+│   ├── health.rs                    Aktive Sonden der Kinder: startet die Binärdatei von PHYSICS-REPLICA, ruft die HIL-Brücke auf
+│   ├── server.rs                    Einfache JSON/HTTP-Oberfläche (tiny_http, blockierend, ohne Async-Runtime)
+│   └── main.rs                      Einstiegspunkt + echte `family-status`/`family-sync`-Subbefehle
+├── docs/                            Dokumentation und Physikanpassung
+├── images/                          Medien und Diagramme
+├── systemd/                         Dienst-Unit
+├── tools/                           Projektwerkzeuge und CI-Prüfungen
+├── .github/                         CI-Workflow und Issue-Vorlagen
+├── Cargo.toml                       Crate-Metadaten
+├── bump_version.py                  ausdrückliche Versionserhöhung
+├── build.sh / build.bat             Validiert und baut (Bauen ändert nie die Version)
+├── build-test.sh / build-test.bat   Nicht-versionierender Build-Check
+├── run.sh / run.bat                 Führt die kompilierte Release-Binärdatei aus (leitet Argumente weiter)
+├── docker-compose.blueprint.yml     Integrations-Blueprint für die 3 Kinder unten
+├── CHANGELOG.md                     was sich in jeder Version geändert hat
+├── bump_manifest_version.py         gleicht die Manifest-Version an
+├── hydra-umc.project.json           Manifest: Version, Reifegrad, Familie
+└── test.sh                          führt die Tests aus
+```
+
+</details>
+
+## 🗺️ Roadmap und bekannte Grenzen
+
+**Bekannte Grenzen heute**
+
 * **Phase 1:** Digital-Twin-Synchronisation mit Echtzeit-Hardware-Telemetrie und Sub-10ms-Latenz.
 * **Phase 2:** Physics Replica-Integration mit industriellen Simulatoren (Isaac Sim) und Unterstützung für verformbare Körper.
 * **Phase 3:** Automatisierte Wiederherstellungsmuster von Node Healing für dezentrales Failover und frühzeitige Erkennung von Sensordegradation.
 * **Phase 4:** Fotorealistisches Rendering für die Erzeugung synthetischer Daten und HIL-Bridge-Unterstützung für Full-Scale Vehicle-in-the-Loop.
 
----
+## 🌍 Sprachen
+
+Diese README und die Dokumente des Repositorys gibt es in acht Sprachen: Englisch, Spanisch, Deutsch, Französisch, Italienisch, Japanisch, Chinesisch und Portugiesisch (Portugal). Sie entstehen gemeinsam, und die CI prüft, dass die acht Dateien dieselben Abschnitte und dieselben Links haben. Dieses Repository hat weder eine eigene Oberfläche noch einen eigenen Meldungskatalog, es gibt also keine Oberflächentexte zu übersetzen.
 
 ## 🔗 Verwandte Projekte
 
@@ -289,22 +353,27 @@ Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (Juan
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — Wartungsvorfall-Koordinator: eine Edge-Rolle mit niedrigem Privileg sammelt einen bereinigten Inventar-/Gesundheits-Snapshot, eine Control-Plane-Rolle rendert ihn schreibgeschützt und bittet einen KI-Anbieter um einen Diagnosevorschlag - wendet nie einen Patch an und stellt nie etwas bereit.
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** — reproduzierbarer Entwicklungshost (Raspberry Pi 5 / CM5), der den Quellcode des Ökosystems vorhält und begrenzte Build-/Test-Aufgaben über eine dauerhafte Warteschlange ausführt; eine dedizierte Entwicklerrolle, ausdrücklich kein operativer CM5.
 
+## 📚 Dokumentation
 
----
+Hier steht mehr:
 
-## 📚 Dokumentation & Community
+* **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — jeder `family-status`/`family-sync`/`serve`-Aufruf, echte Ausgabe aus einer gebauten Release-Binärdatei, die Exit-Code-Tabelle, und der `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP-JSON-Vertrag.
+* [Sicherheitsgrundlage des Ökosystems](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
+* [Bedrohungsmodell des Ökosystems](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
+* [Änderungsprotokoll dieses Repositorys](CHANGELOG.md)
+* [Lizenz dieses Repositorys](LICENSE.md)
 
-- **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — jeder `family-status`/`family-sync`/`serve`-Aufruf, echte Ausgabe aus einer gebauten Release-Binärdatei, die Exit-Code-Tabelle, und der `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP-JSON-Vertrag.
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Technologie-Stack und Coding-Richtlinien für einen Pull Request.
-- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — die in dieser Community erwarteten Verhaltensstandards.
-- **[SECURITY.md](SECURITY.md)** — wie man eine Schwachstelle meldet, und die echten Sicherheitsschwerpunkte dieses Projekts.
-- **[SUPPORT.md](SUPPORT.md)** — wo man Fragen stellt und Fehler meldet.
-- **[LICENSE.md](LICENSE.md)** — die eigene Lizenz dieses Projekts.
+## 🤝 Mitwirken und Community
+
+* Führe vor einem Pull Request `HYDRA_UMC_CI=1 py -3 tools/ci_validate.py` (oder `HYDRA_UMC_CI=1 python3 tools/ci_validate.py`) aus: Es muss `CI_VALIDATION=PASS` ausgeben. Führe dafür nicht `build.sh` oder `build.bat` aus; Bauen ist keine Prüfung.
+* Die acht READMEs entstehen aus einer einzigen Quelle in HYDRA-UMC-DOCS; bearbeite sie nicht von Hand. Ändere die Quelle und schreibe sie mit `tools/make_readmes.py` neu.
+* Behaupte in einer README nichts, was nicht gelaufen ist: Schreibe „simuliert“ oder „nicht auf Hardware erprobt“, wo das stimmt.
+* Siehe [CONTRIBUTING.md](CONTRIBUTING.md), den [Verhaltenskodex](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) und [SUPPORT.md](SUPPORT.md).
 
 ## 👤 AUTOR
-**JuanenRac** (Electro Hobby 3D)
-📧 electrohobby3d@gmail.com
-📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
+
+**JuanenRac (Electro Hobby 3D)** · electrohobby3d@gmail.com
 
 ## 📜 LIZENZ
-GPL-3.0 - Siehe LICENSE für Details.
+
+GPL-3.0-or-later - [LICENSE](LICENSE).

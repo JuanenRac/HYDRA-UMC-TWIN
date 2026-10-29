@@ -1,24 +1,34 @@
+<!-- =============================================================================
+HYDRA-UMC-TWIN - Digital Twin integration hub
+Copyright (C) JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+GPL-3.0-or-later - see LICENSE
+============================================================================= -->
+
 <p align="center">
   <img src="images/HYDRA_UMC_BANNER.svg" alt="HYDRA-UMC-TWIN banner" width="100%">
 </p>
 
-# ♊ HYDRA-UMC-TWIN
+# 🪞 HYDRA-UMC-TWIN
 
 <p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>简体中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🌐 基于物理的数字孪生与高保真仿真引擎
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="Engine">
-  <img src="https://img.shields.io/%20(planned)-lightgrey.svg" alt="Physics">
-  <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="HIL">
-  <img src="https://img.shields.io/badge/Stage-%E5%8A%9F%E8%83%BD%E9%98%B6%E6%AE%B5%20v0-yellow.svg" alt="功能阶段 v0">
+  <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
+  <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
+  <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
+  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
+  <img src="https://img.shields.io/badge/Tests-77%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Version-0.1.0-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
 ---
 
 > **安全与安防现状:**本生态系统不是经认证的安全系统。目前尚无硬件 E-STOP 通路,没有由固件强制执行的限位或联锁,也没有经过验证的运动指令;固件映像使用 CRC32 和共享密钥的 HMAC-SHA256 校验,而非非对称签名;TLS 与双向 TLS 均为可选项,默认关闭;自制电路板尚未组装或测试。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)。
+
+---
 
 ## 📋 速览
 
@@ -26,9 +36,12 @@
 |---|---|
 | 版本 | `0.1.0` |
 | 成熟度 | 可用 |
+| 测试 | 77 (`cargo test`) |
 | 技术栈 | Rust / tiny_http |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
+
+**跳转：** [概述](#-概述) · [架构](#-架构) · [安全与防护](#-安全与防护) · [配置](#-配置) · [快速开始](#-快速开始) · [测试](#-测试) · [仓库结构](#-仓库结构) · [相关项目](#-相关项目)
 
 ## 🚦 项目状态
 
@@ -39,11 +52,11 @@
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟠 | 此仓库尚未记录测试数量 |
+| 测试 | 🟢 | 77 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 文档 | 🟢 | 八种语言的 README，每次变更都会与清单核对 |
 
-## 1. 🛠️ 技术概述
+## 🎯 概述
 
 **HYDRA-UMC-TWIN** 的目标是成为生态系统的虚拟核心:一个基于物理的微工厂副本,用于对机器人集群进行安全的测试、训练和监控。目前这些都还不存在。
 
@@ -62,9 +75,18 @@
 
 **诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在有三个真实的子命令。`family-status [--workspace 路径]` 从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。`family-sync [--workspace 路径]` 更进一步：它会让每个已存在的子项目通过一份真实的状态同步契约（最低成熟度 `functional`、兼容的最高主版本号），并为每个子项目报告 `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)` 或 `MISSING`。`serve` 则把两者都以真实的 HTTP JSON 形式对外提供，而不再局限于一次性的 CLI 调用。目前还没有任何 Bevy 应用、渲染、物理帧循环、URDF 场景加载，也没有任何真实的网络同步传输层——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，每个命令/端点请参见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)，尚待完成的内容请参见下方路线图。
 
----
+## 🧩 在 HYDRA-UMC 中的角色
 
-## 2. 🔄 孪生架构
+**HYDRA-UMC-TWIN** 是 Digital Twin 系列的集成父项目。它读取三个子项目的清单，报告系列是否就绪且同步，探测其健康状况，并签署互锁证书，告诉硬件在环桥接某份风险报告来自孪生体。物理引擎本身仍在计划中。
+
+## 🏛️ 架构
+
+<p align="center">
+  <img src="images/architecture.svg" alt="HYDRA-UMC-TWIN architecture" width="100%">
+</p>
+
+<details>
+<summary>图表的文本版本（Mermaid）</summary>
 
 ```mermaid
 flowchart TB
@@ -76,9 +98,9 @@ flowchart TB
     TWIN --> DATA["SYNTHETIC-DATA-GEN"]
 ```
 
----
+</details>
 
-## 3. 🧱 架构与设计决策
+### 架构与设计决策
 
 * **为什么本引擎没有 `hardware/`/`firmware/`/`os/` 文件夹。** 这是没有自有板卡的纯软件；源代码文件夹仅在实现需要时才包含。
 * **为什么 `Cargo.toml` 目前刻意不包含 Bevy 依赖。** Bevy 是一个较重的图形引擎——编译耗时长，需要并非总是可用的 GPU/图形工具链。v0 只添加了 `serde`/`serde_json`/`tiny_http`（用于读取子项目的清单）——真正的渲染工作仍在等待一个真实可用的 GPU/图形工具链出现后才能编译。
@@ -89,45 +111,47 @@ flowchart TB
 * **为何 `family-sync` 同时按成熟度和版本上限筛选，而不仅仅是"是否存在"。** `family-status` 已经回答了"这个子项目是否被检出，它对自己有什么声明"——但一个已检出、成熟度为 `scaffolding` 的子项目还没有真正值得同步的状态，而一个已经超出本 Twin 已验证的最高主版本号的子项目，可能已经以本 Twin 尚不了解的方式改变了自己的状态形态。这两者都是拒绝同步的真实理由，且都不同于「缺失」，所以 `contract.rs` 会分别检查并报告它们，而不是把一切都合并成一个笼统的「未就绪」。
 * **为何 `contract::assess()` 中成熟度检查先于版本兼容性检查。** 一个不成熟子项目的版本号还不是一个有意义的信号——先检查成熟度，意味着报告出的拒绝理由总会指出真正失败的那个最根本的关卡，而不会让一个版本不匹配掩盖了「这个子项目还不是真的」这个更基础的问题。
 
----
+## 🔒 安全与防护
 
-## 📂 目录结构
+| 威胁 | 防御 | 位置 |
+|---|---|---|
+| 由想让机器人动起来的人自己写的风险报告 | 报告以孪生体的 Ed25519 密钥签名的证书形式传递；桥接只持有公钥，因此能访问它的人也无法伪造证书 | `src/certificate.rs`, `docs/INTERLOCK_CERTIFICATE.md` |
+| 任何人都可以要求孪生体签名 | 只有孪生体带着签名密钥和认证令牌启动时才存在 `POST /interlock/certify`；其请求体限制为 4 KiB，`keygen` 从不覆盖文件，在 Unix 上以 0600 权限写入 | `src/server.rs`, `src/main.rs` |
 
-纯软件引擎，没有自己的硬件设计——因此本项目不携带 `hardware/`、
-`firmware/` 或 `os/` 文件夹（遵循仓库结构策略）。
+**目前不做的事：** 物理仿真。在引擎出现之前，孪生体为持有认证令牌的调用方的报告签名，因此证书的可信度取决于报告的来源。
 
-```text
-HYDRA-UMC-TWIN/
-├── src/
-│   ├── manifest.rs       # 真实的、具防御性的兄弟项目自身清单读取器
-│   ├── family.rs         # 真实的就绪检查 + 综合同步结果
-│   ├── contract.rs       # 真实的状态同步契约（成熟度 + 版本上限）
-│   ├── certificate.rs    # Ed25519 联锁证书:被签名的文本、签名、nonce、密钥生成
-│   ├── health.rs         # 子项目的主动探测:运行 PHYSICS-REPLICA 的二进制文件,调用 HIL 网桥
-│   ├── server.rs         # 简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
-│   └── main.rs           # 入口点 + 真实的 `family-status`/`family-sync` 子命令
-├── docs/                # 文档与物理调参
-├── build/               # 构建笔记/产物（cargo 自身的输出位于 target/，已被 gitignore）
-├── images/              # 媒体与图表
-├── systemd/
-│   └── hydra-umc-twin.service # 本地 CM5 family-status/sync API 的 systemd 单元
-├── tools/
-│   ├── build_test.py    # 不递增版本号的构建检查
-│   ├── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
-│   ├── _doc_policy.py   # 家族共享的文档规则 (HYDRA-UMC-SDK 的副本,保持同步)
-│   ├── _readme_parity.py # 检查八个 README 结构一致 (HYDRA-UMC-SDK 的副本,保持同步)
-│   └── hydra_project_tool.py # 每个仓库相同的命令: validate、test、ci、version、status、bump
-├── Cargo.toml           # 包元数据、依赖项（serde/serde_json）、里程表版本号
-├── bump_version.py      # 里程表式版本递增（仅由显式 `bump` 命令运行）
-├── build.sh / build.bat # 验证并构建（构建不会更改版本）
-├── build-test.sh / build-test.bat # 不递增版本号的构建检查
-├── run.sh / run.bat     # 运行编译后的 release 二进制文件（转发参数）
-└── docker-compose.blueprint.yml   # 下方 3 个子项目的集成蓝图
+## ⚙️ 配置
+
+| 变量 | 默认值 | 设置内容 |
+|---|---|---|
+| `--addr` | `127.0.0.1` | HTTP API 的地址 |
+| `--port` | `8111` | HTTP API 的端口 |
+| `--workspace` | 包含本仓库的文件夹 | 在哪里查找同级仓库 |
+| `--physics-replica-bin` / `HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN` | 无 | 健康检查所启动的物理副本的可执行文件 |
+| `--hil-bridge-addr` / `HYDRA_UMC_TWIN_HIL_ADDR` | 无 | 要探测的硬件在环桥接的 主机:端口 |
+| `--timeout-ms` | `5000` | 每次健康探测允许的时间 |
+| `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | 无 | 启用证书签名的 Ed25519 密钥 |
+| `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | 无 | `POST /interlock/certify` 所需的令牌 |
+
+## 🚀 快速开始
+
+需要稳定版 Rust 工具链（2021 版）及 `cargo`。
+
+```bash
+./build.sh  # Linux, macOS (build.bat on Windows)
+./run.sh family-status
+./run.sh family-sync
+./run.sh serve --port 8111
+./run.sh keygen --key-file twin.key
 ```
 
----
+## 🧪 测试
 
-## 🏗️ 构建与运行
+运行 `cargo test` 会执行 77 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+
+CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
+
+## 🏗️ 构建与发布
 
 需要 Rust 工具链（`cargo`/`rustc`，通过 [rustup](https://rustup.rs) 安装）
 以及 Python 3.10+（仅供 `bump_version.py` 使用）。
@@ -203,15 +227,56 @@ Not every child is sync-ready - see the lines above.
 `docker compose up` 尚不可运行——该文件是已确认的拓扑结构/端口/依赖图
 参考，未来的 `Dockerfile` 将据此添加。
 
----
+## 📂 仓库结构
 
-## 🚀 路线图
+<p align="center">
+  <img src="images/repository-structure.svg" alt="Repository structure of HYDRA-UMC-TWIN" width="100%">
+</p>
+
+<details>
+<summary>目录树的文本版本</summary>
+
+```text
+HYDRA-UMC-TWIN/
+├── src/                             源代码
+│   ├── manifest.rs                  真实的、具防御性的兄弟项目自身清单读取器
+│   ├── family.rs                    真实的就绪检查 + 综合同步结果
+│   ├── contract.rs                  真实的状态同步契约（成熟度 + 版本上限）
+│   ├── certificate.rs               Ed25519 联锁证书:被签名的文本、签名、nonce、密钥生成
+│   ├── health.rs                    子项目的主动探测:运行 PHYSICS-REPLICA 的二进制文件,调用 HIL 网桥
+│   ├── server.rs                    简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
+│   └── main.rs                      入口点 + 真实的 `family-status`/`family-sync` 子命令
+├── docs/                            文档与物理调参
+├── images/                          媒体与图表
+├── systemd/                         服务单元
+├── tools/                           项目工具和 CI 检查
+├── .github/                         CI 工作流和 Issue 模板
+├── Cargo.toml                       crate 元数据
+├── bump_version.py                  显式提升版本
+├── build.sh / build.bat             验证并构建（构建不会更改版本）
+├── build-test.sh / build-test.bat   不递增版本号的构建检查
+├── run.sh / run.bat                 运行编译后的 release 二进制文件（转发参数）
+├── docker-compose.blueprint.yml     下方 3 个子项目的集成蓝图
+├── CHANGELOG.md                     每个版本的变更
+├── bump_manifest_version.py         同步清单版本
+├── hydra-umc.project.json           清单：版本、成熟度、系列
+└── test.sh                          运行测试
+```
+
+</details>
+
+## 🗺️ 路线图与已知限制
+
+**当前已知限制**
+
 * **第一阶段：** 数字孪生与实时硬件遥测的同步，延迟低于 10ms。
 * **第二阶段：** 物理复制品与工业级仿真器（Isaac Sim）的集成，以及可变形体支持。
 * **第三阶段：** 用于去中心化故障转移和早期传感器退化检测的节点自愈自动化恢复模式。
 * **第四阶段：** 用于合成数据生成的照片级真实渲染，以及支持全尺寸车辆在环的 HIL Bridge。
 
----
+## 🌍 语言
+
+本 README 和仓库文档提供八种语言：英语、西班牙语、德语、法语、意大利语、日语、中文和葡萄牙语（葡萄牙）。它们同时编写，并由 CI 检查八个文件拥有相同的章节和相同的链接。 本仓库没有自己的界面或消息目录，因此没有需要翻译的界面文字。
 
 ## 🔗 相关项目
 
@@ -302,22 +367,27 @@ Not every child is sync-ready - see the lines above.
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — 维护事件协调器：一个低权限的边缘角色采集经过脱敏的库存/健康快照，一个控制面角色以只读方式渲染它，并请求某个 AI 提供方给出诊断建议——从不应用补丁，也从不部署任何内容。
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** — 可复现的开发主机（Raspberry Pi 5 / CM5），保存整个生态系统的源代码，并在持久队列下运行有界的构建/测试任务；这是专用的开发角色，明确区别于运行中的 CM5。
 
+## 📚 文档
 
----
+更多阅读：
 
-## 📚 文档与社区
+* **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — 每一个 `family-status`/`family-sync`/`serve` 调用、从真实构建的发布版二进制文件中获取的真实输出、退出码表，以及 `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP JSON 契约。
+* [生态系统的安全基线](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
+* [生态系统的威胁模型](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
+* [本仓库的更新日志](CHANGELOG.md)
+* [本仓库的许可证](LICENSE.md)
 
-- **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — 每一个 `family-status`/`family-sync`/`serve` 调用、从真实构建的发布版二进制文件中获取的真实输出、退出码表，以及 `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP JSON 契约。
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** —— 提交 Pull Request 所需的技术栈和编码规范。
-- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** —— 本社区所期望的行为准则。
-- **[SECURITY.md](SECURITY.md)** —— 如何报告漏洞，以及本项目真实的安全关注重点。
-- **[SUPPORT.md](SUPPORT.md)** —— 在哪里提问和报告缺陷。
-- **[LICENSE.md](LICENSE.md)** —— 本项目自身的许可证。
+## 🤝 参与贡献与社区
+
+* 提交 pull request 之前，请运行 `HYDRA_UMC_CI=1 py -3 tools/ci_validate.py`（或 `HYDRA_UMC_CI=1 python3 tools/ci_validate.py`）：它必须输出 `CI_VALIDATION=PASS`。此检查不要运行 `build.sh` 或 `build.bat`；构建不是检查。
+* 八个 README 由 HYDRA-UMC-DOCS 中的同一个源生成；请勿手工编辑。修改源文件，再用 `tools/make_readmes.py` 重新生成。
+* 不要在 README 中声称尚未运行过的内容：属实时请写“仅模拟”或“尚未在硬件上试过”。
+* 请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)、[行为准则](CODE_OF_CONDUCT.md)、[SECURITY.md](SECURITY.md) 和 [SUPPORT.md](SUPPORT.md)。
 
 ## 👤 作者
-**JuanenRac** (Electro Hobby 3D)
-📧 electrohobby3d@gmail.com
-📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
+
+**JuanenRac (Electro Hobby 3D)** · electrohobby3d@gmail.com
 
 ## 📜 许可证
-GPL-3.0 —— 详见 LICENSE。
+
+GPL-3.0-or-later - [LICENSE](LICENSE).

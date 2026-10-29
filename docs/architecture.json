@@ -1,0 +1,154 @@
+{
+  "repo": "HYDRA-UMC-TWIN",
+  "ecosystem": "hydra",
+  "tagline": "A readiness hub that also signs the certificates a real-hardware bridge insists on.",
+  "description": "HYDRA-UMC-TWIN reads the manifests of its three children, checks family status and state-sync contract, probes their health, and signs interlock certificates with an Ed25519 key behind a token.",
+  "columns": [
+    "WHO CALLS IT",
+    "THIS REPOSITORY",
+    "THE FAMILY"
+  ],
+  "nodes": [
+    {
+      "id": "cli",
+      "column": 0,
+      "level": "tested",
+      "title": "CLI",
+      "lines": [
+        "family-status, family-sync,",
+        "family-health, keygen"
+      ],
+      "code": [
+        "src/main.rs"
+      ]
+    },
+    {
+      "id": "http",
+      "column": 0,
+      "level": "tested",
+      "title": "HTTP API",
+      "lines": [
+        "serve on port 8111:",
+        "status, sync, certify"
+      ],
+      "code": [
+        "src/server.rs"
+      ]
+    },
+    {
+      "id": "phy",
+      "column": 2,
+      "level": "contract",
+      "title": "PHYSICS-REPLICA",
+      "lines": [
+        "holds the physics; asks",
+        "for certificates"
+      ]
+    },
+    {
+      "id": "hil",
+      "column": 2,
+      "level": "contract",
+      "title": "HIL-BRIDGE",
+      "lines": [
+        "checks the certificate",
+        "with the public key"
+      ]
+    },
+    {
+      "id": "syn",
+      "column": 2,
+      "level": "contract",
+      "title": "SYNTHETIC-DATA-GEN",
+      "lines": [
+        "the third child"
+      ]
+    },
+    {
+      "id": "fam",
+      "column": 1,
+      "level": "tested",
+      "title": "family.rs + manifest.rs",
+      "lines": [
+        "readiness and state-sync",
+        "contract of the children"
+      ],
+      "code": [
+        "src/family.rs",
+        "src/manifest.rs",
+        "src/contract.rs"
+      ]
+    },
+    {
+      "id": "hea",
+      "column": 1,
+      "level": "tested",
+      "title": "health.rs",
+      "lines": [
+        "probes the replica binary",
+        "and the bridge address"
+      ],
+      "code": [
+        "src/health.rs"
+      ]
+    },
+    {
+      "id": "cer",
+      "column": 1,
+      "level": "tested",
+      "title": "certificate.rs",
+      "lines": [
+        "signs risk reports with",
+        "an Ed25519 key"
+      ],
+      "code": [
+        "src/certificate.rs"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "cli",
+      "to": "fam",
+      "level": "tested"
+    },
+    {
+      "from": "http",
+      "to": "fam",
+      "level": "tested"
+    },
+    {
+      "from": "fam",
+      "to": "hea",
+      "level": "tested"
+    },
+    {
+      "from": "hea",
+      "to": "phy",
+      "level": "contract"
+    },
+    {
+      "from": "hea",
+      "to": "hil",
+      "level": "contract"
+    },
+    {
+      "from": "cer",
+      "to": "hil",
+      "level": "contract",
+      "label": "certificate"
+    },
+    {
+      "from": "phy",
+      "to": "cer",
+      "level": "contract",
+      "label": "risk report"
+    },
+    {
+      "from": "fam",
+      "to": "syn",
+      "level": "contract"
+    }
+  ],
+  "footer": "Tried on a computer with real sibling checkouts; no robot and no real hardware were behind the bridge."
+}
