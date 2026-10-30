@@ -120,6 +120,8 @@ flowchart TB
 
 **目前不做的事：** 物理仿真。在引擎出现之前，孪生体为持有认证令牌的调用方的报告签名，因此证书的可信度取决于报告的来源。
 
+HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因此请求无法让 API 探查机器上的其他目录；`--strict-workspace-root 路径` 可选择另一个根目录，`--allow-any-workspace` 则恢复之前不受限制的行为。
+
 ## ⚙️ 配置
 
 | 变量 | 默认值 | 设置内容 |
@@ -215,7 +217,7 @@ Not every child is sync-ready - see the lines above.
 **重要提示：** `Cargo.toml` 目前刻意**不包含 Bevy 依赖**。Bevy 是一个
 较重的图形引擎（编译耗时长，需要并非总是可用的 GPU/图形工具链）；v0 只
 添加了 `serde`/`serde_json`/`tiny_http` 用于读取清单。真正的 `bevy` 依赖（以及物理
-后端和面向 HIL-BRIDGE 的 HTTP 客户端）将在真正的渲染/引擎工作
+后端和面向 HIL-BRIDGE 的 gRPC/WebSocket 客户端）将在真正的渲染/引擎工作
 开始时添加。
 
 ### 集成 3 个子项目（`docker-compose.blueprint.yml`）

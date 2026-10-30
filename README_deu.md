@@ -120,6 +120,8 @@ flowchart TB
 
 **Was er nie tut:** Physik simulieren, noch nicht. Bis die Engine existiert, signiert der Twin den Bericht des Aufrufers mit Zertifizierungs-Token; ein Zertifikat ist also so gut wie die Quelle des Berichts.
 
+Die Überschreibung `?workspace=` der HTTP-API ist standardmäßig auf den bereitgestellten Arbeitsbereich begrenzt, sodass eine Anfrage die API nicht andere Verzeichnisse des Rechners untersuchen lassen kann; `--strict-workspace-root PFAD` wählt eine andere Wurzel, und `--allow-any-workspace` bringt das frühere, unbegrenzte Verhalten zurück.
+
 ## ⚙️ Konfiguration
 
 | Variable | Standard | Was sie festlegt |
@@ -207,7 +209,7 @@ Not every child is sync-ready - see the lines above.
 
 Beendet sich nur dann mit `0`, wenn jedes erwartete Kind `READY` ist; mit `1` für jedes `MISSING`/`REJECTED`-Kind.
 
-**Wichtig:** `Cargo.toml` enthält absichtlich **noch keine Bevy-Abhängigkeit**. Bevy ist eine schwere Grafik-Engine (lange Kompilierzeiten, benötigt eine GPU/Grafik-Toolchain, die nicht immer verfügbar ist); v0 hat nur `serde`/`serde_json`/`tiny_http` zum Lesen von Manifesten hinzugefügt. Die echte `bevy`-Abhängigkeit (plus ein Physik-Backend und der HTTP-Client für HIL-BRIDGE) wird hinzugefügt, wenn die echte Rendering-/Engine-Arbeit beginnt.
+**Wichtig:** `Cargo.toml` enthält absichtlich **noch keine Bevy-Abhängigkeit**. Bevy ist eine schwere Grafik-Engine (lange Kompilierzeiten, benötigt eine GPU/Grafik-Toolchain, die nicht immer verfügbar ist); v0 hat nur `serde`/`serde_json`/`tiny_http` zum Lesen von Manifesten hinzugefügt. Die echte `bevy`-Abhängigkeit (plus ein Physik-Backend und der gRPC/WebSocket-Client für HIL-BRIDGE) wird hinzugefügt, wenn die echte Rendering-/Engine-Arbeit beginnt.
 
 ### Integration der 3 Kinder (`docker-compose.blueprint.yml`)
 

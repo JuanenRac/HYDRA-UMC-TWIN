@@ -120,6 +120,8 @@ flowchart TB
 
 **What it never does:** simulate physics yet. Until the engine exists, the twin signs the report of the caller that holds the certify token, so a certificate is as good as the source of the report.
 
+The `?workspace=` override of the HTTP API is bounded by default to the served workspace, so a request cannot make the API probe other directories of the machine; `--strict-workspace-root PATH` picks another root and `--allow-any-workspace` brings back the earlier, unbounded behaviour.
+
 ## ⚙️ Configuration
 
 | Variable | Default | What it sets |
@@ -207,7 +209,7 @@ Not every child is sync-ready - see the lines above.
 
 Exits `0` only if every expected child is `READY`; `1` for any `MISSING`/`REJECTED` child.
 
-**Important:** `Cargo.toml` deliberately has **no Bevy dependency yet**. Bevy is a heavy graphics engine (long compile times, needs a GPU/graphics toolchain that isn't always available); v0 only added `serde`/`serde_json`/`tiny_http` for reading manifests. The real `bevy` dependency (plus a physics backend and the HTTP client for HIL-BRIDGE) is added when real rendering/engine work starts.
+**Important:** `Cargo.toml` deliberately has **no Bevy dependency yet**. Bevy is a heavy graphics engine (long compile times, needs a GPU/graphics toolchain that isn't always available); v0 only added `serde`/`serde_json`/`tiny_http` for reading manifests. The real `bevy` dependency (plus a physics backend and the gRPC/WebSocket client for HIL-BRIDGE) is added when real rendering/engine work starts.
 
 ### Integrating the 3 children (`docker-compose.blueprint.yml`)
 

@@ -120,6 +120,8 @@ flowchart TB
 
 **Cosa non fa mai:** simulare la fisica, per ora. Finché il motore non esiste, il gemello firma il rapporto di chi ha il token di certificazione; un certificato vale quanto la fonte del rapporto.
 
+Il parametro `?workspace=` dell'API HTTP è limitato per impostazione predefinita all'area di lavoro servita, così che una richiesta non possa far esaminare all'API altre directory della macchina; `--strict-workspace-root PERCORSO` sceglie un'altra radice e `--allow-any-workspace` ripristina il comportamento precedente, senza limiti.
+
 ## ⚙️ Configurazione
 
 | Variabile | Predefinito | Cosa imposta |
@@ -207,7 +209,7 @@ Not every child is sync-ready - see the lines above.
 
 Esce con `0` solo se ogni figlio atteso è `READY`; `1` per qualsiasi figlio `MISSING`/`REJECTED`.
 
-**Importante:** `Cargo.toml` deliberatamente **non ha ancora la dipendenza Bevy**. Bevy è un motore grafico pesante (tempi di compilazione lunghi, richiede un toolchain GPU/grafico non sempre disponibile); v0 ha aggiunto solo `serde`/`serde_json`/`tiny_http` per leggere i manifesti. La vera dipendenza `bevy` (più un backend fisico e il client HTTP per HIL-BRIDGE) verrà aggiunta quando inizierà il vero lavoro di rendering/motore.
+**Importante:** `Cargo.toml` deliberatamente **non ha ancora la dipendenza Bevy**. Bevy è un motore grafico pesante (tempi di compilazione lunghi, richiede un toolchain GPU/grafico non sempre disponibile); v0 ha aggiunto solo `serde`/`serde_json`/`tiny_http` per leggere i manifesti. La vera dipendenza `bevy` (più un backend fisico e il client gRPC/WebSocket per HIL-BRIDGE) verrà aggiunta quando inizierà il vero lavoro di rendering/motore.
 
 ### Integrazione dei 3 figli (`docker-compose.blueprint.yml`)
 
