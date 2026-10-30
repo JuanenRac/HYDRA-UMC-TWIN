@@ -285,20 +285,34 @@ fn run_keygen(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// The root every `?workspace=` override is bounded to when none is named:
+/// the served workspace itself, unless the check is switched off or the
+/// workspace cannot be resolved (then there is nothing to bound to).
+fn default_workspace_bound(workspace: &std::path::Path, allow_any: bool) -> Option<PathBuf> {
+    if allow_any {
+        None
+    } else {
+        workspace.canonicalize().ok()
+    }
+}
+
 fn run_serve(args: &[String]) -> ExitCode {
     let addr = find_flag(args, "--addr").unwrap_or_else(|| "127.0.0.1".to_string());
     let port = find_flag(args, "--port").unwrap_or_else(|| "8111".to_string());
     let workspace: PathBuf = find_flag(args, "--workspace")
         .map(PathBuf::from)
         .unwrap_or_else(default_workspace);
-    // Opt-in production hardening: unset (the default), a `?workspace=`
-    // override can point at any real directory the process can read -
-    // the deliberate, tested behavior this API has always had, kept
-    // unchanged. Set, every override must resolve inside this root -
-    // see server.rs's own resolve_workspace_override() for the full
-    // rationale. Canonicalized at startup, not per-request: a root that
-    // doesn't exist is a real, loud startup error, not a silent
-    // always-reject once the server is already listening.
+    // Production hardening, on by default: a `?workspace=` override must
+    // resolve inside a root. Without `--strict-workspace-root PATH` that
+    // root is the served workspace itself; `--allow-any-workspace` brings
+    // back the earlier behaviour (an override may point at any real
+    // directory the process can read). Canonicalized at startup, not
+    // per-request: a root that doesn't exist is a real, loud startup error.
+    let allow_any = has_flag(args, "--allow-any-workspace");
+    if allow_any && find_flag(args, "--strict-workspace-root").is_some() {
+        eprintln!("[twin] fatal: --allow-any-workspace and --strict-workspace-root cannot be used together");
+        return ExitCode::from(2);
+    }
     let strict_root: Option<PathBuf> = match find_flag(args, "--strict-workspace-root") {
         Some(raw) => match PathBuf::from(&raw).canonicalize() {
             Ok(canonical) => Some(canonical),
@@ -307,7 +321,9 @@ fn run_serve(args: &[String]) -> ExitCode {
                 return ExitCode::from(2);
             }
         },
-        None => None,
+        // A served workspace that cannot be resolved has nothing to bound
+        // an override to; the check then stays off, as it was before.
+        None => default_workspace_bound(&workspace, allow_any),
     };
 
     // The interlock certificates (certificate.rs): off unless a signing key AND a token for the callers that ask for a signature are given.
@@ -370,7 +386,7 @@ fn run_serve(args: &[String]) -> ExitCode {
             );
             match &strict_root {
                 Some(root) => eprintln!("[twin] --strict-workspace-root set: ?workspace= overrides are bounded to {}", root.display()),
-                None => eprintln!("[twin] --strict-workspace-root not set: ?workspace= overrides may point at any real, readable directory"),
+                None => eprintln!("[twin] ?workspace= overrides may point at any real, readable directory (--allow-any-workspace)"),
             }
             eprintln!("[twin] GET /family-status, GET /family-sync, GET /stats");
             match &certifier {
@@ -423,5 +439,24 @@ fn main() -> ExitCode {
             println!("{ROLE}");
             ExitCode::SUCCESS
         }
+    }
+}
+
+#[cfg(test)]
+mod workspace_bound_tests {
+    use super::default_workspace_bound;
+
+    #[test]
+    fn the_served_workspace_bounds_the_overrides_unless_they_are_allowed_anywhere() {
+        let dir = std::env::temp_dir();
+        assert_eq!(
+            default_workspace_bound(&dir, false),
+            dir.canonicalize().ok()
+        );
+        assert_eq!(default_workspace_bound(&dir, true), None);
+        assert_eq!(
+            default_workspace_bound(&dir.join("no-such-folder-here"), false),
+            None
+        );
     }
 }

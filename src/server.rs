@@ -94,11 +94,10 @@ fn query_param(url: &str, key: &str) -> Option<String> {
 /// to actually exist and be a real directory, returning a clear error
 /// instead of a misleading "everything missing" for anything else.
 /// `strict_root`, when set, additionally requires the resolved override
-/// to be the root itself or a real subdirectory of it - a deliberate,
-/// OPT-IN production hardening flag (`--strict-workspace-root`, see
-/// main.rs), never the default. Unset, `?workspace=` keeps pointing at
-/// any real, existing directory the process can read, exactly the
-/// tested, documented behavior above - this never changes that default.
+/// to be the root itself or a real subdirectory of it - the serving
+/// default (see main.rs: the served workspace, or `--strict-workspace-root`;
+/// `--allow-any-workspace` turns it off). Unset, `?workspace=` points at
+/// any real, existing directory the process can read, as described above.
 fn resolve_workspace_override(
     url: &str,
     strict_root: Option<&std::path::Path>,
