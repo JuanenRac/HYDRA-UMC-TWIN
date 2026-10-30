@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] - The workspace override bounded to the served workspace, the real interface of the hardware-in-the-loop bridge in the compose blueprint, and the universal README
+
 - **`?workspace=` overrides are bounded to the served workspace by default:** a request can no longer make the API probe other directories of the machine; `--strict-workspace-root PATH` picks another root and the new `--allow-any-workspace` brings back the earlier behaviour.
 - **The compose blueprint states the real interface of the hardware-in-the-loop bridge:** the service now publishes the HTTP JSON API on `127.0.0.1:8113` (the port and protocol the bridge itself serves and this project's health check asks), not a planned gRPC port 50051.
 - **The notes of the project manifest no longer carry a hand-written test count:** the counts went out of date at every change; the number of tests is stated by the README, which is checked against the code.
