@@ -93,7 +93,9 @@ pub fn state_problems(state: &Value) -> Vec<String> {
         for (index, joint) in joints.iter().enumerate() {
             if let Some(name) = joint.get("name").and_then(Value::as_str) {
                 if !seen.insert(name.to_string()) {
-                    found.push(format!("/joint_states/{index}/name: the joint {name:?} appears twice"));
+                    found.push(format!(
+                        "/joint_states/{index}/name: the joint {name:?} appears twice"
+                    ));
                 }
             }
         }
@@ -195,14 +197,15 @@ mod tests {
         bad["poses"][0]["pose"]["orientation"] = json!({"w": 1.0, "x": 1.0, "y": 0.0, "z": 0.0});
         assert!(state_problems(&bad).join("\n").contains("not 1"));
         let mut near = state();
-        near["poses"][0]["pose"]["orientation"] = json!({"w": 0.7071067811865476, "x": 0.0, "y": 0.0, "z": 0.7071067811865476});
+        near["poses"][0]["pose"]["orientation"] = json!({"w": std::f64::consts::FRAC_1_SQRT_2, "x": 0.0, "y": 0.0, "z": std::f64::consts::FRAC_1_SQRT_2});
         assert!(state_problems(&near).is_empty());
     }
 
     #[test]
     fn a_joint_named_twice_is_refused() {
         let mut bad = state();
-        bad["joint_states"] = json!([{"name": "a", "position": 1.0}, {"name": "a", "position": 2.0}]);
+        bad["joint_states"] =
+            json!([{"name": "a", "position": 1.0}, {"name": "a", "position": 2.0}]);
         assert!(state_problems(&bad).join("\n").contains("appears twice"));
     }
 }
