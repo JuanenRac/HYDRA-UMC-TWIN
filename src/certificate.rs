@@ -207,7 +207,7 @@ pub fn encode_hex(bytes: &[u8]) -> String {
 }
 
 pub fn decode_hex(text: &str) -> Result<Vec<u8>, ()> {
-    if !text.len().is_multiple_of(2) || !text.is_ascii() {
+    if text.len() % 2 == 1 || !text.is_ascii() {
         return Err(());
     }
     (0..text.len() / 2)
