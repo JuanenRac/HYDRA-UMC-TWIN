@@ -19,6 +19,7 @@ mod contract;
 mod family;
 mod health;
 mod manifest;
+mod schema;
 mod server;
 
 use contract::SyncReadiness;
@@ -92,6 +93,39 @@ fn run_family_status(args: &[String]) -> ExitCode {
         println!(
             "Some children are missing or unusable - see the NOT FOUND and UNUSABLE lines above."
         );
+        ExitCode::from(1)
+    }
+}
+
+fn run_validate_state(args: &[String]) -> ExitCode {
+    let Some(path) = args.first() else {
+        eprintln!("usage: hydra-umc-twin validate-state <state.json>");
+        return ExitCode::from(2);
+    };
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) => {
+            eprintln!("[twin] cannot read {path}: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let state: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("[twin] {path} is not JSON: {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let problems = schema::state_problems(&state);
+    if problems.is_empty() {
+        let source = state.get("source").and_then(|v| v.as_str()).unwrap_or("?");
+        println!("TWIN_STATE=PASS source={source}");
+        ExitCode::SUCCESS
+    } else {
+        for problem in &problems {
+            println!("  {problem}");
+        }
+        println!("TWIN_STATE=FAIL problems={}", problems.len());
         ExitCode::from(1)
     }
 }
@@ -431,6 +465,7 @@ fn main() -> ExitCode {
     match args.first().map(|s| s.as_str()) {
         Some("family-status") => run_family_status(&args[1..]),
         Some("family-sync") => run_family_sync(&args[1..]),
+        Some("validate-state") => run_validate_state(&args[1..]),
         Some("family-health") => run_family_health(&args[1..]),
         Some("serve") => run_serve(&args[1..]),
         Some("keygen") => run_keygen(&args[1..]),

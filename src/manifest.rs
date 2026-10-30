@@ -109,6 +109,17 @@ pub fn read_child_manifest_checked(
             )));
         }
     }
+    // A manifest that declares a schema_version is held to the schema of the SDK as a whole; an older one without it keeps the
+    // three fields this Twin has always needed.
+    if value.get("schema_version").is_some() {
+        let problems = crate::schema::manifest_problems(&value);
+        if !problems.is_empty() {
+            return Err(ManifestError::Unparseable(format!(
+                "it does not match the project manifest schema: {}",
+                problems.join("; ")
+            )));
+        }
+    }
     Ok(manifest)
 }
 
@@ -172,6 +183,41 @@ mod tests {
         )
     }
 
+    /// A manifest that passes the schema of the SDK, with `extra` (a comma and members) before the closing brace.
+    fn full(name: &str, extra: &str) -> String {
+        format!(
+            r#"{{"schema_version": "1.0", "ecosystem": "HYDRA-UMC", "name": "{name}", "version": "0.0.2", "role": "library", "stack": "rust", "technologies": ["Rust"], "deployment_target": "cm5", "maturity": "functional", "family": "Digital Twin & Simulation", "parent": null, "build": "cargo build", "notes": "n", "native_version": {{"file": "Cargo.toml", "pattern": "^version"}}{extra}}}"#
+        )
+    }
+
+    #[test]
+    fn a_manifest_that_declares_a_schema_is_held_to_it() {
+        let tmp = tempdir();
+        write_manifest(tmp.path(), &full("HYDRA-UMC-X", r#", "evidence": "bench""#));
+        assert!(read_child_manifest_checked(tmp.path(), "HYDRA-UMC-X").is_ok());
+        for broken in [
+            r#", "evidence": "magic""#,
+            r#", "surprise": true"#,
+            r#", "service": {"port": 70000}"#,
+        ] {
+            write_manifest(tmp.path(), &full("HYDRA-UMC-X", broken));
+            let error = read_child_manifest_checked(tmp.path(), "HYDRA-UMC-X").unwrap_err();
+            assert!(
+                matches!(&error, ManifestError::Unparseable(why) if why.contains("project manifest schema")),
+                "{broken}: {error:?}"
+            );
+        }
+        // a manifest without schema_version keeps working as before
+        write_manifest(tmp.path(), &named("HYDRA-UMC-X", ""));
+        assert!(read_child_manifest_checked(tmp.path(), "HYDRA-UMC-X").is_ok());
+        // and another project's manifest is still reported as such, not as a schema problem
+        write_manifest(tmp.path(), &full("HYDRA-UMC-OTHER", ""));
+        assert!(matches!(
+            read_child_manifest_checked(tmp.path(), "HYDRA-UMC-X"),
+            Err(ManifestError::WrongIdentity(_))
+        ));
+    }
+
     #[test]
     fn checked_read_says_not_found_only_for_a_missing_checkout_or_file() {
         let tmp = tempdir();
@@ -225,14 +271,8 @@ mod tests {
     #[test]
     fn checked_read_checks_the_schema_major_when_there_is_one() {
         let tmp = tempdir();
-        write_manifest(
-            tmp.path(),
-            &named(
-                "X",
-                r#", "schema_version": "1.0", "ecosystem": "HYDRA-UMC""#,
-            ),
-        );
-        assert!(read_child_manifest_checked(tmp.path(), "X").is_ok());
+        write_manifest(tmp.path(), &full("HYDRA-UMC-X", ""));
+        assert!(read_child_manifest_checked(tmp.path(), "HYDRA-UMC-X").is_ok());
         write_manifest(tmp.path(), &named("X", r#", "schema_version": "2.0""#));
         assert!(matches!(
             read_child_manifest_checked(tmp.path(), "X"),

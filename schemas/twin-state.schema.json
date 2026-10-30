@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://juanenrac.github.io/hydra-umc-sdk/contracts/v1/twin-state.schema.json",
+  "title": "TwinState", "type": "object",
+  "description": "The state a digital twin exchanges: the joints and the named poses of one robot at one instant, whether the reading is of the real robot or of a simulation, and the frame the poses are in. Joint positions are radians for a revolute joint and meters for a prismatic one.",
+  "required": ["schema_version", "source", "frame", "timestamp_utc", "joint_states"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "source": {"enum": ["real", "simulated"], "description": "Whether the state was read from the real robot or produced by a simulation: a consumer must never take one for the other."},
+    "robot_id": {"type": "string", "minLength": 1},
+    "frame": {"enum": ["base", "tool"], "description": "The frame of the poses (the same two as the Pose contract)."},
+    "timestamp_utc": {"type": "string", "format": "date-time", "description": "When the state was read or computed."},
+    "sequence": {"type": "integer", "minimum": 0, "description": "Grows with every state of one robot, so a consumer can drop an old one that arrives late."},
+    "joint_states": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["name", "position"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "position": {"type": "number"},
+          "velocity": {"type": "number"},
+          "effort": {"type": "number"}
+        }, "additionalProperties": true
+      }
+    },
+    "poses": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["name", "pose"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "pose": {
+            "type": "object", "required": ["schema_version", "frame", "position", "orientation"],
+            "description": "A Pose contract payload; the unit length of its quaternion is checked by the clients, a schema cannot express it.",
+            "properties": {
+              "schema_version": {"const": "1.0"},
+              "frame": {"enum": ["base", "tool"]},
+              "position": {"type": "object", "required": ["x", "y", "z"], "additionalProperties": false, "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}},
+              "orientation": {"type": "object", "required": ["w", "x", "y", "z"], "additionalProperties": false, "properties": {"w": {"type": "number"}, "x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}}
+            }, "additionalProperties": true
+          }
+        }, "additionalProperties": true
+      }
+    }
+  }, "additionalProperties": true
+}

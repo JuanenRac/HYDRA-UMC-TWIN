@@ -191,6 +191,22 @@ $ hydra-umc-twin serve --workspace /opt/hydra-umc/twin/workspace --strict-worksp
 [twin] --strict-workspace-root set: ?workspace= overrides are bounded to /opt/hydra-umc/twin/workspace
 ```
 
+## `validate-state FILE`
+
+Checks a twin state (the `TwinState` contract of the SDK) against its JSON Schema: `source` (`real` or `simulated`, so that a reading of the
+robot and one of a simulation are never taken for each other), `frame`, `timestamp_utc`, the `joint_states` and the optional named `poses`. Besides
+the schema it refuses a pose whose quaternion is not of length 1 and a joint named twice. It prints each problem and `TWIN_STATE=PASS` or
+`TWIN_STATE=FAIL`; the exit status is `0` (valid), `1` (invalid) or `2` (the file cannot be read or is not JSON).
+
+```
+$ hydra-umc-twin validate-state state.json
+TWIN_STATE=PASS source=simulated
+```
+
+The manifests of the children are validated the same way: a `hydra-umc.project.json` that declares a `schema_version` must match the project
+manifest schema of the SDK as a whole (the schemas are vendored under `schemas/`), and `family-status` / `family-sync` report the violations as
+`UNUSABLE`. A manifest without `schema_version` keeps the three fields this Twin has always needed.
+
 ## Exit codes
 
 | Code | Meaning |

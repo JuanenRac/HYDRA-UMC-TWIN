@@ -111,6 +111,8 @@ flowchart TB
 * **Why `family-sync` gates on maturity AND a version ceiling, not just "is it there."** `family-status` already answers "is this child checked out and what does it claim" - but a checked-out, `scaffolding`-maturity child has no real state worth syncing yet, and a child that has bumped past this Twin's verified-compatible major version may have changed its own state shape in a way this Twin doesn't know about. Both are real reasons to refuse sync, distinct from "missing," so `contract.rs` checks and reports them separately rather than folding everything into one generic "not ready."
 * **Why maturity is checked before version compatibility in `contract::assess()`.** An immature child's version number isn't a meaningful signal yet - checking maturity first means the reported rejection reason always names the most fundamental gate that actually failed, instead of a version mismatch masking a more basic "this child isn't real yet" problem.
 
+**Contracts checked with JSON Schema.** `validate-state FILE` checks a twin state (the `TwinState` contract of the SDK: joint states, named poses, instant, frame and whether the state is `real` or `simulated`) against its schema, and refuses a pose quaternion that is not of unit length and a joint named twice. The manifest of a child that declares a `schema_version` is validated against the project manifest schema of the SDK with the `jsonschema` crate (Draft 2020-12, formats checked); both schemas are vendored under `schemas/`.
+
 ## 🔒 Security & Safety
 
 | Threat | Defence | Where |

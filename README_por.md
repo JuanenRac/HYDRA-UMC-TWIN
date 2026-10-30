@@ -111,6 +111,8 @@ flowchart TB
 * **Porque é que o `family-sync` condiciona por maturidade E por um teto de versão, e não apenas por «está lá».** O `family-status` já responde a «este filho está descarregado e o que afirma» - mas um filho descarregado com maturidade `scaffolding` ainda não tem um estado real que valha a pena sincronizar, e um filho que passou da versão major compatível verificada deste Twin pode ter mudado a sua forma de estado de uma maneira que este Twin desconhece. Ambas são razões reais para recusar a sincronização, distintas de «em falta», pelo que o `contract.rs` as verifica e reporta em separado em vez de as dobrar num «não está pronto» genérico.
 * **Porque é que a maturidade é verificada antes da compatibilidade de versão no `contract::assess()`.** O número de versão de um filho imaturo ainda não é um sinal significativo - verificar primeiro a maturidade significa que o motivo de rejeição reportado nomeia sempre a porta mais fundamental que realmente falhou, em vez de uma divergência de versão a mascarar um problema mais básico de «este filho ainda não é real».
 
+**Contratos verificados com JSON Schema.** `validate-state FICHEIRO` verifica um estado do gémeo (o contrato `TwinState` do SDK: estados das articulações, poses com nome, instante, referencial e se o estado é `real` ou `simulated`) contra o seu esquema, e recusa um quaternião de pose sem comprimento unitário e uma articulação com nome repetido. O manifesto de um filho que declara `schema_version` é validado contra o esquema de manifesto de projeto do SDK com a crate `jsonschema` (Draft 2020-12, formatos verificados); os dois esquemas vão incluídos em `schemas/`.
+
 ## 🔒 Segurança e proteção
 
 | Ameaça | Defesa | Onde |

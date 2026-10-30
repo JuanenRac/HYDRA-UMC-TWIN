@@ -111,6 +111,8 @@ flowchart TB
 * **Pourquoi `family-sync` filtre à la fois sur la maturité ET un plafond de version, pas seulement sur « est-il présent ».** `family-status` répond déjà à « cet enfant est-il cloné et que prétend-il de lui-même » - mais un enfant cloné de maturité `scaffolding` n'a pas encore de vrai état qui vaille la peine d'être synchronisé, et un enfant qui a dépassé la version majeure maximale vérifiée par ce Jumeau a pu changer sa propre forme d'état d'une manière que ce Jumeau ignore. Les deux sont de vraies raisons de refuser la synchronisation, distinctes de « absent », donc `contract.rs` les vérifie et les rapporte séparément plutôt que de tout fondre dans un « pas prêt » générique.
 * **Pourquoi la maturité est vérifiée avant la compatibilité de version dans `contract::assess()`.** Le numéro de version d'un enfant immature n'est pas encore un signal significatif - vérifier la maturité en premier signifie que la raison de rejet rapportée nomme toujours la porte la plus fondamentale qui a réellement échoué, plutôt qu'une incompatibilité de version masquant un problème plus basique de « cet enfant n'est pas encore réel ».
 
+**Contrats vérifiés avec JSON Schema.** `validate-state FICHIER` vérifie un état du jumeau (le contrat `TwinState` du SDK : états des articulations, poses nommées, instant, repère et indication `real` ou `simulated`) contre son schéma, et refuse un quaternion de pose de longueur différente de 1 ainsi qu'une articulation nommée deux fois. Le manifeste d'un enfant qui déclare `schema_version` est validé contre le schéma de manifeste de projet du SDK avec la crate `jsonschema` (Draft 2020-12, formats vérifiés) ; les deux schémas sont embarqués dans `schemas/`.
+
 ## 🔒 Sécurité et protection
 
 | Menace | Défense | Où |

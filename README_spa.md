@@ -111,6 +111,8 @@ flowchart TB
 * **Por qué `family-sync` filtra por madurez Y por un techo de versión, no solo por "está ahí".** `family-status` ya responde "¿este hijo está clonado y qué dice de sí mismo?" - pero un hijo clonado con madurez `scaffolding` todavía no tiene estado real que merezca la pena sincronizar, y un hijo que ha superado la versión mayor máxima verificada por este Twin puede haber cambiado su propia forma de estado de un modo que este Twin todavía no conoce. Ambas son razones reales para rechazar la sincronización, distintas de "ausente", así que `contract.rs` las comprueba y reporta por separado en vez de mezclarlo todo en un "no listo" genérico.
 * **Por qué la madurez se comprueba antes que la compatibilidad de versión en `contract::assess()`.** El número de versión de un hijo inmaduro todavía no es una señal significativa - comprobar la madurez primero significa que la razón de rechazo reportada siempre nombra la puerta más fundamental que realmente falló, en vez de que un desajuste de versión enmascare un problema más básico de "este hijo todavía no es real".
 
+**Contratos comprobados con JSON Schema.** `validate-state FICHERO` comprueba un estado del gemelo (el contrato `TwinState` del SDK: estados de las articulaciones, poses con nombre, instante, marco y si el estado es `real` o `simulated`) contra su esquema, y rechaza un cuaternión de pose que no tenga longitud unidad y una articulación con nombre repetido. El manifiesto de un hijo que declara `schema_version` se valida contra el esquema de manifiesto de proyecto del SDK con la crate `jsonschema` (Draft 2020-12, formatos comprobados); ambos esquemas van incluidos en `schemas/`.
+
 ## 🔒 Seguridad y protección
 
 | Amenaza | Defensa | Dónde |

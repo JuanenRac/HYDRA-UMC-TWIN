@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The state of the twin has a contract, and the manifests are validated with JSON Schema.** `schemas/twin-state.schema.json` (the SDK's `TwinState`: joint states, named poses, instant, frame and whether the state is `real` or `simulated`) is checked by the new `validate-state` command, which also refuses a pose quaternion that is not of unit length and a joint named twice. The manifest of a child that declares a `schema_version` is validated against the project manifest schema of the SDK with the `jsonschema` crate (Draft 2020-12, formats checked) instead of a hand-written subset; the schemas are vendored under `schemas/`.
+
 ## [0.1.1] - The workspace override bounded to the served workspace, the real interface of the hardware-in-the-loop bridge in the compose blueprint, and the universal README
 
 - **`?workspace=` overrides are bounded to the served workspace by default:** a request can no longer make the API probe other directories of the machine; `--strict-workspace-root PATH` picks another root and the new `--allow-any-workspace` brings back the earlier behaviour.
