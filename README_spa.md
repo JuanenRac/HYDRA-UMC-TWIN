@@ -236,6 +236,7 @@ HYDRA-UMC-TWIN/
 │   ├── health.rs                    Sondas activas de los hijos: ejecuta el binario de PHYSICS-REPLICA, llama al puente HIL
 │   ├── server.rs                    Superficie JSON/HTTP plana (tiny_http, bloqueante, sin runtime async)
 │   └── main.rs                      Entry point + subcomandos reales `family-status`/`family-sync`
+├── schemas/                         esquemas JSON de los contratos del SDK incluidos
 ├── docs/                            Documentación y ajuste de física
 ├── images/                          Medios y diagramas
 ├── systemd/                         unidad de servicio

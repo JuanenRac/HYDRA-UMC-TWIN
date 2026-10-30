@@ -260,6 +260,7 @@ HYDRA-UMC-TWIN/
 │   ├── health.rs                    子プロジェクトの能動プローブ:PHYSICS-REPLICA のバイナリを実行し、HIL ブリッジを呼び出す
 │   ├── server.rs                    シンプルなJSON/HTTPサーフェス(tiny_http、ブロッキング、非同期ランタイムなし)
 │   └── main.rs                      エントリポイント + 実際の `family-status`/`family-sync` サブコマンド
+├── schemas/                         同梱した SDK 契約の JSON スキーマ
 ├── docs/                            ドキュメントと物理チューニング
 ├── images/                          メディアと図表
 ├── systemd/                         サービスユニット

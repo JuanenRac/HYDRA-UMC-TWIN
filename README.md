@@ -236,6 +236,7 @@ HYDRA-UMC-TWIN/
 │   ├── health.rs                    Active probes of the children: runs the PHYSICS-REPLICA binary, calls the HIL bridge
 │   ├── server.rs                    Plain JSON/HTTP surface (tiny_http, blocking, no async runtime)
 │   └── main.rs                      Entry point + real `family-status`/`family-sync` subcommands
+├── schemas/                         vendored JSON Schemas of the SDK contracts
 ├── docs/                            Documentation and physics tuning
 ├── images/                          Media and diagrams
 ├── systemd/                         service unit

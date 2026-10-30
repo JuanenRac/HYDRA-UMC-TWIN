@@ -250,6 +250,7 @@ HYDRA-UMC-TWIN/
 │   ├── health.rs                    子项目的主动探测:运行 PHYSICS-REPLICA 的二进制文件,调用 HIL 网桥
 │   ├── server.rs                    简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
 │   └── main.rs                      入口点 + 真实的 `family-status`/`family-sync` 子命令
+├── schemas/                         随附的 SDK 契约 JSON 模式
 ├── docs/                            文档与物理调参
 ├── images/                          媒体与图表
 ├── systemd/                         服务单元
