@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - Steadier tests of the health probes
+
 - **Steadier tests of the health probes:** the tests that need a port where nothing answers keep that port taken by a listener that hangs up (a port that was only released can be given to another test of the same run), and the stand-in script of the physics replica gets a limit that start-up time on a loaded machine cannot reach.
 
 ## [0.1.2] - Collision prediction, a twin that follows the real joints and a contract for the state of the twin
