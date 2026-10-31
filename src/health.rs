@@ -356,7 +356,7 @@ mod tests {
         Duration::from_millis(600)
     }
 
-/// An address where nothing usable answers, and that no other test of this run can be handed: a port that was only bound and then released
+    /// An address where nothing usable answers, and that no other test of this run can be handed: a port that was only bound and then released
     /// can be given to another test's server a moment later, and the probe would find a live service. The port stays taken by a listener that
     /// hangs up on every connection, so the probe always meets the same thing.
     fn address_that_answers_nothing() -> String {
