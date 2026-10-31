@@ -179,7 +179,14 @@ fn bearer_matches(request: &tiny_http::Request, expected: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>) {
+/// The checks every POST of the interlock routes share: the route exists only when the server holds a certifier, the caller carries the
+/// token, the request does not come from a browser, it is declared as JSON and the body is read within `max_bytes`. On any failure the
+/// answer is already written and None is returned.
+fn read_guarded_post(
+    mut request: tiny_http::Request,
+    certifier: Option<&Certifier>,
+    max_bytes: u64,
+) -> Option<(tiny_http::Request, Vec<u8>)> {
     use std::io::Read;
     let Some(certifier) = certifier else {
         write_json(
@@ -187,18 +194,18 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
             404,
             &json!({"error": "signing is not configured on this server"}),
         );
-        return;
+        return None;
     };
     if !bearer_matches(&request, &certifier.token) {
         let response = tiny_http::Response::from_string(
-            json!({"error": "a valid bearer token is required to ask for a certificate"})
+            json!({"error": "a valid bearer token is required on the interlock routes"})
                 .to_string(),
         )
         .with_status_code(401)
         .with_header(json_header())
         .with_header(Header::from_bytes(&b"WWW-Authenticate"[..], &b"Bearer"[..]).unwrap());
         let _ = request.respond(response);
-        return;
+        return None;
     }
     // a web page can send a "simple" cross-site POST to a loopback port: refuse anything from a browser, and anything not declared as JSON
     let mut json_content_type = false;
@@ -210,7 +217,7 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
                 403,
                 &json!({"error": "requests carrying an Origin header are refused"}),
             );
-            return;
+            return None;
         }
         if name.eq_ignore_ascii_case("content-type") {
             json_content_type = h
@@ -230,12 +237,12 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
             415,
             &json!({"error": "Content-Type must be application/json"}),
         );
-        return;
+        return None;
     }
     let mut raw = Vec::new();
     if request
         .as_reader()
-        .take(MAX_CERTIFY_BODY_BYTES + 1)
+        .take(max_bytes + 1)
         .read_to_end(&mut raw)
         .is_err()
     {
@@ -244,16 +251,26 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
             400,
             &json!({"error": "could not read the request body"}),
         );
-        return;
+        return None;
     }
-    if raw.len() as u64 > MAX_CERTIFY_BODY_BYTES {
+    if raw.len() as u64 > max_bytes {
         write_json(
             request,
             413,
-            &json!({"error": format!("request body is larger than {MAX_CERTIFY_BODY_BYTES} bytes")}),
+            &json!({"error": format!("request body is larger than {max_bytes} bytes")}),
         );
-        return;
+        return None;
     }
+    Some((request, raw))
+}
+
+fn handle_certify(request: tiny_http::Request, context: &Context) {
+    let Some((request, raw)) =
+        read_guarded_post(request, context.certifier.as_ref(), MAX_CERTIFY_BODY_BYTES)
+    else {
+        return;
+    };
+    let certifier = context.certifier.as_ref().expect("checked by the guard");
     let input: RiskInput = match serde_json::from_slice(&raw) {
         Ok(input) => input,
         Err(e) => {
@@ -265,6 +282,21 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
             return;
         }
     };
+    if let Some(max_age_ms) = context.state_max_age_ms {
+        let fresh = context
+            .states
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .check_fresh(
+                &input.joint,
+                std::time::Duration::from_millis(max_age_ms),
+                std::time::Instant::now(),
+            );
+        if let Err(reason) = fresh {
+            write_json(request, 409, &json!({"error": reason}));
+            return;
+        }
+    }
     let issued_at_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -280,6 +312,86 @@ fn handle_certify(mut request: tiny_http::Request, certifier: Option<&Certifier>
         Ok(certificate) => write_json(request, 200, &serde_json::to_value(&certificate).unwrap()),
         Err(e) => write_json(request, 400, &json!({"error": e.to_string()})),
     }
+}
+
+/// The largest body of `POST /interlock/state`: one report is about a hundred bytes of JSON.
+const MAX_STATE_BODY_BYTES: u64 = 2 * 1024;
+
+/// `POST /interlock/state`: the bridge tells the twin where a real joint is (see `joint_state.rs`). Same token as the certificates.
+fn handle_state_report(request: tiny_http::Request, context: &Context) {
+    let Some((request, raw)) =
+        read_guarded_post(request, context.certifier.as_ref(), MAX_STATE_BODY_BYTES)
+    else {
+        return;
+    };
+    let report: crate::joint_state::JointStateReport = match serde_json::from_slice(&raw) {
+        Ok(report) => report,
+        Err(e) => {
+            write_json(
+                request,
+                400,
+                &json!({"error": format!("malformed state report: {e}")}),
+            );
+            return;
+        }
+    };
+    let joint = report.joint.clone();
+    let seq = report.seq;
+    let result = context
+        .states
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .accept(report, std::time::Instant::now());
+    match result {
+        Ok(()) => write_json(
+            request,
+            200,
+            &json!({"accepted": true, "joint": joint, "seq": seq}),
+        ),
+        Err(crate::joint_state::StateRejection::Stale { last_seq }) => write_json(
+            request,
+            409,
+            &json!({"accepted": false, "error": "seq is not newer than the last report of this joint", "last_seq": last_seq}),
+        ),
+        Err(e) => write_json(
+            request,
+            400,
+            &json!({"accepted": false, "error": e.to_string()}),
+        ),
+    }
+}
+
+/// `GET /interlock/state`: the last report of every joint and its age. It shows where the robot is, so it needs the token too.
+fn handle_state_list(request: tiny_http::Request, context: &Context) {
+    let Some(certifier) = context.certifier.as_ref() else {
+        write_json(
+            request,
+            404,
+            &json!({"error": "signing is not configured on this server"}),
+        );
+        return;
+    };
+    if !bearer_matches(&request, &certifier.token) {
+        let response = tiny_http::Response::from_string(
+            json!({"error": "a valid bearer token is required on the interlock routes"})
+                .to_string(),
+        )
+        .with_status_code(401)
+        .with_header(json_header())
+        .with_header(Header::from_bytes(&b"WWW-Authenticate"[..], &b"Bearer"[..]).unwrap());
+        let _ = request.respond(response);
+        return;
+    }
+    let joints = context
+        .states
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .snapshot(std::time::Instant::now());
+    write_json(
+        request,
+        200,
+        &json!({"joints": joints, "requireFreshStateMs": context.state_max_age_ms}),
+    );
 }
 
 /// How many requests are served at once. One request that is slow (a `?workspace=` on a network file system that does not answer, a
@@ -325,6 +437,10 @@ struct Context {
     strict_root: Option<PathBuf>,
     certifier: Option<Certifier>,
     health: Option<HealthRoute>,
+    /// What the bridge says about the real joints (`POST /interlock/state`).
+    states: std::sync::Mutex<crate::joint_state::JointStateStore>,
+    /// `--require-fresh-state-ms`: when set, a certificate is only signed for a joint whose state report is at most this old.
+    state_max_age_ms: Option<u64>,
 }
 
 /// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
@@ -347,7 +463,15 @@ pub fn run_with_workers(
     certifier: Option<Certifier>,
     workers: usize,
 ) {
-    run_with_options(server, workspace, strict_root, certifier, workers, None);
+    run_with_options(
+        server,
+        workspace,
+        strict_root,
+        certifier,
+        workers,
+        None,
+        None,
+    );
 }
 
 /// The whole configuration of the server: the optional parts (the certificate signer, the active health probes) are `None` when off.
@@ -358,6 +482,7 @@ pub fn run_with_options(
     certifier: Option<Certifier>,
     workers: usize,
     health: Option<HealthRoute>,
+    state_max_age_ms: Option<u64>,
 ) {
     let server = std::sync::Arc::new(server);
     let context = std::sync::Arc::new(Context {
@@ -365,6 +490,8 @@ pub fn run_with_options(
         strict_root,
         certifier,
         health,
+        states: Default::default(),
+        state_max_age_ms,
     });
     let mut handles = Vec::new();
     for _ in 1..workers.max(1) {
@@ -389,7 +516,17 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
     let path = url.split('?').next().unwrap_or("").to_string();
 
     if request.method() == &Method::Post && path == "/interlock/certify" {
-        handle_certify(request, context.certifier.as_ref());
+        handle_certify(request, context);
+        return;
+    }
+
+    if request.method() == &Method::Post && path == "/interlock/state" {
+        handle_state_report(request, context);
+        return;
+    }
+
+    if request.method() == &Method::Get && path == "/interlock/state" {
+        handle_state_list(request, context);
         return;
     }
 
@@ -942,7 +1079,15 @@ mod tests {
         let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
         let port = server.server_addr().to_ip().unwrap().port();
         thread::spawn(move || {
-            run_with_options(server, workspace, None, None, DEFAULT_WORKERS, Some(route))
+            run_with_options(
+                server,
+                workspace,
+                None,
+                None,
+                DEFAULT_WORKERS,
+                Some(route),
+                None,
+            )
         });
         port
     }
@@ -1007,5 +1152,165 @@ mod tests {
         let (_, body) = get(port, &format!("/family-health?workspace={query}"));
         let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(parsed["workspace"], ws.display().to_string());
+    }
+
+    fn start_gated_server(max_age_ms: u64) -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind");
+        let port = server.server_addr().to_ip().expect("ip").port();
+        let certifier = Certifier {
+            signer: Signer::from_seed([7u8; 32]),
+            token: CERTIFY_TOKEN.to_string(),
+        };
+        let ws = tempdir();
+        thread::spawn(move || {
+            run_with_options(
+                server,
+                ws,
+                None,
+                Some(certifier),
+                DEFAULT_WORKERS,
+                None,
+                Some(max_age_ms),
+            )
+        });
+        port
+    }
+
+    fn get_state(port: u16, extra_headers: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let request = format!(
+            "GET /interlock/state HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Connection: close\r\n\r\n"
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, body) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, body.to_string())
+    }
+
+    fn post_state(port: u16, extra_headers: &str, body: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let request = format!(
+            "POST /interlock/state HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, resp) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, resp.to_string())
+    }
+
+    fn state_body(seq: u64) -> String {
+        format!(
+            r#"{{"joint":"shoulder","position":0.5,"seq":{seq},"stamp_ms":1700000000000,"source":"measured"}}"#
+        )
+    }
+
+    #[test]
+    fn the_state_routes_need_the_token_and_do_not_exist_without_a_certifier() {
+        let port = start_certifying_server();
+        assert_eq!(
+            post_state(port, "Content-Type: application/json\r\n", &state_body(1)).0,
+            401
+        );
+        assert_eq!(get_state(port, "").0, 401);
+        let wrong =
+            "Authorization: Bearer not-the-token-at-all\r\nContent-Type: application/json\r\n";
+        assert_eq!(post_state(port, wrong, &state_body(1)).0, 401);
+        let ws = tempdir();
+        let port = start_test_server(ws);
+        assert_eq!(post_state(port, &auth(), &state_body(1)).0, 404);
+        assert_eq!(get_state(port, "").0, 404);
+    }
+
+    #[test]
+    fn a_state_report_is_stored_listed_and_a_stale_one_is_a_409() {
+        let port = start_certifying_server();
+        let (status, body) = post_state(port, &auth(), &state_body(3));
+        assert_eq!(status, 200, "{body}");
+        let (status, body) = post_state(port, &auth(), &state_body(3));
+        assert_eq!(status, 409, "{body}");
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["last_seq"], 3);
+        let (status, body) = post_state(port, &auth(), &state_body(4));
+        assert_eq!(status, 200, "{body}");
+        let (status, body) = get_state(port, &format!("Authorization: Bearer {CERTIFY_TOKEN}\r\n"));
+        assert_eq!(status, 200, "{body}");
+        let parsed: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(parsed["joints"][0]["joint"], "shoulder");
+        assert_eq!(parsed["joints"][0]["seq"], 4);
+        assert!(parsed["joints"][0]["age_ms"].is_u64());
+        assert!(parsed["requireFreshStateMs"].is_null());
+    }
+
+    #[test]
+    fn malformed_state_reports_are_400_and_a_browser_post_is_refused() {
+        let port = start_certifying_server();
+        assert_eq!(post_state(port, &auth(), "not json").0, 400);
+        let bad_source = state_body(1).replace("measured", "guessed");
+        assert_eq!(post_state(port, &auth(), &bad_source).0, 400);
+        let nan_name = state_body(1).replace("shoulder", "");
+        assert_eq!(post_state(port, &auth(), &nan_name).0, 400);
+        let origin = format!("{}Origin: http://evil.example\r\n", auth());
+        assert_eq!(post_state(port, &origin, &state_body(1)).0, 403);
+        assert_eq!(
+            post_state(
+                port,
+                &format!("Authorization: Bearer {CERTIFY_TOKEN}\r\n"),
+                &state_body(1)
+            )
+            .0,
+            415
+        );
+    }
+
+    #[test]
+    fn without_the_switch_a_certificate_is_signed_whether_or_not_the_joint_was_reported() {
+        let port = start_certifying_server();
+        let (status, body) = post_certify(port, &auth(), REPORT);
+        assert_eq!(status, 200, "{body}");
+    }
+
+    #[test]
+    fn with_the_switch_a_joint_the_twin_cannot_see_is_not_certified() {
+        let port = start_gated_server(60_000);
+        let (status, body) = post_certify(port, &auth(), REPORT);
+        assert_eq!(status, 409, "{body}");
+        assert!(body.contains("no state report"), "{body}");
+        assert_eq!(post_state(port, &auth(), &state_body(1)).0, 200);
+        let (status, body) = post_certify(port, &auth(), REPORT);
+        assert_eq!(status, 200, "{body}");
+        // another joint is still unseen
+        let other = REPORT.replace("shoulder", "elbow");
+        assert_eq!(post_certify(port, &auth(), &other).0, 409);
+    }
+
+    #[test]
+    fn with_the_switch_an_old_state_report_stops_the_certificates() {
+        let port = start_gated_server(50);
+        assert_eq!(post_state(port, &auth(), &state_body(1)).0, 200);
+        std::thread::sleep(std::time::Duration::from_millis(120));
+        let (status, body) = post_certify(port, &auth(), REPORT);
+        assert_eq!(status, 409, "{body}");
+        assert!(body.contains("ms old"), "{body}");
+        assert_eq!(post_state(port, &auth(), &state_body(2)).0, 200);
+        assert_eq!(post_certify(port, &auth(), REPORT).0, 200);
     }
 }

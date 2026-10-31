@@ -18,6 +18,7 @@ mod certificate;
 mod contract;
 mod family;
 mod health;
+mod joint_state;
 mod manifest;
 mod schema;
 mod server;
@@ -411,6 +412,22 @@ fn run_serve(args: &[String]) -> ExitCode {
         None
     };
 
+    // Off unless asked for: with it, a certificate is only signed for a joint whose state the bridge reported at most this long ago.
+    let state_max_age_ms: Option<u64> = match find_flag(args, "--require-fresh-state-ms") {
+        None => None,
+        Some(raw) => match raw.parse::<u64>() {
+            Ok(ms) if (1..=3_600_000).contains(&ms) => Some(ms),
+            _ => {
+                eprintln!("[twin] fatal: --require-fresh-state-ms must be a whole number of milliseconds from 1 to 3600000, got {raw}");
+                return ExitCode::from(2);
+            }
+        },
+    };
+    if state_max_age_ms.is_some() && certifier.is_none() {
+        eprintln!("[twin] fatal: --require-fresh-state-ms needs the signing key and the certify token (the state routes use that token)");
+        return ExitCode::from(2);
+    }
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -441,6 +458,10 @@ fn run_serve(args: &[String]) -> ExitCode {
                 ),
                 None => eprintln!("[twin] GET /family-health is off: start with --health-probes to run the active probes"),
             }
+            match state_max_age_ms {
+                Some(ms) => eprintln!("[twin] POST /interlock/certify refuses a joint whose state report is missing or older than {ms} ms"),
+                None => eprintln!("[twin] state reports (POST /interlock/state) are stored but do not gate the certificates (--require-fresh-state-ms is off)"),
+            }
             eprintln!("[twin] serving with {workers} worker thread(s)");
             server::run_with_options(
                 bound,
@@ -449,6 +470,7 @@ fn run_serve(args: &[String]) -> ExitCode {
                 certifier,
                 workers,
                 health_route,
+                state_max_age_ms,
             );
             ExitCode::SUCCESS
         }

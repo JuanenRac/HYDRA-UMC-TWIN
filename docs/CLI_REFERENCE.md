@@ -231,3 +231,20 @@ exchange, not live simulation tick data.
 `keygen` writes a new Ed25519 signing key (one line of 64 hexadecimal characters, mode 0600 on Unix) and prints its key id and public key. It never
 overwrites a file. `serve --signing-key-file PATH --certify-token-file PATH` (or `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` and `HYDRA_UMC_TWIN_CERTIFY_TOKEN`) turns on
 `POST /interlock/certify`; see `docs/INTERLOCK_CERTIFICATE.md` for the format, the vector and what the bridge checks.
+
+## `POST /interlock/state`, `GET /interlock/state` and `--require-fresh-state-ms`
+
+The twin keeps the newest report of every real joint that HYDRA-UMC-HIL-BRIDGE sends it. Both routes use the token of `--certify-token-file` and exist only when
+the signing is configured (otherwise `404`).
+
+```json
+{"joint":"shoulder","position":0.5,"seq":7,"stamp_ms":1700000000000,"source":"measured"}
+```
+
+`source` is `commanded` (what the bridge ordered) or `measured` (what the controller read back). `seq` must be newer than the last one of that joint (`409` with `last_seq`
+otherwise, so a late or replayed message cannot move the twin back); an empty or over-long joint name or a position that is not finite is a `400`; the twin follows at most
+256 joints; a body is at most 2 KiB; a request with an `Origin` header or not declared as JSON is refused as on `/interlock/certify`. `GET /interlock/state` answers the
+last report of every joint with its `age_ms` counted from its arrival, and `requireFreshStateMs`.
+
+`serve --require-fresh-state-ms N` (1 to 3600000; off by default) makes `POST /interlock/certify` answer `409` for a joint with no report or whose last report is older
+than N ms, so the real mode of the bridge blocks while the twin is blind. It needs the signing key and the token.
