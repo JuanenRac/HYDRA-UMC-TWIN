@@ -240,6 +240,7 @@ HYDRA-UMC-TWIN/
 ├── docs/                            Documentación y ajuste de física
 ├── images/                          Medios y diagramas
 ├── systemd/                         unidad de servicio
+├── tests/                           cli_modes.rs: las comprobaciones de la familia, la validación de estado, los rechazos de arranque de serve y la generación de claves tal como las ve quien llama
 ├── tools/                           herramientas del proyecto y comprobaciones del CI
 ├── .github/                         flujo de CI y plantillas de incidencias
 ├── Cargo.toml                       Metadatos del paquete, dependencias (serde/serde_json), version cuentakilometros

@@ -240,6 +240,7 @@ HYDRA-UMC-TWIN/
 ├── docs/                            Dokumentation und Physikanpassung
 ├── images/                          Medien und Diagramme
 ├── systemd/                         Dienst-Unit
+├── tests/                           cli_modes.rs: die Familienprüfungen, die Zustandsprüfung, die Startverweigerungen von serve und die Schlüsselerzeugung aus Sicht des Aufrufers
 ├── tools/                           Projektwerkzeuge und CI-Prüfungen
 ├── .github/                         CI-Workflow und Issue-Vorlagen
 ├── Cargo.toml                       Crate-Metadaten

@@ -264,6 +264,7 @@ HYDRA-UMC-TWIN/
 ├── docs/                            ドキュメントと物理チューニング
 ├── images/                          メディアと図表
 ├── systemd/                         サービスユニット
+├── tests/                           cli_modes.rs: 呼び出し側から見たファミリー確認、状態検証、serve の起動拒否、鍵生成
 ├── tools/                           プロジェクトのツールと CI の検査
 ├── .github/                         CI ワークフローと Issue テンプレート
 ├── Cargo.toml                       クレートのメタデータ

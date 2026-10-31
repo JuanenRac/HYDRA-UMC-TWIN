@@ -254,6 +254,7 @@ HYDRA-UMC-TWIN/
 ├── docs/                            文档与物理调参
 ├── images/                          媒体与图表
 ├── systemd/                         服务单元
+├── tests/                           cli_modes.rs: 从调用方看到的家族检查、状态验证、serve 启动拒绝和密钥生成
 ├── tools/                           项目工具和 CI 检查
 ├── .github/                         CI 工作流和 Issue 模板
 ├── Cargo.toml                       crate 元数据

@@ -310,6 +310,29 @@
           }
         },
         {
+          "name": "tests/",
+          "desc": {
+            "en": "cli_modes.rs: the family checks, state validatio",
+            "es": "cli_modes.rs: las comprobaciones de la familia,",
+            "de": "cli_modes.rs: die Familienprüfungen, die Zustand",
+            "fr": "cli_modes.rs : les contrôles de la famille, la v",
+            "it": "cli_modes.rs: i controlli della famiglia, la val",
+            "ja": "cli_modes.rs: 呼び出し側から見たファミリー確認、状態検証、serve の起動拒否、",
+            "zh": "cli_modes.rs: 从调用方看到的家族检查、状态验证、serve 启动拒绝和密钥生成",
+            "pt": "cli_modes.rs: as verificações da família, a vali"
+          },
+          "tree_desc": {
+            "en": "cli_modes.rs: the family checks, state validation, serve start-up refusals and key generation as a caller sees them",
+            "es": "cli_modes.rs: las comprobaciones de la familia, la validación de estado, los rechazos de arranque de serve y la generación de claves tal como las ve quien llama",
+            "de": "cli_modes.rs: die Familienprüfungen, die Zustandsprüfung, die Startverweigerungen von serve und die Schlüsselerzeugung aus Sicht des Aufrufers",
+            "fr": "cli_modes.rs : les contrôles de la famille, la validation d'état, les refus de démarrage de serve et la génération de clés vus par l'appelant",
+            "it": "cli_modes.rs: i controlli della famiglia, la validazione dello stato, i rifiuti di avvio di serve e la generazione delle chiavi come li vede chi chiama",
+            "ja": "cli_modes.rs: 呼び出し側から見たファミリー確認、状態検証、serve の起動拒否、鍵生成",
+            "zh": "cli_modes.rs: 从调用方看到的家族检查、状态验证、serve 启动拒绝和密钥生成",
+            "pt": "cli_modes.rs: as verificações da família, a validação de estado, as recusas de arranque do serve e a geração de chaves como as vê quem chama"
+          }
+        },
+        {
           "name": "tools/",
           "desc": {
             "en": "project tools and CI checks",
