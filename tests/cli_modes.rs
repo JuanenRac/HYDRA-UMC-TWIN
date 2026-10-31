@@ -298,3 +298,84 @@ fn keygen_writes_a_key_once_and_never_overwrites_it() {
         "the key file is untouched"
     );
 }
+
+#[test]
+fn the_collision_prediction_is_off_and_refuses_half_configurations() {
+    let dir = scratch("collision");
+    let w = p(&dir);
+    // the options of the prediction mean nothing without its switch
+    for flag in [
+        "--collision-urdf",
+        "--collision-zones",
+        "--collision-config",
+        "--collision-timeout-ms",
+        "--collision-max-states",
+    ] {
+        let (code, _, stderr) = run(&["serve", "--workspace", &w, flag, "1"]);
+        assert_eq!(code, Some(2), "{flag}: {stderr}");
+        assert!(
+            stderr.contains("needs --collision-predict"),
+            "{flag}: {stderr}"
+        );
+    }
+    // the switch needs the token of the interlock routes
+    let (code, _, stderr) = run(&["serve", "--workspace", &w, "--collision-predict"]);
+    assert_eq!(code, Some(2));
+    assert!(
+        stderr.contains("needs the signing key and the certify token"),
+        "{stderr}"
+    );
+    // with a key and a token, every file must be given and exist
+    let key = dir.join("key.txt");
+    let (code, _, _) = run(&["keygen", "--key-file", &p(&key)]);
+    assert_eq!(code, Some(0));
+    let token = dir.join("token.txt");
+    std::fs::write(&token, "a-token-of-at-least-16-characters").unwrap();
+    let base = [
+        "serve",
+        "--workspace",
+        w.as_str(),
+        "--signing-key-file",
+        &p(&key),
+        "--certify-token-file",
+        &p(&token),
+        "--collision-predict",
+    ];
+    let (code, _, stderr) = run(&base);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("--collision-urdf"), "{stderr}");
+    let missing = p(&dir.join("absent.json"));
+    let mut args = base.to_vec();
+    args.extend([
+        "--collision-urdf",
+        &missing,
+        "--collision-zones",
+        &missing,
+        "--collision-config",
+        &missing,
+    ]);
+    let (code, _, stderr) = run(&args);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("is not a file"), "{stderr}");
+    // and a bad number is named
+    let real = p(&token);
+    let mut args = base.to_vec();
+    args.extend([
+        "--collision-urdf",
+        &real,
+        "--collision-zones",
+        &real,
+        "--collision-config",
+        &real,
+        "--physics-replica-bin",
+        &real,
+        "--collision-timeout-ms",
+        "5",
+    ]);
+    let (code, _, stderr) = run(&args);
+    assert_eq!(code, Some(2));
+    assert!(
+        stderr.contains("--collision-timeout-ms must be a whole number from 100 to 60000"),
+        "{stderr}"
+    );
+}

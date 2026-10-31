@@ -145,6 +145,14 @@ impl JointStateStore {
         }
     }
 
+    /// The last position of every joint, whether it was commanded or measured.
+    pub fn positions(&self) -> std::collections::BTreeMap<String, f64> {
+        self.joints
+            .iter()
+            .map(|(name, stored)| (name.clone(), stored.report.position))
+            .collect()
+    }
+
     /// The reports with the age of each in milliseconds, ordered by joint name.
     pub fn snapshot(&self, now: Instant) -> Vec<serde_json::Value> {
         let mut names: Vec<&String> = self.joints.keys().collect();

@@ -134,6 +134,29 @@
           }
         },
         {
+          "name": "collision.rs",
+          "desc": {
+            "en": "Collision prediction route, off by default",
+            "es": "Ruta de predicción de colisión, apagada por defecto",
+            "de": "Kollisionsvorhersage-Route, standardmäßig aus",
+            "fr": "Route de prédiction de collision, désactivée par défaut",
+            "it": "Rotta di previsione delle collisioni, spenta per impostazione",
+            "ja": "衝突予測のルート（既定はオフ）",
+            "zh": "碰撞预测路由（默认关闭）",
+            "pt": "Rota de previsão de colisão, desligada por defeito"
+          },
+          "tree_desc": {
+            "en": "Collision prediction (`POST /predict/collision`, off by default): asks PHYSICS-REPLICA, information only",
+            "es": "Predicción de colisión (`POST /predict/collision`, apagada por defecto): pregunta a PHYSICS-REPLICA, solo informa",
+            "de": "Kollisionsvorhersage (`POST /predict/collision`, standardmäßig aus): fragt PHYSICS-REPLICA, nur Information",
+            "fr": "Prédiction de collision (`POST /predict/collision`, désactivée par défaut) : interroge PHYSICS-REPLICA, information seule",
+            "it": "Previsione delle collisioni (`POST /predict/collision`, spenta per impostazione): interroga PHYSICS-REPLICA, solo informazione",
+            "ja": "衝突予測（`POST /predict/collision`、既定はオフ）：PHYSICS-REPLICA に問い合わせる、情報のみ",
+            "zh": "碰撞预测（`POST /predict/collision`，默认关闭）：询问 PHYSICS-REPLICA，仅供参考",
+            "pt": "Previsão de colisão (`POST /predict/collision`, desligada por defeito): consulta o PHYSICS-REPLICA, só informa"
+          }
+        },
+        {
           "name": "server.rs",
           "desc": {
             "en": "Plain JSON/HTTP surface",

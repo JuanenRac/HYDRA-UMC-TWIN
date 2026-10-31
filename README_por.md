@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-78%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-119%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.1-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Versão | `0.1.1` |
 | Maturidade | Funcional |
-| Testes | 78 (`cargo test`) |
+| Testes | 119 (`cargo test`) |
 | Tecnologia | Rust / tiny_http |
 | Destino | O Raspberry Pi CM5 de uma célula HYDRA-UMC |
 | Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
@@ -52,7 +52,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 | Área | Estado | O que significa aqui |
 |---|---|---|
 | Software | 🟡 | Funciona para o seu propósito principal; a verificação de honestidade acima lista o que ainda falta |
-| Testes | 🟢 | 78 testes automáticos, executados a cada alteração |
+| Testes | 🟢 | 119 testes automáticos, executados a cada alteração |
 | Hardware real | 🔴 | Ainda não: não há registo de execução em hardware real para esta versão |
 | Documentação | 🟢 | README em oito idiomas, verificado contra o manifesto a cada alteração |
 
@@ -68,6 +68,7 @@ Escrito em Rust, hoje lê os manifestos dos seus três filhos (PHYSICS-REPLICA, 
 * 🔏 **Certificados de interbloqueio:** `POST /interlock/certify` assina um relatório de risco (articulação, posição, `collision_imminent`, `distance_m`) com a chave Ed25519 do gémeo e devolve um certificado que o HYDRA-UMC-HIL-BRIDGE só aceita para esse comando (atual, de uso único) antes de enviar o que quer que seja ao hardware real. A rota só existe se o servidor arrancar com `--signing-key-file` e `--certify-token-file` (ou `HYDRA_UMC_TWIN_CERTIFY_TOKEN`): sem o token ninguém pode pedir uma assinatura, sem chave a rota responde `404`, e um sem o outro não arranca. `keygen --key-file CAMINHO` cria uma chave (nunca sobre um ficheiro existente) e imprime a chave pública a dar ao bridge. Enquanto não existir o motor de física, o gémeo assina o relatório de quem chama com o token (a réplica de física), não um calculado por si: um certificado vale o que valer a sua fonte. O formato está em `docs/INTERLOCK_CERTIFICATE.md`. *(implementado, experimentado com o binário real do bridge)*
 * 🔌 **API JSON sobre HTTP (v0):** `serve [--addr ADDR] [--port PORT] [--workspace PATH]` (por defeito `127.0.0.1:8111`) expõe exatamente a mesma lógica de family-status/family-sync através de `GET /family-status`, `GET /family-sync` e `GET /stats`, com um servidor `tiny_http` bloqueante real - o mesmo binário que a unidade `systemd/hydra-umc-twin.service` de uma CM5 instalada executa (apenas em loopback). Consulte o [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para o contrato completo.
 * 🩺 **Verificação ativa da saúde dos filhos (v0):** `family-health` não acredita nos manifestos: executa o binário compilado do PHYSICS-REPLICA sobre um URDF de teste e compara a pose com a exata, e chama `GET /stats` da ponte HIL em execução (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`). Um filho que não se consegue executar nem alcançar, ou que responde mal, é indicado como tal; o SYNTHETIC-DATA-GEN não tem nada para executar e é indicado como não sondado. `serve --health-probes` acrescenta `GET /family-health` (desligado por omissão, respostas em cache, o pedido nunca escolhe o que se executa). *(implementado)*
+* 🚧 **Previsão de colisão (desligada por defeito):** com `serve --collision-predict`, `POST /predict/collision` responde se se prevê que uma lista curta de estados futuros das articulações entre numa zona do ficheiro de zonas ou toque no próprio robô, consultando o HYDRA-UMC-PHYSICS-REPLICA (que sobrestima por construção). As articulações que um estado omite vêm dos últimos relatórios das articulações reais, e uma articulação que ninguém conhece é um erro, nunca zero. É só informação: os certificados e `/interlock/*` não a leem, e uma falha nunca é lida como «livre». Não experimentado com um robô real. Veja `docs/COLLISION_PREDICTION.md`.
 * 🌐 **Simulação completa da fábrica (planeada):** replica robôs, ferramentas e o ambiente num espaço 3D unificado - depende da integração real do motor Bevy.
 * ⚡ **Hardware-in-the-Loop (HIL) (planeado):** liga Apps e Studios ao simulador como se fosse um controlador real.
 * 📊 **Previsão de desgaste (planeada):** estima a vida útil dos componentes a partir do esforço mecânico simulado.
@@ -151,7 +152,7 @@ Requer a cadeia de ferramentas Rust estável (edição 2021) com `cargo`.
 
 ## 🧪 Testes
 
-78 testes automáticos correm com `cargo test`. Não precisam de hardware nem de nada fora desta máquina.
+119 testes automáticos correm com `cargo test`. Não precisam de hardware nem de nada fora desta máquina.
 
 A CI executa `HYDRA_UMC_CI=1 python tools/ci_validate.py`, que verifica o manifesto, os documentos, os oito README e as imagens.
 
@@ -161,7 +162,7 @@ Requer a cadeia de ferramentas Rust (`cargo`/`rustc`, instalada via [rustup](htt
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (78 testes) e depois `cargo build --release`
+./build.sh   # `cargo test` (119 testes) e depois `cargo build --release`
 ./run.sh     # executa target/release/hydra-umc-twin, imprime nome + versão + papel
 ```
 
@@ -234,6 +235,7 @@ HYDRA-UMC-TWIN/
 │   ├── contract.rs                  Contrato real de sincronização de estado (maturidade + teto de versão)
 │   ├── certificate.rs               Certificados de interbloqueio Ed25519: o texto assinado, a assinatura, os nonces, a geração de chaves
 │   ├── health.rs                    Sondas ativas dos filhos: executa o binário do PHYSICS-REPLICA, chama a ponte HIL
+│   ├── collision.rs                 Previsão de colisão (`POST /predict/collision`, desligada por defeito): consulta o PHYSICS-REPLICA, só informa
 │   ├── server.rs                    Superfície JSON/HTTP simples (tiny_http, bloqueante, sem runtime assíncrono)
 │   └── main.rs                      Ponto de entrada + subcomandos reais `family-status`/`family-sync`
 ├── schemas/                         esquemas JSON dos contratos do SDK incluídos
@@ -364,6 +366,7 @@ Este projeto faz parte do ecossistema de robótica HYDRA-UMC do mesmo autor (Jua
 Onde ler mais:
 
 * **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — cada invocação de `family-status`/`family-sync`/`serve`, com a saída real capturada de um binário de lançamento compilado, a tabela de códigos de saída e o contrato JSON/HTTP de `GET /family-status`/`GET /family-sync`/`GET /stats`.
+* **[docs/COLLISION_PREDICTION.md](docs/COLLISION_PREDICTION.md)** — a rota de previsão de colisão: os interruptores, o pedido e a resposta, os códigos de estado e os limites.
 * [Base de segurança do ecossistema](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
 * [Modelo de ameaças do ecossistema](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
 * [Registo de alterações deste repositório](CHANGELOG.md)

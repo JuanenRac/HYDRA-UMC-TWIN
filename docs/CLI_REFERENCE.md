@@ -248,3 +248,7 @@ last report of every joint with its `age_ms` counted from its arrival, and `requ
 
 `serve --require-fresh-state-ms N` (1 to 3600000; off by default) makes `POST /interlock/certify` answer `409` for a joint with no report or whose last report is older
 than N ms, so the real mode of the bridge blocks while the twin is blind. It needs the signing key and the token.
+
+## `serve --collision-predict` and `POST /predict/collision`
+
+Off by default. With `--collision-predict`, `--collision-urdf PATH`, `--collision-zones PATH` and `--collision-config PATH` (and the signing key and the token of the interlock routes) the server adds `POST /predict/collision`: a body `{"states": [{"joint": position, ...}, ...]}` is answered with whether the trajectory is predicted to enter a zone of the zones file or touch the robot itself, by asking HYDRA-UMC-PHYSICS-REPLICA (`--physics-replica-bin`, `--collision-timeout-ms` from 100 to 60000, default 5000; `--collision-max-states` from 1 to 256, default 64). The joints a state leaves out come from the last reports of `POST /interlock/state`. Errors are `400`, `422`, `502`, `503` and `504` and never read as "clear". The options of the prediction without the switch stop the start. Information only: the certificates and `/interlock/*` do not read it. See `docs/COLLISION_PREDICTION.md`. Not tried with a real robot.

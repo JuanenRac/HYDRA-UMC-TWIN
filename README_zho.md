@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-78%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-119%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.1-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.1` |
 | 成熟度 | 可用 |
-| 测试 | 78 (`cargo test`) |
+| 测试 | 119 (`cargo test`) |
 | 技术栈 | Rust / tiny_http |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 78 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 119 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 文档 | 🟢 | 八种语言的 README，每次变更都会与清单核对 |
 
@@ -68,6 +68,7 @@ GPL-3.0-or-later - see LICENSE
 * 🔏 **联锁证书:** `POST /interlock/certify` 用孪生体的 Ed25519 密钥对风险报告(关节、位置、`collision_imminent`、`distance_m`)签名,并返回一份证书;HYDRA-UMC-HIL-BRIDGE 在向真实硬件发送任何内容之前,只会为该条命令接受它(时效内、仅限一次)。只有服务器以 `--signing-key-file` 和 `--certify-token-file`(或 `HYDRA_UMC_TWIN_CERTIFY_TOKEN`)启动时该路由才存在:没有令牌,任何人都无法请求签名;没有密钥,该路由返回 `404`;缺一个都无法启动。`keygen --key-file 路径` 生成密钥(绝不覆盖已有文件)并打印要交给桥接的公钥。在物理引擎出现之前,孪生体签署的是持有令牌的调用方(物理复制体)提交的报告,而不是它自己计算的:证书的价值取决于其来源。格式见 `docs/INTERLOCK_CERTIFICATE.md`。*(已实现,已针对真实的桥接二进制程序试过)*
 * 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace 路径]`（默认 `127.0.0.1:8111`）通过一个真实的阻塞式 `tiny_http` 服务器，把同样的 family-status/family-sync 逻辑以 `GET /family-status`、`GET /family-sync`、`GET /stats` 的形式对外提供——与部署到 CM5 上的 `systemd/hydra-umc-twin.service` 单元运行的是同一个二进制文件（仅限回环地址）。完整契约见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 🩺 **子项目的主动健康检查 (v0):** `family-health` 不轻信清单:它用测试 URDF 运行已构建的 PHYSICS-REPLICA 二进制文件并把姿态与精确值比较,同时调用正在运行的 HIL 网桥的 `GET /stats`(`--physics-replica-bin`、`--hil-bridge-addr`、`--timeout-ms`)。无法运行或无法连通、或应答错误的子项目会如实报告;SYNTHETIC-DATA-GEN 没有可运行的内容,报告为未探测。`serve --health-probes` 会增加 `GET /family-health`(默认关闭,应答带缓存,请求绝不决定运行什么)。*(已实现)*
+* 🚧 **碰撞预测（默认关闭）：** 使用 `serve --collision-predict` 时，`POST /predict/collision` 通过询问 HYDRA-UMC-PHYSICS-REPLICA（按构造偏大估计），回答一小段未来关节状态列表是否预计会进入区域文件中的某个区域或碰到机器人自身。状态中省略的关节取自真实关节的最近报告，没有人知道的关节是错误，而不是零。它仅供参考：证书和 `/interlock/*` 不会读取它，失败也绝不会被当作“无碰撞”。尚未在真实机器人上试验。参见 `docs/COLLISION_PREDICTION.md`。
 * 🌐 **完整工厂仿真（计划中）：** 在统一的 3D 空间中复制机器人、工具和环境——依赖于先有真实的 Bevy 引擎集成。
 * ⚡ **硬件在环（HIL）（计划中）：** 将应用程序和 Studio 连接到仿真器，就像连接到真实控制器一样。
 * 📊 **磨损预测（计划中）：** 基于模拟的机械应力估算组件寿命。
@@ -151,7 +152,7 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 
 ## 🧪 测试
 
-运行 `cargo test` 会执行 78 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `cargo test` 会执行 119 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -162,7 +163,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（78 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（119 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 
@@ -248,6 +249,7 @@ HYDRA-UMC-TWIN/
 │   ├── contract.rs                  真实的状态同步契约（成熟度 + 版本上限）
 │   ├── certificate.rs               Ed25519 联锁证书:被签名的文本、签名、nonce、密钥生成
 │   ├── health.rs                    子项目的主动探测:运行 PHYSICS-REPLICA 的二进制文件,调用 HIL 网桥
+│   ├── collision.rs                 碰撞预测（`POST /predict/collision`，默认关闭）：询问 PHYSICS-REPLICA，仅供参考
 │   ├── server.rs                    简洁的 JSON/HTTP 接口(tiny_http,阻塞式,无异步运行时)
 │   └── main.rs                      入口点 + 真实的 `family-status`/`family-sync` 子命令
 ├── schemas/                         随附的 SDK 契约 JSON 模式
@@ -378,6 +380,7 @@ HYDRA-UMC-TWIN/
 更多阅读：
 
 * **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — 每一个 `family-status`/`family-sync`/`serve` 调用、从真实构建的发布版二进制文件中获取的真实输出、退出码表，以及 `GET /family-status`/`GET /family-sync`/`GET /stats` HTTP JSON 契约。
+* **[docs/COLLISION_PREDICTION.md](docs/COLLISION_PREDICTION.md)** — 碰撞预测路由：开关、请求与响应、状态码和限制。
 * [生态系统的安全基线](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
 * [生态系统的威胁模型](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
 * [本仓库的更新日志](CHANGELOG.md)

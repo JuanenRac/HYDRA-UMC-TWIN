@@ -15,6 +15,7 @@
 //! scope (the real Bevy engine and physics backend).
 
 mod certificate;
+mod collision;
 mod contract;
 mod family;
 mod health;
@@ -284,6 +285,86 @@ fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> 
     }
 }
 
+/// `--collision-predict` (off by default) with `--collision-urdf`, `--collision-zones` and `--collision-config`: the route
+/// `POST /predict/collision`. Without the switch none of the other flags may be given (a half-configured server never starts).
+fn load_collision(
+    args: &[String],
+    workspace: &std::path::Path,
+    have_token: bool,
+) -> Result<Option<collision::CollisionRoute>, String> {
+    let flags = [
+        "--collision-urdf",
+        "--collision-zones",
+        "--collision-config",
+        "--collision-timeout-ms",
+        "--collision-max-states",
+    ];
+    if !has_flag(args, "--collision-predict") {
+        if let Some(flag) = flags.iter().find(|f| find_flag(args, f).is_some()) {
+            return Err(format!(
+                "{flag} needs --collision-predict (the prediction is off unless asked for)"
+            ));
+        }
+        return Ok(None);
+    }
+    if !have_token {
+        return Err("--collision-predict needs the signing key and the certify token (the route uses that token)".into());
+    }
+    let file = |flag: &str| -> Result<PathBuf, String> {
+        let path = find_flag(args, flag)
+            .ok_or_else(|| format!("--collision-predict needs {flag} PATH"))?;
+        let path = PathBuf::from(path);
+        if !path.is_file() {
+            return Err(format!("{flag}: {} is not a file", path.display()));
+        }
+        Ok(path)
+    };
+    let urdf = file("--collision-urdf")?;
+    let zones = file("--collision-zones")?;
+    let config = file("--collision-config")?;
+    let binary = find_flag(args, "--physics-replica-bin")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN").ok())
+        .filter(|p| !p.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| health::built_binary(workspace))
+        .ok_or("--collision-predict needs the binary of HYDRA-UMC-PHYSICS-REPLICA: build it next to the workspace or pass --physics-replica-bin")?;
+    if !binary.is_file() {
+        return Err(format!("{} is not a file", binary.display()));
+    }
+    let whole = |flag: &str, default: u64, low: u64, high: u64| -> Result<u64, String> {
+        match find_flag(args, flag) {
+            None => Ok(default),
+            Some(raw) => raw
+                .parse::<u64>()
+                .ok()
+                .filter(|n| (low..=high).contains(n))
+                .ok_or_else(|| {
+                    format!("{flag} must be a whole number from {low} to {high}, got {raw}")
+                }),
+        }
+    };
+    let timeout_ms = whole(
+        "--collision-timeout-ms",
+        collision::DEFAULT_TIMEOUT_MS,
+        100,
+        60_000,
+    )?;
+    let max_states = whole(
+        "--collision-max-states",
+        collision::DEFAULT_MAX_STATES as u64,
+        1,
+        collision::HARD_MAX_STATES as u64,
+    )? as usize;
+    Ok(Some(collision::CollisionRoute::new(
+        binary,
+        urdf,
+        zones,
+        config,
+        std::time::Duration::from_millis(timeout_ms),
+        max_states,
+    )))
+}
+
 /// `keygen --key-file PATH`: write a new signing key (never over an existing file) and print the public key to give to the bridge.
 fn run_keygen(args: &[String]) -> ExitCode {
     let Some(path) = find_flag(args, "--key-file") else {
@@ -428,6 +509,14 @@ fn run_serve(args: &[String]) -> ExitCode {
         return ExitCode::from(2);
     }
 
+    let collision_route = match load_collision(args, &workspace, certifier.is_some()) {
+        Ok(route) => route,
+        Err(message) => {
+            eprintln!("[twin] fatal: {message}");
+            return ExitCode::from(2);
+        }
+    };
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -462,8 +551,15 @@ fn run_serve(args: &[String]) -> ExitCode {
                 Some(ms) => eprintln!("[twin] POST /interlock/certify refuses a joint whose state report is missing or older than {ms} ms"),
                 None => eprintln!("[twin] state reports (POST /interlock/state) are stored but do not gate the certificates (--require-fresh-state-ms is off)"),
             }
+            match &collision_route {
+                Some(route) => eprintln!(
+                    "[twin] POST /predict/collision predicts contacts of a trajectory with the zones in {} and with the robot itself (information only: nothing reads it to decide; not tried with a real robot)",
+                    route.zones.display()
+                ),
+                None => eprintln!("[twin] POST /predict/collision is off: start with --collision-predict to enable it"),
+            }
             eprintln!("[twin] serving with {workers} worker thread(s)");
-            server::run_with_options(
+            server::run_with_collision(
                 bound,
                 workspace,
                 strict_root,
@@ -471,6 +567,7 @@ fn run_serve(args: &[String]) -> ExitCode {
                 workers,
                 health_route,
                 state_max_age_ms,
+                collision_route,
             );
             ExitCode::SUCCESS
         }

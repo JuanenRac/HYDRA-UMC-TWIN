@@ -394,6 +394,58 @@ fn handle_state_list(request: tiny_http::Request, context: &Context) {
     );
 }
 
+/// `POST /predict/collision`: would this short trajectory bring the robot into a zone or into itself? It needs the same token as the
+/// other interlock routes (it shows where the robot is and starts a process). The answer is information only.
+fn handle_predict_collision(request: tiny_http::Request, context: &Context) {
+    use crate::collision::{CollisionError, MAX_BODY_BYTES};
+    let route = context.collision.as_ref().expect("checked by the caller");
+    let Some((request, raw)) =
+        read_guarded_post(request, context.certifier.as_ref(), MAX_BODY_BYTES)
+    else {
+        return;
+    };
+    let states = match route.parse_request(&raw) {
+        Ok(states) => states,
+        Err(CollisionError::BadRequest(message)) => {
+            write_json(request, 400, &json!({"error": message}));
+            return;
+        }
+        Err(_) => unreachable!("parsing only fails as a bad request"),
+    };
+    let reported = context
+        .states
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .positions();
+    match route.predict(&states, &reported) {
+        Ok(mut answer) => {
+            answer["reported_joints"] = json!(reported.len());
+            write_json(request, 200, &answer);
+        }
+        Err(CollisionError::Busy) => write_json(
+            request,
+            503,
+            &json!({"error": "too many predictions are running; try again"}),
+        ),
+        Err(CollisionError::Refused(reason)) => write_json(
+            request,
+            422,
+            &json!({"error": reason, "note": "no prediction was made: an unknown position is never read as clear"}),
+        ),
+        Err(CollisionError::Timeout(ms)) => write_json(
+            request,
+            504,
+            &json!({"error": format!("the prediction did not end within {ms} ms")}),
+        ),
+        Err(CollisionError::Unavailable(reason)) => {
+            write_json(request, 502, &json!({"error": reason}))
+        }
+        Err(CollisionError::BadRequest(message)) => {
+            write_json(request, 400, &json!({"error": message}))
+        }
+    }
+}
+
 /// How many requests are served at once. One request that is slow (a `?workspace=` on a network file system that does not answer, a
 /// client that sends its body one byte a minute) holds one worker, never the whole server.
 pub const DEFAULT_WORKERS: usize = 8;
@@ -441,6 +493,8 @@ struct Context {
     states: std::sync::Mutex<crate::joint_state::JointStateStore>,
     /// `--require-fresh-state-ms`: when set, a certificate is only signed for a joint whose state report is at most this old.
     state_max_age_ms: Option<u64>,
+    /// `--collision-predict`: the prediction of `POST /predict/collision`. None: the route does not exist.
+    collision: Option<crate::collision::CollisionRoute>,
 }
 
 /// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
@@ -475,6 +529,7 @@ pub fn run_with_workers(
 }
 
 /// The whole configuration of the server: the optional parts (the certificate signer, the active health probes) are `None` when off.
+#[cfg(test)]
 pub fn run_with_options(
     server: Server,
     workspace: PathBuf,
@@ -484,6 +539,30 @@ pub fn run_with_options(
     health: Option<HealthRoute>,
     state_max_age_ms: Option<u64>,
 ) {
+    run_with_collision(
+        server,
+        workspace,
+        strict_root,
+        certifier,
+        workers,
+        health,
+        state_max_age_ms,
+        None,
+    );
+}
+
+/// `run_with_options` plus the optional collision prediction.
+#[allow(clippy::too_many_arguments)]
+pub fn run_with_collision(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+    workers: usize,
+    health: Option<HealthRoute>,
+    state_max_age_ms: Option<u64>,
+    collision: Option<crate::collision::CollisionRoute>,
+) {
     let server = std::sync::Arc::new(server);
     let context = std::sync::Arc::new(Context {
         workspace,
@@ -492,6 +571,7 @@ pub fn run_with_options(
         health,
         states: Default::default(),
         state_max_age_ms,
+        collision,
     });
     let mut handles = Vec::new();
     for _ in 1..workers.max(1) {
@@ -527,6 +607,15 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
 
     if request.method() == &Method::Get && path == "/interlock/state" {
         handle_state_list(request, context);
+        return;
+    }
+
+    // Only where the server was started with `--collision-predict`; otherwise the path is like any other POST path (405).
+    if request.method() == &Method::Post
+        && path == "/predict/collision"
+        && context.collision.is_some()
+    {
+        handle_predict_collision(request, context);
         return;
     }
 
@@ -1312,5 +1401,210 @@ mod tests {
         assert!(body.contains("ms old"), "{body}");
         assert_eq!(post_state(port, &auth(), &state_body(2)).0, 200);
         assert_eq!(post_certify(port, &auth(), REPORT).0, 200);
+    }
+
+    // ---- POST /predict/collision (see collision.rs) ----
+
+    const PLANAR_URDF: &str = r#"<robot name="planar">
+      <link name="base"/><link name="l1"/><link name="l2"/><link name="tool"/>
+      <joint name="shoulder" type="revolute"><parent link="base"/><child link="l1"/>
+        <axis xyz="0 0 1"/><limit lower="-3.1" upper="3.1" effort="10" velocity="2"/></joint>
+      <joint name="elbow" type="revolute"><parent link="l1"/><child link="l2"/>
+        <origin xyz="1 0 0"/><axis xyz="0 0 1"/><limit lower="-3.1" upper="3.1" effort="10" velocity="2"/></joint>
+      <joint name="tip" type="fixed"><parent link="l2"/><child link="tool"/>
+        <origin xyz="1 0 0"/></joint>
+    </robot>"#;
+    const PRESS_ZONES: &str = r#"{"zones":[{"id":"press","level":"danger","min":{"x":1.9,"y":-0.2,"z":-0.2},"max":{"x":2.2,"y":0.2,"z":0.2}}]}"#;
+    const SIZES: &str = r#"{"link_radius_m":0.05,"tool_extent_m":0.05}"#;
+
+    fn raw_request(port: u16, request: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, body) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, body.to_string())
+    }
+
+    fn post_predict(port: u16, extra_headers: &str, body: &str) -> (u16, String) {
+        raw_request(
+            port,
+            &format!(
+                "POST /predict/collision HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            ),
+        )
+    }
+
+    fn collision_files(tag: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let dir = tempdir().join(tag);
+        std::fs::create_dir_all(&dir).unwrap();
+        let (urdf, zones, config) = (
+            dir.join("arm.urdf"),
+            dir.join("zones.json"),
+            dir.join("sizes.json"),
+        );
+        std::fs::write(&urdf, PLANAR_URDF).unwrap();
+        std::fs::write(&zones, PRESS_ZONES).unwrap();
+        std::fs::write(&config, SIZES).unwrap();
+        (urdf, zones, config)
+    }
+
+    fn sibling_binary() -> Option<PathBuf> {
+        let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        // only a binary that already knows the command counts
+        crate::health::built_binary(&workspace).filter(|bin| {
+            std::process::Command::new(bin)
+                .arg("predict-collision")
+                .output()
+                .map(|o| String::from_utf8_lossy(&o.stderr).contains("predict-collision:"))
+                .unwrap_or(false)
+        })
+    }
+
+    fn start_predicting_server(binary: PathBuf, tag: &str) -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind");
+        let port = server.server_addr().to_ip().expect("ip").port();
+        let certifier = Certifier {
+            signer: Signer::from_seed([7u8; 32]),
+            token: CERTIFY_TOKEN.to_string(),
+        };
+        let (urdf, zones, config) = collision_files(tag);
+        let route = crate::collision::CollisionRoute::new(
+            binary,
+            urdf,
+            zones,
+            config,
+            std::time::Duration::from_millis(5000),
+            8,
+        );
+        let ws = tempdir();
+        thread::spawn(move || {
+            run_with_collision(
+                server,
+                ws,
+                None,
+                Some(certifier),
+                DEFAULT_WORKERS,
+                None,
+                None,
+                Some(route),
+            )
+        });
+        port
+    }
+
+    #[test]
+    fn characterization_without_the_switch_the_prediction_path_is_an_ordinary_post_path() {
+        // a plain server and a server that signs: the path answers like any other POST path, 405, and nothing else changed
+        let plain = start_test_server(tempdir());
+        assert_eq!(post_predict(plain, "", "{}").0, 405);
+        let signing = start_certifying_server();
+        assert_eq!(post_predict(signing, &auth(), r#"{"states":[{}]}"#).0, 405);
+        // the interlock routes and the read-only routes are as before
+        assert_eq!(post_certify(signing, &auth(), REPORT).0, 200);
+        assert_eq!(get(signing, "/stats").0, 200);
+        assert_eq!(get(signing, "/predict/collision").0, 404);
+    }
+
+    #[test]
+    fn the_prediction_needs_the_token_and_refuses_browsers_and_bad_bodies() {
+        let port = start_predicting_server(PathBuf::from("not-needed-here"), "guards");
+        let json = "Content-Type: application/json\r\n";
+        assert_eq!(post_predict(port, json, r#"{"states":[{}]}"#).0, 401);
+        assert_eq!(
+            post_predict(
+                port,
+                &format!("Authorization: Bearer wrong-token-wrong-token\r\n{json}"),
+                r#"{"states":[{}]}"#
+            )
+            .0,
+            401
+        );
+        assert_eq!(
+            post_predict(
+                port,
+                &format!("Origin: http://evil.example\r\n{}", auth()),
+                r#"{"states":[{}]}"#
+            )
+            .0,
+            403
+        );
+        assert_eq!(post_predict(port, &auth(), "nope").0, 400);
+        assert_eq!(post_predict(port, &auth(), r#"{"states":[]}"#).0, 400);
+        let nine = format!(r#"{{"states":[{}]}}"#, ["{}"; 9].join(","));
+        assert_eq!(post_predict(port, &auth(), &nine).0, 400);
+        let big = format!(r#"{{"states":[{{"j":1}}],"pad":"{}"}}"#, "x".repeat(70_000));
+        assert_eq!(post_predict(port, &auth(), &big).0, 413);
+        // GET on the path is still not a route
+        assert_eq!(get(port, "/predict/collision").0, 404);
+    }
+
+    #[test]
+    fn a_child_that_cannot_run_is_a_502_never_a_clear_answer() {
+        let port = start_predicting_server(PathBuf::from("definitely-not-a-binary-9f2c"), "norun");
+        let (status, body) =
+            post_predict(port, &auth(), r#"{"states":[{"shoulder":0,"elbow":0}]}"#);
+        assert_eq!(status, 502, "{body}");
+        assert!(!body.contains("\"collision\":false"), "{body}");
+    }
+
+    #[test]
+    fn with_the_real_physics_replica_the_trajectory_is_predicted_and_the_reports_fill_the_gaps() {
+        let Some(binary) = sibling_binary() else {
+            eprintln!("skipped: HYDRA-UMC-PHYSICS-REPLICA with predict-collision is not built next to this repository");
+            return;
+        };
+        let port = start_predicting_server(binary, "real");
+        // the tool of the straight arm is at (2, 0, 0), inside the press
+        let (status, body) =
+            post_predict(port, &auth(), r#"{"states":[{"shoulder":0,"elbow":0}]}"#);
+        assert_eq!(status, 200, "{body}");
+        let answer: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(answer["collision"], true);
+        assert_eq!(answer["level"], "danger");
+        assert_eq!(answer["hits"][0]["zone"], "press");
+        assert_eq!(answer["reported_joints"], 0);
+        // swung out of the way: clear
+        let (status, body) = post_predict(
+            port,
+            &auth(),
+            r#"{"states":[{"shoulder":1.5,"elbow":0},{"shoulder":2.0,"elbow":0}]}"#,
+        );
+        assert_eq!(status, 200, "{body}");
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&body).unwrap()["collision"],
+            false
+        );
+        // a joint left out and never reported is a 422, not zero
+        let (status, body) = post_predict(port, &auth(), r#"{"states":[{"shoulder":0}]}"#);
+        assert_eq!(status, 422, "{body}");
+        assert!(body.contains("elbow"), "{body}");
+        // the bridge reports where the real joints are; now the request can name only what moves
+        for joint in ["shoulder", "elbow"] {
+            let report = format!(
+                r#"{{"joint":"{joint}","position":0.0,"seq":1,"stamp_ms":1700000000000,"source":"measured"}}"#
+            );
+            assert_eq!(post_state(port, &auth(), &report).0, 200);
+        }
+        let (status, body) = post_predict(port, &auth(), r#"{"states":[{}]}"#);
+        assert_eq!(status, 200, "{body}");
+        let answer: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(answer["collision"], true);
+        assert_eq!(answer["reported_joints"], 2);
+        // an unknown joint name in a request is the refusal of the child
+        let (status, _) = post_predict(port, &auth(), r#"{"states":[{"wrist":1}]}"#);
+        assert_eq!(status, 422);
     }
 }

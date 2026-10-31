@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-78%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-119%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.1-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.1` |
 | 成熟度 | 機能する |
-| テスト | 78 (`cargo test`) |
+| テスト | 119 (`cargo test`) |
 | 技術 | Rust / tiny_http |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 78 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 119 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | ドキュメント | 🟢 | 8 言語の README。変更のたびにマニフェストと照合されます |
 
@@ -68,6 +68,7 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 * 🔏 **インターロック証明書:** `POST /interlock/certify` は、リスク報告(関節、位置、`collision_imminent`、`distance_m`)に双子の Ed25519 鍵で署名し、HYDRA-UMC-HIL-BRIDGE が実機に何かを送る前に、そのコマンドに限って(新しく、一度だけ)受け入れる証明書を返します。このルートは、サーバーが `--signing-key-file` と `--certify-token-file`(または `HYDRA_UMC_TWIN_CERTIFY_TOKEN`)付きで起動したときだけ存在します。トークンがなければ誰も署名を要求できず、鍵がなければルートは `404` を返し、どちらか一方だけでは起動しません。`keygen --key-file パス` は鍵を作り(既存のファイルには決して上書きしません)、ブリッジに渡す公開鍵を表示します。物理エンジンができるまで、双子はトークンを持つ呼び出し側(物理レプリカ)の報告に署名するだけで、自分で計算した報告ではありません。証明書の価値はその出どころ次第です。形式は `docs/INTERLOCK_CERTIFICATE.md` にあります。*(実装済み、実際のブリッジのバイナリで試験済み)*
 * 🔌 **HTTP JSON API（v0）：** `serve [--addr ADDR] [--port PORT] [--workspace パス]`（デフォルト `127.0.0.1:8111`）は、同じ family-status/family-sync ロジックを、実際のブロッキング `tiny_http` サーバー経由で `GET /family-status`、`GET /family-sync`、`GET /stats` として公開します——デプロイされた CM5 の `systemd/hydra-umc-twin.service` ユニットが実行するのと同じバイナリです（ループバックのみ）。完全な契約は [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 * 🩺 **子プロジェクトの能動的な健全性チェック (v0):** `family-health` はマニフェストを信用しません。ビルド済みの PHYSICS-REPLICA バイナリをテスト用 URDF で実行して姿勢を正確な値と比較し、稼働中の HIL ブリッジの `GET /stats` を呼び出します(`--physics-replica-bin`、`--hil-bridge-addr`、`--timeout-ms`)。実行できない・到達できない、または誤った応答を返す子はその旨が報告され、実行するものがない SYNTHETIC-DATA-GEN は未プローブとして報告されます。`serve --health-probes` で `GET /family-health` が加わります(既定ではオフ、応答はキャッシュされ、リクエストが実行内容を選ぶことはありません)。*(実装済み)*
+* 🚧 **衝突予測（既定はオフ）：** `serve --collision-predict` を付けると、`POST /predict/collision` は、将来の関節状態の短いリストがゾーンファイルのゾーンに入るか、ロボット自身に接触すると予測されるかを、HYDRA-UMC-PHYSICS-REPLICA（構造上、過大に見積もる）に問い合わせて答えます。状態が省略した関節は実関節の最新の報告から補われ、誰も知らない関節はゼロではなくエラーになります。情報のみで、証明書と `/interlock/*` はこれを読まず、失敗が「接触なし」と解釈されることもありません。実機では未検証です。`docs/COLLISION_PREDICTION.md` を参照してください。
 * 🌐 **完全な工場シミュレーション（計画中）：** ロボット、工具、環境を統一された 3D 空間内で複製します——まず実際の Bevy エンジン統合が存在することが前提です。
 * ⚡ **ハードウェア・イン・ザ・ループ（HIL）（計画中）：** アプリと Studio を、あたかも実際のコントローラーであるかのようにシミュレーターに接続します。
 * 📊 **摩耗予測（計画中）：** シミュレートされた機械的応力に基づいてコンポーネントの寿命を推定します。
@@ -151,7 +152,7 @@ HTTP API の `?workspace=` による上書きは、既定では配信中のワ�
 
 ## 🧪 テスト
 
-`cargo test` で自動テスト 78 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`cargo test` で自動テスト 119 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -162,7 +163,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（78 件のテスト）、その後 `cargo build --release`
+./build.sh   # 、`cargo test`（119 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 
@@ -258,6 +259,7 @@ HYDRA-UMC-TWIN/
 │   ├── contract.rs                  実際の状態同期契約（成熟度 + バージョン上限）
 │   ├── certificate.rs               Ed25519 インターロック証明書:署名対象のテキスト、署名、nonce、鍵の生成
 │   ├── health.rs                    子プロジェクトの能動プローブ:PHYSICS-REPLICA のバイナリを実行し、HIL ブリッジを呼び出す
+│   ├── collision.rs                 衝突予測（`POST /predict/collision`、既定はオフ）：PHYSICS-REPLICA に問い合わせる、情報のみ
 │   ├── server.rs                    シンプルなJSON/HTTPサーフェス(tiny_http、ブロッキング、非同期ランタイムなし)
 │   └── main.rs                      エントリポイント + 実際の `family-status`/`family-sync` サブコマンド
 ├── schemas/                         同梱した SDK 契約の JSON スキーマ
@@ -388,6 +390,7 @@ HYDRA-UMC-TWIN/
 さらに読むには：
 
 * **[docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md)** — すべての `family-status`/`family-sync`/`serve` 呼び出し、ビルド済みリリースバイナリから実際に取得した出力、終了コード表、そして `GET /family-status`/`GET /family-sync`/`GET /stats` の HTTP JSON 契約。
+* **[docs/COLLISION_PREDICTION.md](docs/COLLISION_PREDICTION.md)** — 衝突予測のルート：スイッチ、リクエストとレスポンス、ステータスコード、制限事項。
 * [エコシステムのセキュリティ基準](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
 * [エコシステムの脅威モデル](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
 * [このリポジトリの変更履歴](CHANGELOG.md)

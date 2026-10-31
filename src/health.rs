@@ -125,7 +125,7 @@ pub fn check_family_health(workspace: &Path, config: &HealthConfig) -> Vec<Child
     ]
 }
 
-fn built_binary(workspace: &Path) -> Option<PathBuf> {
+pub fn built_binary(workspace: &Path) -> Option<PathBuf> {
     let name = if cfg!(windows) {
         "hydra-umc-physics-replica.exe"
     } else {
