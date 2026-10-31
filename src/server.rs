@@ -1192,9 +1192,16 @@ mod tests {
     #[test]
     fn the_health_route_reports_each_child_and_answers_from_the_cache_inside_the_window() {
         let ws = tempdir();
+        // held by a listener that hangs up, so no other test of the run can be handed the port (see health.rs)
         let closed = {
             let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-            l.local_addr().unwrap().to_string()
+            let addr = l.local_addr().unwrap().to_string();
+            std::thread::spawn(move || {
+                for stream in l.incoming().flatten() {
+                    drop(stream);
+                }
+            });
+            addr
         };
         let route = HealthRoute::new(
             crate::health::HealthConfig {

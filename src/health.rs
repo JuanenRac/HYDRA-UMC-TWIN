@@ -356,6 +356,20 @@ mod tests {
         Duration::from_millis(600)
     }
 
+/// An address where nothing usable answers, and that no other test of this run can be handed: a port that was only bound and then released
+    /// can be given to another test's server a moment later, and the probe would find a live service. The port stays taken by a listener that
+    /// hangs up on every connection, so the probe always meets the same thing.
+    fn address_that_answers_nothing() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                drop(stream);
+            }
+        });
+        addr
+    }
+
     /// A one-shot HTTP server on an OS-assigned port that answers every connection with `reply` (raw bytes).
     fn serve_raw(reply: &'static str) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -424,11 +438,7 @@ mod tests {
 
     #[test]
     fn nothing_listening_or_a_bad_address_is_unreachable() {
-        // bind to get a free port, then close it
-        let closed = {
-            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-            listener.local_addr().unwrap().to_string()
-        };
+        let closed = address_that_answers_nothing();
         assert!(matches!(
             probe_hil_bridge(&closed, short()),
             Probe::Unreachable { .. }
@@ -521,10 +531,12 @@ mod tests {
         dir
     }
 
+    /// The stand-in is a `.bat` on Windows, and starting `cmd.exe` under a loaded machine can take seconds; a verdict test must never be
+    /// decided by that start-up time, so the limit is generous. Only the test that wants the limit to fire sets its own short one.
     fn config_with(bin: PathBuf) -> HealthConfig {
         HealthConfig {
             physics_replica_bin: Some(bin),
-            timeout: Duration::from_millis(1500),
+            timeout: Duration::from_secs(60),
             ..HealthConfig::default()
         }
     }

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Steadier tests of the health probes:** the tests that need a port where nothing answers keep that port taken by a listener that hangs up (a port that was only released can be given to another test of the same run), and the stand-in script of the physics replica gets a limit that start-up time on a loaded machine cannot reach.
+
 ## [0.1.2] - Collision prediction, a twin that follows the real joints and a contract for the state of the twin
 
 - **Collision prediction, off by default.** `serve --collision-predict` (with `--collision-urdf`, `--collision-zones`, `--collision-config`, and the signing key and token) adds `POST /predict/collision`: a list of future states is answered with whether it is predicted to enter a zone of the zones file or touch the robot itself, computed by `predict-collision` of HYDRA-UMC-PHYSICS-REPLICA, which over-estimates by construction. The joints a state leaves out come from the last reports of the real joints; a joint nobody knows is a `422`, never zero. The files and the binary come from the configuration, never from the request; at most two predictions run at once (`503`), one that does not end is killed (`504`), and a failure is never read as "clear". Information only: the certificates and `/interlock/*` do not read it, and without the switch the path is an ordinary `POST` path (`405`) and nothing else changes. Not tried with a real robot; see `docs/COLLISION_PREDICTION.md`.
