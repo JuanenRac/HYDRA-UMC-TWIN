@@ -295,6 +295,10 @@ fn run_with_timeout(
 mod tests {
     use super::*;
 
+    // A script that is being written while another test starts a child leaves its descriptor open in that child, and executing it then fails with
+    // "Text file busy" (ETXTBSY) on Linux: the tests that write and start scripts take turns.
+    static SCRIPT_TURN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn route_with_timeout(binary: &str, timeout_ms: u64) -> CollisionRoute {
         CollisionRoute::new(
             PathBuf::from(binary),
@@ -417,6 +421,7 @@ mod tests {
 
     #[test]
     fn the_answer_of_the_child_is_passed_on_and_must_agree_with_its_exit_status() {
+        let _turn = SCRIPT_TURN.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch_dir("answers");
         let clear = fake(&dir, r#"{"collision":false,"level":"clear"}"#, 0, false);
         let answer = route(clear.to_str().unwrap())
@@ -444,6 +449,7 @@ mod tests {
 
     #[test]
     fn a_refusal_of_the_child_is_a_refusal_with_its_reason() {
+        let _turn = SCRIPT_TURN.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch_dir("refusal");
         let refuses = fake(&dir, "", 2, false);
         match route(refuses.to_str().unwrap()).predict(&states(), &BTreeMap::new()) {
@@ -462,6 +468,7 @@ mod tests {
 
     #[test]
     fn a_child_that_does_not_end_is_killed_and_the_answer_is_a_timeout() {
+        let _turn = SCRIPT_TURN.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch_dir("hang");
         let hangs = fake(&dir, r#"{"collision":false}"#, 0, true);
         let started = Instant::now();
