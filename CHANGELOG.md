@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A simulated robot and `GET /metrics`.** `serve --sim-config FILE` adds `POST /sim/command`, `POST /sim/step` and `GET /sim/state`: a simple physics model (top speed, top acceleration and travel of each joint; no masses, gravity or contacts) that moves over time, brakes without overshooting, keeps to its travel and is deterministic, and reports its joints to the twin as `measured`, so the hardware-in-the-loop bridge can be run with no robot (`--sim-tick-ms` makes the time follow the clock). `GET /metrics` gives the counters of the service as Prometheus text, with no position, token, key or path in it.
+
 ## [0.1.3] - Steadier tests of the health probes
 
 - **Steadier tests of the health probes:** the tests that need a port where nothing answers keep that port taken by a listener that hangs up (a port that was only released can be given to another test of the same run), and the stand-in script of the physics replica gets a limit that start-up time on a loaded machine cannot reach.

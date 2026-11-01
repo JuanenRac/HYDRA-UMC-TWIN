@@ -25,6 +25,7 @@ fn json_header() -> Header {
 }
 
 fn write_json(request: tiny_http::Request, status: u16, body: &serde_json::Value) {
+    crate::metrics::note_status(status);
     let text = body.to_string();
     let response = Response::from_string(text)
         .with_status_code(status)
@@ -197,6 +198,8 @@ fn read_guarded_post(
         return None;
     };
     if !bearer_matches(&request, &certifier.token) {
+        crate::metrics::count(&crate::metrics::UNAUTHORIZED);
+        crate::metrics::note_status(401);
         let response = tiny_http::Response::from_string(
             json!({"error": "a valid bearer token is required on the interlock routes"})
                 .to_string(),
@@ -309,7 +312,10 @@ fn handle_certify(request: tiny_http::Request, context: &Context) {
         }
     };
     match certifier.signer.certify(&input, issued_at_ms, &nonce) {
-        Ok(certificate) => write_json(request, 200, &serde_json::to_value(&certificate).unwrap()),
+        Ok(certificate) => {
+            crate::metrics::count(&crate::metrics::CERTIFICATES_SIGNED);
+            write_json(request, 200, &serde_json::to_value(&certificate).unwrap())
+        }
         Err(e) => write_json(request, 400, &json!({"error": e.to_string()})),
     }
 }
@@ -342,6 +348,10 @@ fn handle_state_report(request: tiny_http::Request, context: &Context) {
         .lock()
         .unwrap_or_else(|p| p.into_inner())
         .accept(report, std::time::Instant::now());
+    match &result {
+        Ok(()) => crate::metrics::count(&crate::metrics::STATE_REPORTS_ACCEPTED),
+        Err(_) => crate::metrics::count(&crate::metrics::STATE_REPORTS_REFUSED),
+    }
     match result {
         Ok(()) => write_json(
             request,
@@ -372,6 +382,8 @@ fn handle_state_list(request: tiny_http::Request, context: &Context) {
         return;
     };
     if !bearer_matches(&request, &certifier.token) {
+        crate::metrics::count(&crate::metrics::UNAUTHORIZED);
+        crate::metrics::note_status(401);
         let response = tiny_http::Response::from_string(
             json!({"error": "a valid bearer token is required on the interlock routes"})
                 .to_string(),
@@ -392,6 +404,36 @@ fn handle_state_list(request: tiny_http::Request, context: &Context) {
         200,
         &json!({"joints": joints, "requireFreshStateMs": context.state_max_age_ms}),
     );
+}
+
+/// `GET /metrics`: the counters of the service in the text format of Prometheus (see `metrics.rs`). Numbers about the service only.
+fn handle_metrics(request: tiny_http::Request, context: &Context) {
+    let joints_tracked = context
+        .states
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .snapshot(std::time::Instant::now())
+        .len();
+    let sim = context.sim.as_ref().map(|route| {
+        let robot = route.robot.lock().unwrap_or_else(|p| p.into_inner());
+        (robot.snapshot().len(), robot.clock_s())
+    });
+    let text = crate::metrics::render(&crate::metrics::Gauges {
+        version: env!("CARGO_PKG_VERSION"),
+        joints_tracked,
+        sim,
+    });
+    crate::metrics::note_status(200);
+    let response = Response::from_string(text)
+        .with_status_code(200)
+        .with_header(
+            Header::from_bytes(
+                &b"Content-Type"[..],
+                &b"text/plain; version=0.0.4; charset=utf-8"[..],
+            )
+            .unwrap(),
+        );
+    let _ = request.respond(response);
 }
 
 /// `POST /predict/collision`: would this short trajectory bring the robot into a zone or into itself? It needs the same token as the
@@ -495,6 +537,194 @@ struct Context {
     state_max_age_ms: Option<u64>,
     /// `--collision-predict`: the prediction of `POST /predict/collision`. None: the route does not exist.
     collision: Option<crate::collision::CollisionRoute>,
+    /// `--sim-config`: the simulated robot of the `/sim/...` routes. None: those routes do not exist.
+    sim: Option<SimRoute>,
+}
+
+/// The simulated robot (see `dynamics.rs`) and the number of the last report it made of every joint.
+pub struct SimRoute {
+    robot: std::sync::Mutex<crate::dynamics::SimulatedRobot>,
+    seq: std::sync::Mutex<std::collections::BTreeMap<String, u64>>,
+    /// `--sim-tick-ms`: how often the simulated time follows the wall clock (None: only `POST /sim/step` moves time).
+    tick: Option<std::time::Duration>,
+}
+
+impl SimRoute {
+    pub fn new(config: &crate::dynamics::SimConfig, tick_ms: Option<u64>) -> SimRoute {
+        SimRoute {
+            robot: std::sync::Mutex::new(crate::dynamics::SimulatedRobot::new(config)),
+            seq: Default::default(),
+            tick: tick_ms.map(std::time::Duration::from_millis),
+        }
+    }
+}
+
+/// Let `seconds` pass in the simulated robot and report where every joint is to the store of the real joints, as `measured`: the twin then
+/// follows the simulated robot the way it follows a real one, and `--require-fresh-state-ms` works the same.
+fn sim_advance(
+    context: &Context,
+    seconds: f64,
+) -> Result<Vec<crate::dynamics::JointSnapshot>, String> {
+    let route = context.sim.as_ref().ok_or("the simulation is not on")?;
+    crate::metrics::count(&crate::metrics::SIM_STEPS);
+    let snapshot = {
+        let mut robot = route.robot.lock().unwrap_or_else(|p| p.into_inner());
+        robot.advance(seconds)?;
+        robot.snapshot()
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let mut seqs = route.seq.lock().unwrap_or_else(|p| p.into_inner());
+    let mut states = context.states.lock().unwrap_or_else(|p| p.into_inner());
+    let at = std::time::Instant::now();
+    for joint in &snapshot {
+        // the sequence is made from the clock as well as a counter, like the bridge's, so a report of the simulated joint is always newer
+        // than the one the bridge made when it delivered the command (and than the last one of its own)
+        let seq = seqs.entry(joint.joint.clone()).or_insert(0);
+        *seq = (*seq + 1).max(now_ms);
+        let report = |seq: u64| crate::joint_state::JointStateReport {
+            joint: joint.joint.clone(),
+            position: joint.position,
+            seq,
+            stamp_ms: now_ms,
+            source: crate::joint_state::StateSource::Measured,
+        };
+        if let Err(crate::joint_state::StateRejection::Stale { last_seq }) =
+            states.accept(report(*seq), at)
+        {
+            // a report of the bridge in the same millisecond: go one past it
+            *seq = last_seq + 1;
+            let _ = states.accept(report(*seq), at);
+        }
+    }
+    Ok(snapshot)
+}
+
+const MAX_SIM_BODY_BYTES: u64 = 1024;
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimCommandBody {
+    joint: String,
+    /// The position to go to; or, instead of it, `"stop": true` to stop the joint where it can.
+    position: Option<f64>,
+    #[serde(default)]
+    stop: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SimStepBody {
+    #[serde(default = "default_step_seconds")]
+    seconds: f64,
+}
+
+fn default_step_seconds() -> f64 {
+    0.01
+}
+
+/// `POST /sim/command`: order a joint of the simulated robot to a position (information a controller would get from the bridge).
+fn handle_sim_command(request: tiny_http::Request, context: &Context) {
+    let Some((request, raw)) =
+        read_guarded_post(request, context.certifier.as_ref(), MAX_SIM_BODY_BYTES)
+    else {
+        return;
+    };
+    let body: SimCommandBody = match serde_json::from_slice(&raw) {
+        Ok(body) => body,
+        Err(e) => {
+            write_json(
+                request,
+                400,
+                &json!({"error": format!("malformed command: {e}")}),
+            );
+            return;
+        }
+    };
+    let route = context.sim.as_ref().expect("checked by the caller");
+    let outcome = match (body.position, body.stop) {
+        (Some(position), false) => route
+            .robot
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .command(&body.joint, position),
+        (None, true) => route
+            .robot
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .stop(&body.joint),
+        _ => Err("give either a position or \"stop\": true".to_string()),
+    };
+    if outcome.is_ok() {
+        crate::metrics::count(&crate::metrics::SIM_COMMANDS);
+    }
+    match outcome {
+        Ok(outcome) => write_json(request, 200, &json!({"accepted": true, "command": outcome})),
+        Err(message) => write_json(request, 400, &json!({"accepted": false, "error": message})),
+    }
+}
+
+/// `POST /sim/step`: let some time pass (`{"seconds": 0.01}`, at most one minute) and answer with where every joint is.
+fn handle_sim_step(request: tiny_http::Request, context: &Context) {
+    let Some((request, raw)) =
+        read_guarded_post(request, context.certifier.as_ref(), MAX_SIM_BODY_BYTES)
+    else {
+        return;
+    };
+    let body: SimStepBody = match serde_json::from_slice(if raw.is_empty() { b"{}" } else { &raw })
+    {
+        Ok(body) => body,
+        Err(e) => {
+            write_json(
+                request,
+                400,
+                &json!({"error": format!("malformed step: {e}")}),
+            );
+            return;
+        }
+    };
+    match sim_advance(context, body.seconds) {
+        Ok(snapshot) => write_json(
+            request,
+            200,
+            &json!({"joints": snapshot, "advanced_s": body.seconds}),
+        ),
+        Err(message) => write_json(request, 400, &json!({"error": message})),
+    }
+}
+
+/// `GET /sim/state`: where every joint of the simulated robot is, how fast it moves and where it is going.
+fn handle_sim_state(request: tiny_http::Request, context: &Context) {
+    let Some(certifier) = context.certifier.as_ref() else {
+        write_json(
+            request,
+            404,
+            &json!({"error": "signing is not configured on this server"}),
+        );
+        return;
+    };
+    if !bearer_matches(&request, &certifier.token) {
+        crate::metrics::count(&crate::metrics::UNAUTHORIZED);
+        crate::metrics::note_status(401);
+        let response = tiny_http::Response::from_string(
+            json!({"error": "a valid bearer token is required on the interlock routes"})
+                .to_string(),
+        )
+        .with_status_code(401)
+        .with_header(json_header())
+        .with_header(Header::from_bytes(&b"WWW-Authenticate"[..], &b"Bearer"[..]).unwrap());
+        let _ = request.respond(response);
+        return;
+    }
+    let route = context.sim.as_ref().expect("checked by the caller");
+    let robot = route.robot.lock().unwrap_or_else(|p| p.into_inner());
+    write_json(
+        request,
+        200,
+        &json!({"joints": robot.snapshot(), "clock_s": robot.clock_s()}),
+    );
 }
 
 /// Like `run`, with the key and token that let `POST /interlock/certify` sign a risk report (None: the route answers 404).
@@ -552,6 +782,7 @@ pub fn run_with_options(
 }
 
 /// `run_with_options` plus the optional collision prediction.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub fn run_with_collision(
     server: Server,
@@ -563,6 +794,32 @@ pub fn run_with_collision(
     state_max_age_ms: Option<u64>,
     collision: Option<crate::collision::CollisionRoute>,
 ) {
+    run_with_sim(
+        server,
+        workspace,
+        strict_root,
+        certifier,
+        workers,
+        health,
+        state_max_age_ms,
+        collision,
+        None,
+    );
+}
+
+/// `run_with_collision` plus the optional simulated robot.
+#[allow(clippy::too_many_arguments)]
+pub fn run_with_sim(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+    workers: usize,
+    health: Option<HealthRoute>,
+    state_max_age_ms: Option<u64>,
+    collision: Option<crate::collision::CollisionRoute>,
+    sim: Option<SimRoute>,
+) {
     let server = std::sync::Arc::new(server);
     let context = std::sync::Arc::new(Context {
         workspace,
@@ -572,7 +829,22 @@ pub fn run_with_collision(
         states: Default::default(),
         state_max_age_ms,
         collision,
+        sim,
     });
+    // the simulated time follows the wall clock when asked to (`--sim-tick-ms`)
+    if let Some(tick) = context.sim.as_ref().and_then(|route| route.tick) {
+        let context = context.clone();
+        std::thread::spawn(move || {
+            let mut last = std::time::Instant::now();
+            loop {
+                std::thread::sleep(tick);
+                let now = std::time::Instant::now();
+                let elapsed = now.duration_since(last).as_secs_f64().min(1.0);
+                last = now;
+                let _ = sim_advance(&context, elapsed);
+            }
+        });
+    }
     let mut handles = Vec::new();
     for _ in 1..workers.max(1) {
         let (server, context) = (server.clone(), context.clone());
@@ -594,6 +866,12 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
     let workspace = &context.workspace;
     let url = request.url().to_string();
     let path = url.split('?').next().unwrap_or("").to_string();
+    crate::metrics::count(&crate::metrics::REQUESTS);
+
+    if request.method() == &Method::Get && path == "/metrics" {
+        handle_metrics(request, context);
+        return;
+    }
 
     if request.method() == &Method::Post && path == "/interlock/certify" {
         handle_certify(request, context);
@@ -617,6 +895,22 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
     {
         handle_predict_collision(request, context);
         return;
+    }
+
+    // Only where the server was started with `--sim-config`; otherwise these paths are like any other (404 / 405).
+    if context.sim.is_some() {
+        if request.method() == &Method::Post && path == "/sim/command" {
+            handle_sim_command(request, context);
+            return;
+        }
+        if request.method() == &Method::Post && path == "/sim/step" {
+            handle_sim_step(request, context);
+            return;
+        }
+        if request.method() == &Method::Get && path == "/sim/state" {
+            handle_sim_state(request, context);
+            return;
+        }
     }
 
     if request.method() != &Method::Get {
@@ -1613,5 +1907,345 @@ mod tests {
         // an unknown joint name in a request is the refusal of the child
         let (status, _) = post_predict(port, &auth(), r#"{"states":[{"wrist":1}]}"#);
         assert_eq!(status, 422);
+    }
+
+    // --- the simulated robot (`--sim-config`) ---------------------------------------------------------------------------------------------
+
+    const SIM_MODEL: &str = r#"{"joints":[
+        {"name":"shoulder","lower":-2.0,"upper":2.0,"max_velocity":1.0,"max_acceleration":5.0},
+        {"name":"elbow","lower":-1.5,"upper":1.5,"max_velocity":2.0,"max_acceleration":10.0,"initial":0.5}
+    ]}"#;
+
+    fn start_sim_server() -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind");
+        let port = server.server_addr().to_ip().expect("ip").port();
+        let certifier = Certifier {
+            signer: Signer::from_seed([7u8; 32]),
+            token: CERTIFY_TOKEN.to_string(),
+        };
+        let sim = SimRoute::new(&crate::dynamics::SimConfig::parse(SIM_MODEL).unwrap(), None);
+        let ws = tempdir();
+        thread::spawn(move || {
+            run_with_sim(
+                server,
+                ws,
+                None,
+                Some(certifier),
+                DEFAULT_WORKERS,
+                None,
+                None,
+                None,
+                Some(sim),
+            )
+        });
+        port
+    }
+
+    fn sim_post(port: u16, path: &str, extra_headers: &str, body: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let request = format!(
+            "POST {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            body.len()
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, resp) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, resp.to_string())
+    }
+
+    fn sim_get(port: u16, path: &str, extra_headers: &str) -> (u16, String) {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        let request = format!(
+            "GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n{extra_headers}Connection: close\r\n\r\n"
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        let (headers, resp) = raw.split_once("\r\n\r\n").unwrap_or((raw.as_str(), ""));
+        let status = headers
+            .lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        (status, resp.to_string())
+    }
+
+    fn bearer() -> String {
+        format!("Authorization: Bearer {CERTIFY_TOKEN}\r\n")
+    }
+
+    fn joint_of(body: &str, name: &str) -> serde_json::Value {
+        let answer: serde_json::Value = serde_json::from_str(body).unwrap();
+        answer["joints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["joint"] == name)
+            .unwrap_or_else(|| panic!("{name} is not in {body}"))
+            .clone()
+    }
+
+    #[test]
+    fn the_simulation_routes_do_not_exist_without_the_model_and_need_the_token_with_it() {
+        let plain = start_certifying_server();
+        assert_eq!(sim_get(plain, "/sim/state", &bearer()).0, 404);
+        assert_eq!(sim_post(plain, "/sim/step", &auth(), "{}").0, 405);
+
+        let port = start_sim_server();
+        assert_eq!(sim_get(port, "/sim/state", "").0, 401);
+        assert_eq!(
+            sim_post(
+                port,
+                "/sim/step",
+                "Content-Type: application/json\r\n",
+                "{}"
+            )
+            .0,
+            401
+        );
+        assert_eq!(
+            sim_post(
+                port,
+                "/sim/command",
+                "Content-Type: application/json\r\n",
+                "{}"
+            )
+            .0,
+            401
+        );
+        assert_eq!(sim_get(port, "/sim/state", &bearer()).0, 200);
+    }
+
+    #[test]
+    fn a_command_moves_the_simulated_joint_over_time_and_the_twin_follows_it_as_measured() {
+        let port = start_sim_server();
+        let (status, body) = sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"shoulder","position":1.0}"#,
+        );
+        assert_eq!(status, 200, "{body}");
+        assert!(body.contains("\"clamped\":false"));
+
+        // nothing has moved yet: the order is not an instant
+        let (_, state) = sim_get(port, "/sim/state", &bearer());
+        assert_eq!(joint_of(&state, "shoulder")["position"], 0.0);
+        assert_eq!(joint_of(&state, "shoulder")["target"], 1.0);
+
+        let (status, step) = sim_post(port, "/sim/step", &auth(), r#"{"seconds":0.1}"#);
+        assert_eq!(status, 200, "{step}");
+        let partway = joint_of(&step, "shoulder")["position"].as_f64().unwrap();
+        assert!(partway > 0.0 && partway < 1.0, "{partway}");
+        assert_eq!(joint_of(&step, "shoulder")["moving"], true);
+
+        // the joints of the model are in the store of the real joints, as measured, and the elbow was there from the start
+        let (_, reports) = get_state(port, &bearer());
+        let reports: serde_json::Value = serde_json::from_str(&reports).unwrap();
+        let shoulder = reports["joints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["joint"] == "shoulder")
+            .unwrap();
+        assert_eq!(shoulder["source"], "measured");
+        assert_eq!(shoulder["position"].as_f64().unwrap(), partway);
+        assert!(reports["joints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|j| j["joint"] == "elbow" && j["position"] == 0.5));
+
+        // and in the end it is where it was sent
+        let (_, done) = sim_post(port, "/sim/step", &auth(), r#"{"seconds":5}"#);
+        assert_eq!(joint_of(&done, "shoulder")["position"], 1.0);
+        assert_eq!(joint_of(&done, "shoulder")["moving"], false);
+    }
+
+    fn metric_value(text: &str, series: &str) -> f64 {
+        text.lines()
+            .find_map(|l| l.strip_prefix(series).and_then(|r| r.trim().parse().ok()))
+            .unwrap_or_else(|| panic!("{series} is not in the metrics"))
+    }
+
+    #[test]
+    fn the_metrics_are_prometheus_text_with_the_counters_of_the_service_and_no_secret() {
+        let port = start_sim_server();
+        // no token is asked: it is numbers about the service only, like /stats
+        let (status, first) = get(port, "/metrics");
+        assert_eq!(status, 200, "{first}");
+        crate::metrics::tests::assert_valid_exposition(&first);
+        assert!(first.contains("hydra_umc_twin_up 1"));
+        assert!(first.contains("hydra_umc_twin_sim_joints 2"));
+        assert!(!first.contains(CERTIFY_TOKEN));
+
+        // the counters follow what the service does
+        assert_eq!(sim_get(port, "/sim/state", "").0, 401);
+        sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"shoulder","position":1.0}"#,
+        );
+        sim_post(port, "/sim/step", &auth(), r#"{"seconds":0.5}"#);
+        post_state(port, &auth(), &state_body(1));
+        post_state(port, &auth(), &state_body(1));
+        let (_, second) = get(port, "/metrics");
+        crate::metrics::tests::assert_valid_exposition(&second);
+        assert!(
+            metric_value(&second, "hydra_umc_twin_requests_total")
+                >= metric_value(&first, "hydra_umc_twin_requests_total") + 6.0
+        );
+        assert!(metric_value(&second, "hydra_umc_twin_unauthorized_total") >= 1.0);
+        assert!(metric_value(&second, "hydra_umc_twin_sim_commands_total") >= 1.0);
+        assert!(metric_value(&second, "hydra_umc_twin_sim_steps_total") >= 1.0);
+        assert!(metric_value(&second, "hydra_umc_twin_state_reports_accepted_total") >= 1.0);
+        assert!(metric_value(&second, "hydra_umc_twin_state_reports_refused_total") >= 1.0);
+        assert!(metric_value(&second, "hydra_umc_twin_sim_clock_seconds") >= 0.5);
+        // the sim reported its two joints as measured (the one reported by hand has the name of one of them)
+        assert!(metric_value(&second, "hydra_umc_twin_joints_tracked") >= 2.0);
+    }
+
+    #[test]
+    fn the_metrics_have_no_simulation_series_without_a_simulated_robot() {
+        let port = start_certifying_server();
+        let (status, text) = get(port, "/metrics");
+        assert_eq!(status, 200);
+        assert!(!text.contains("hydra_umc_twin_sim_"));
+    }
+
+    #[test]
+    fn the_simulated_joint_is_followed_as_measured_even_after_a_report_of_the_bridge_with_a_later_sequence(
+    ) {
+        let port = start_sim_server();
+        // the bridge reports what it ordered, with a sequence made from the clock (here far ahead of it)
+        let ahead = r#"{"joint":"shoulder","position":1.0,"seq":9999999999999,"stamp_ms":1700000000000,"source":"commanded"}"#;
+        assert_eq!(post_state(port, &auth(), ahead).0, 200);
+        sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"shoulder","position":1.0}"#,
+        );
+        sim_post(port, "/sim/step", &auth(), r#"{"seconds":5}"#);
+        let (_, reports) = get_state(port, &bearer());
+        let reports: serde_json::Value = serde_json::from_str(&reports).unwrap();
+        let shoulder = reports["joints"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|j| j["joint"] == "shoulder")
+            .unwrap();
+        assert_eq!(shoulder["source"], "measured");
+        assert_eq!(shoulder["position"], 1.0);
+        assert!(shoulder["seq"].as_u64().unwrap() > 9_999_999_999_999);
+    }
+
+    #[test]
+    fn a_stop_order_brakes_the_simulated_joint_where_it_can() {
+        let port = start_sim_server();
+        sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"shoulder","position":2.0}"#,
+        );
+        let (_, moving) = sim_post(port, "/sim/step", &auth(), r#"{"seconds":0.5}"#);
+        let at = joint_of(&moving, "shoulder")["position"].as_f64().unwrap();
+        let (status, body) = sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"shoulder","stop":true}"#,
+        );
+        assert_eq!(status, 200, "{body}");
+        let (_, done) = sim_post(port, "/sim/step", &auth(), r#"{"seconds":5}"#);
+        let end = joint_of(&done, "shoulder")["position"].as_f64().unwrap();
+        assert!(end > at && end < 2.0, "{at} -> {end}");
+        assert_eq!(joint_of(&done, "shoulder")["moving"], false);
+        // a position and a stop together, or neither, are not an order
+        assert_eq!(
+            sim_post(
+                port,
+                "/sim/command",
+                &auth(),
+                r#"{"joint":"shoulder","position":1,"stop":true}"#
+            )
+            .0,
+            400
+        );
+        assert_eq!(
+            sim_post(port, "/sim/command", &auth(), r#"{"joint":"shoulder"}"#).0,
+            400
+        );
+    }
+
+    #[test]
+    fn the_simulated_joint_keeps_to_its_travel_and_refuses_what_makes_no_sense() {
+        let port = start_sim_server();
+        let (status, body) = sim_post(
+            port,
+            "/sim/command",
+            &auth(),
+            r#"{"joint":"elbow","position":9}"#,
+        );
+        assert_eq!(status, 200, "{body}");
+        assert!(
+            body.contains("\"clamped\":true") && body.contains("1.5"),
+            "{body}"
+        );
+        let (_, done) = sim_post(port, "/sim/step", &auth(), r#"{"seconds":10}"#);
+        assert_eq!(joint_of(&done, "elbow")["position"], 1.5);
+
+        assert_eq!(
+            sim_post(
+                port,
+                "/sim/command",
+                &auth(),
+                r#"{"joint":"wrist","position":0}"#
+            )
+            .0,
+            400
+        );
+        assert_eq!(
+            sim_post(port, "/sim/command", &auth(), r#"{"joint":"elbow"}"#).0,
+            400
+        );
+        assert_eq!(
+            sim_post(
+                port,
+                "/sim/command",
+                &auth(),
+                r#"{"joint":"elbow","position":0,"extra":1}"#
+            )
+            .0,
+            400
+        );
+        assert_eq!(
+            sim_post(port, "/sim/step", &auth(), r#"{"seconds":-1}"#).0,
+            400
+        );
+        assert_eq!(
+            sim_post(port, "/sim/step", &auth(), r#"{"seconds":3600}"#).0,
+            400
+        );
+        assert_eq!(
+            sim_post(port, "/sim/step", &auth(), r#"{"seconds":"soon"}"#).0,
+            400
+        );
+        // a step with no body is the default small one
+        assert_eq!(sim_post(port, "/sim/step", &auth(), "").0, 200);
     }
 }

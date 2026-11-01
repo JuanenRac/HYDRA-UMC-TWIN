@@ -17,10 +17,12 @@
 mod certificate;
 mod collision;
 mod contract;
+mod dynamics;
 mod family;
 mod health;
 mod joint_state;
 mod manifest;
+mod metrics;
 mod schema;
 mod server;
 
@@ -285,6 +287,35 @@ fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> 
     }
 }
 
+/// `--sim-config FILE` (off by default, and `--sim-tick-ms N` to let the simulated time follow the wall clock): the simulated robot behind
+/// `/sim/...`. It needs the signing key and the certify token, because the routes use that token. A tick without a model never starts.
+fn load_sim(args: &[String], have_token: bool) -> Result<Option<server::SimRoute>, String> {
+    let Some(path) = find_flag(args, "--sim-config") else {
+        if find_flag(args, "--sim-tick-ms").is_some() {
+            return Err("--sim-tick-ms needs --sim-config".into());
+        }
+        return Ok(None);
+    };
+    if !have_token {
+        return Err("--sim-config needs the signing key and the certify token (the simulation routes use that token)".into());
+    }
+    let text =
+        std::fs::read_to_string(&path).map_err(|e| format!("cannot read --sim-config: {e}"))?;
+    let config = dynamics::SimConfig::parse(&text)?;
+    let tick = match find_flag(args, "--sim-tick-ms") {
+        None => None,
+        Some(raw) => Some(
+            raw.parse::<u64>()
+                .ok()
+                .filter(|n| (5..=1000).contains(n))
+                .ok_or_else(|| {
+                    format!("--sim-tick-ms must be a whole number from 5 to 1000, got {raw}")
+                })?,
+        ),
+    };
+    Ok(Some(server::SimRoute::new(&config, tick)))
+}
+
 /// `--collision-predict` (off by default) with `--collision-urdf`, `--collision-zones` and `--collision-config`: the route
 /// `POST /predict/collision`. Without the switch none of the other flags may be given (a half-configured server never starts).
 fn load_collision(
@@ -413,6 +444,7 @@ fn default_workspace_bound(workspace: &std::path::Path, allow_any: bool) -> Opti
 }
 
 fn run_serve(args: &[String]) -> ExitCode {
+    metrics::start();
     let addr = find_flag(args, "--addr").unwrap_or_else(|| "127.0.0.1".to_string());
     let port = find_flag(args, "--port").unwrap_or_else(|| "8111".to_string());
     let workspace: PathBuf = find_flag(args, "--workspace")
@@ -517,6 +549,14 @@ fn run_serve(args: &[String]) -> ExitCode {
         }
     };
 
+    let sim_route = match load_sim(args, certifier.is_some()) {
+        Ok(route) => route,
+        Err(message) => {
+            eprintln!("[twin] fatal: {message}");
+            return ExitCode::from(2);
+        }
+    };
+
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
         Ok(bound) => {
@@ -558,8 +598,12 @@ fn run_serve(args: &[String]) -> ExitCode {
                 ),
                 None => eprintln!("[twin] POST /predict/collision is off: start with --collision-predict to enable it"),
             }
+            match &sim_route {
+                Some(_) => eprintln!("[twin] POST /sim/command, POST /sim/step and GET /sim/state drive a simulated robot (a model with speed, acceleration and travel limits, no robot behind it); its joints are reported to the twin as measured"),
+                None => eprintln!("[twin] /sim/... is off: start with --sim-config FILE to simulate a robot"),
+            }
             eprintln!("[twin] serving with {workers} worker thread(s)");
-            server::run_with_collision(
+            server::run_with_sim(
                 bound,
                 workspace,
                 strict_root,
@@ -568,6 +612,7 @@ fn run_serve(args: &[String]) -> ExitCode {
                 health_route,
                 state_max_age_ms,
                 collision_route,
+                sim_route,
             );
             ExitCode::SUCCESS
         }

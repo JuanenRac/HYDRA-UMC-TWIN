@@ -252,3 +252,31 @@ than N ms, so the real mode of the bridge blocks while the twin is blind. It nee
 ## `serve --collision-predict` and `POST /predict/collision`
 
 Off by default. With `--collision-predict`, `--collision-urdf PATH`, `--collision-zones PATH` and `--collision-config PATH` (and the signing key and the token of the interlock routes) the server adds `POST /predict/collision`: a body `{"states": [{"joint": position, ...}, ...]}` is answered with whether the trajectory is predicted to enter a zone of the zones file or touch the robot itself, by asking HYDRA-UMC-PHYSICS-REPLICA (`--physics-replica-bin`, `--collision-timeout-ms` from 100 to 60000, default 5000; `--collision-max-states` from 1 to 256, default 64). The joints a state leaves out come from the last reports of `POST /interlock/state`. Errors are `400`, `422`, `502`, `503` and `504` and never read as "clear". The options of the prediction without the switch stop the start. Information only: the certificates and `/interlock/*` do not read it. See `docs/COLLISION_PREDICTION.md`. Not tried with a real robot.
+
+## `serve --sim-config FILE`: a simulated robot, `/sim/...` and `GET /metrics`
+
+Off by default. `--sim-config FILE` (with the signing key and the token of the interlock routes, which these routes use) gives the twin a **simulated robot**: a model in which
+every joint follows the position it is ordered to with a top speed, a top acceleration and the two ends of its travel. It is not a rigid-body engine (no masses, gravity,
+contacts or motors): it is what the hardware-in-the-loop bridge needs to be run without a robot. A joint accelerates, cruises, brakes and stops on its target without overshooting
+it and without a jump of speed; a new order that sends it back brakes it first; a position outside the travel is pulled back to the nearest end (and the answer says so); the same
+orders and the same time steps give the same positions every time. The file is where the numbers of the robot belong:
+
+```json
+{"joints":[{"name":"elbow","lower":-1.5,"upper":1.5,"max_velocity":1.0,"max_acceleration":4.0,"initial":0.0}]}
+```
+
+Unknown fields, a name used twice, a travel that is not `lower < upper`, a non-positive limit or a start outside the travel stop the server with the reason.
+
+| Route | What it does |
+|---|---|
+| `POST /sim/command` | `{"joint","position"}` orders a joint; or `{"joint","stop":true}` brakes it where it can (the target becomes the position it reaches braking with its top deceleration). Answers the target that was kept and whether it was `clamped`. |
+| `POST /sim/step` | `{"seconds": 0.01}` (0 to 60) lets that much simulated time pass and answers every joint: `position`, `velocity`, `target`, `moving`. |
+| `GET /sim/state` | the same, without moving time, and the simulated `clock_s`. |
+
+All three need the bearer token. After every step the simulated joints are reported to the store of the real joints as `measured`, so `GET /interlock/state` and
+`--require-fresh-state-ms` follow the simulated robot the way they follow a real one. `--sim-tick-ms N` (5 to 1000) makes the simulated time follow the wall clock instead of
+moving only on `POST /sim/step`. The bridge delivers its commands to this robot with `serve --sim-robot` (see the bridge's reference).
+
+`GET /metrics` answers the counters of the service in the text format of Prometheus (version 0.0.4 of the exposition format): the version, the uptime, the requests, the answers
+by class of status, the refusals for a missing token, the certificates signed, the state reports accepted and refused, the joints followed and, with a simulated robot, its
+joints, its clock and the orders and steps it took. Only numbers about the service: no position, token, key, path or address. It needs no token, like `GET /stats`.
