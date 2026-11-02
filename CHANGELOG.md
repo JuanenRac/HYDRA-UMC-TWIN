@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - A kinematic twin of the robot poses, a signed dry run of a trajectory before it is played and a log of the drift between the real and the simulated robot
+
 - **A minimal kinematic twin, with no graphics engine.** `serve --poses --twin-config FILE` adds `GET /twin/poses`: the pose of every joint frame of the robot, computed from the last reports of its joints with the forward kinematics of HYDRA-UMC-PHYSICS-REPLICA (started as a process; the kinematics are not written twice) and answered as a `TwinState` document that is checked against the contract before it is sent, with the `source` (`real` or `simulated`) and whether each joint was `commanded` or `measured`. A joint the robot needs that was never reported, or not lately (`poses.max_age_ms`), is a `409` that names it and never a zero. Off by default; see `docs/KINEMATIC_TWIN.md`.
 
 - **A dry run of a trajectory with a signed verdict.** `serve --dryrun` adds `POST /dryrun/trajectory`: the samples of a route are checked against the limits of the URDF (`check-trajectory` of the physics replica) and, with `--collision-predict`, against the zones and the robot itself, and the answer is a verdict (`pass`, `fail` or `incomplete`) signed with the Ed25519 key of the twin, bound to the SHA-256 of the exact samples, to the robot and to a time window (`dryrun.validity_ms`). Only `pass` allows anything: a check that could not run, or a collision prediction that is off while the configuration requires it, is `incomplete`, and a child that cannot be run or refuses the input gives an error status and no verdict. Off by default. Not tried with a real robot.
