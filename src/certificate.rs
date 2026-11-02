@@ -145,6 +145,11 @@ impl Signer {
         encode_hex(&self.key.verifying_key().to_bytes())
     }
 
+    /// The signature (64 bytes in hexadecimal) of a text that the caller built with its own domain line.
+    pub fn sign_text(&self, text: &str) -> String {
+        encode_hex(&self.key.sign(text.as_bytes()).to_bytes())
+    }
+
     /// Sign a report. `nonce` must be 32 hexadecimal characters, never used before.
     pub fn certify(
         &self,

@@ -17,14 +17,18 @@
 mod certificate;
 mod collision;
 mod contract;
+mod drift;
+mod dryrun;
 mod dynamics;
 mod family;
 mod health;
 mod joint_state;
 mod manifest;
 mod metrics;
+mod poses;
 mod schema;
 mod server;
+mod twincfg;
 
 use contract::SyncReadiness;
 use family::FamilySyncOutcome;
@@ -396,6 +400,150 @@ fn load_collision(
     )))
 }
 
+/// The binary of HYDRA-UMC-PHYSICS-REPLICA: `--physics-replica-bin`, HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN or the one built next to the workspace.
+fn physics_binary(
+    args: &[String],
+    workspace: &std::path::Path,
+    who: &str,
+) -> Result<PathBuf, String> {
+    let binary = find_flag(args, "--physics-replica-bin")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN").ok())
+        .filter(|p| !p.trim().is_empty())
+        .map(PathBuf::from)
+        .or_else(|| health::built_binary(workspace))
+        .ok_or_else(|| format!("{who} needs the binary of HYDRA-UMC-PHYSICS-REPLICA: build it next to the workspace or pass --physics-replica-bin"))?;
+    if !binary.is_file() {
+        return Err(format!("{} is not a file", binary.display()));
+    }
+    Ok(binary)
+}
+
+/// `--twin-config FILE` with `--poses`, `--dryrun` and/or `--drift` (each off by default, and `--drift-datalake` to send the observations of
+/// the drift to HYDRA-UMC-DATALAKE): the routes of the kinematic twin. A flag without its switch, a switch without the file, and a route
+/// that needs the token without the signing key never start the server.
+fn load_twin(
+    args: &[String],
+    workspace: &std::path::Path,
+    have_token: bool,
+) -> Result<server::Extras, String> {
+    let (poses_on, dryrun_on, drift_on) = (
+        has_flag(args, "--poses"),
+        has_flag(args, "--dryrun"),
+        has_flag(args, "--drift"),
+    );
+    let datalake_on = has_flag(args, "--drift-datalake");
+    let file = find_flag(args, "--twin-config");
+    if !poses_on && !dryrun_on && !drift_on {
+        if datalake_on {
+            return Err(
+                "--drift-datalake needs --drift (the sending is off unless asked for)".into(),
+            );
+        }
+        if file.is_some() {
+            return Err("--twin-config needs at least one of --poses, --dryrun, --drift (every route is off unless asked for)".into());
+        }
+        return Ok(server::Extras::default());
+    }
+    if datalake_on && !drift_on {
+        return Err("--drift-datalake needs --drift".into());
+    }
+    if !have_token {
+        return Err("--poses, --dryrun and --drift need the signing key and the certify token (the routes use that token)".into());
+    }
+    let file = PathBuf::from(file.ok_or("--poses, --dryrun and --drift need --twin-config FILE")?);
+    let config = twincfg::TwinConfig::load(&file)?;
+    let base = file
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let mut extras = server::Extras {
+        lang: config.lang(),
+        ..server::Extras::default()
+    };
+    let (urdf, binary) = if poses_on || dryrun_on {
+        if config.urdf.trim().is_empty() {
+            return Err("the twin configuration needs \"urdf\" for --poses and --dryrun".into());
+        }
+        let urdf = twincfg::TwinConfig::resolve(&base, &config.urdf);
+        if !urdf.is_file() {
+            return Err(format!("urdf: {} is not a file", urdf.display()));
+        }
+        (
+            urdf,
+            physics_binary(args, workspace, "--poses and --dryrun")?,
+        )
+    } else {
+        (PathBuf::new(), PathBuf::new())
+    };
+    if poses_on {
+        extras.poses = Some(poses::PoseRoute::new(
+            binary.clone(),
+            urdf.clone(),
+            config.robot_id.clone(),
+            config.poses.clone(),
+        ));
+    }
+    if dryrun_on {
+        let physics_config = if config.physics_config.trim().is_empty() {
+            None
+        } else {
+            let path = twincfg::TwinConfig::resolve(&base, &config.physics_config);
+            if !path.is_file() {
+                return Err(format!("physics_config: {} is not a file", path.display()));
+            }
+            Some(path)
+        };
+        extras.dryrun = Some(dryrun::DryRunRoute::new(
+            binary,
+            urdf,
+            physics_config,
+            config.robot_id.clone(),
+            config.dryrun.clone(),
+        ));
+    }
+    if drift_on {
+        let log = if config.drift.log_file.trim().is_empty() {
+            None
+        } else {
+            Some(twincfg::TwinConfig::resolve(&base, &config.drift.log_file))
+        };
+        let sink = if datalake_on {
+            let lake = &config.drift.datalake;
+            if lake.url.trim().is_empty() {
+                return Err(
+                    "--drift-datalake needs drift.datalake.url in the twin configuration".into(),
+                );
+            }
+            let token = if lake.token_file.trim().is_empty() {
+                None
+            } else {
+                let path = twincfg::TwinConfig::resolve(&base, &lake.token_file);
+                let text = std::fs::read_to_string(&path)
+                    .map_err(|e| format!("cannot read drift.datalake.token_file: {e}"))?;
+                let text = text.trim().to_string();
+                if text.is_empty() || text.chars().any(|c| c.is_control()) {
+                    return Err(
+                        "drift.datalake.token_file is empty or has a control character".into(),
+                    );
+                }
+                Some(text)
+            };
+            Some(drift::DatalakeSink::start(lake, token)?)
+        } else {
+            None
+        };
+        extras.drift = Some(server::DriftRoute {
+            max_age_ms: config.drift.max_age_ms,
+            monitor: std::sync::Mutex::new(drift::DriftMonitor::new(
+                config.drift.clone(),
+                log,
+                sink,
+            )),
+        });
+    }
+    Ok(extras)
+}
+
 /// `keygen --key-file PATH`: write a new signing key (never over an existing file) and print the public key to give to the bridge.
 fn run_keygen(args: &[String]) -> ExitCode {
     let Some(path) = find_flag(args, "--key-file") else {
@@ -556,6 +704,13 @@ fn run_serve(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let extras = match load_twin(args, &workspace, certifier.is_some()) {
+        Ok(extras) => extras,
+        Err(message) => {
+            eprintln!("[twin] fatal: {message}");
+            return ExitCode::from(2);
+        }
+    };
 
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
@@ -603,7 +758,16 @@ fn run_serve(args: &[String]) -> ExitCode {
                 None => eprintln!("[twin] /sim/... is off: start with --sim-config FILE to simulate a robot"),
             }
             eprintln!("[twin] serving with {workers} worker thread(s)");
-            server::run_with_sim(
+            for (on, line) in [
+                (extras.poses.is_some(), "GET /twin/poses gives the pose of every joint of the robot from the last reports of its joints (forward kinematics of HYDRA-UMC-PHYSICS-REPLICA)"),
+                (extras.dryrun.is_some(), "POST /dryrun/trajectory runs a trajectory in simulation and signs a verdict (only pass allows anything)"),
+                (extras.drift.is_some(), "POST /drift/observe and GET /drift watch the difference between the real and the simulated joints"),
+            ] {
+                if on {
+                    eprintln!("[twin] {line}");
+                }
+            }
+            server::run_with_extras(
                 bound,
                 workspace,
                 strict_root,
@@ -613,6 +777,7 @@ fn run_serve(args: &[String]) -> ExitCode {
                 state_max_age_ms,
                 collision_route,
                 sim_route,
+                extras,
             );
             ExitCode::SUCCESS
         }

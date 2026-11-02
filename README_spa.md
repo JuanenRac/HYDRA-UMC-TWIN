@@ -87,6 +87,8 @@ Escrito en Rust, hoy lee los manifiestos de sus tres hijos (PHYSICS-REPLICA, HIL
 
 **HYDRA-UMC-TWIN** es el padre de integración de la familia Digital Twin. Lee los manifiestos de sus tres hijos, informa de si la familia está lista y sincronizada, comprueba su salud y firma certificados de interbloqueo que indican al puente hardware-in-the-loop que un informe de riesgo procede del gemelo. El motor de física sigue previsto.
 
+Un gemelo cinemático mínimo no necesita motor gráfico: `GET /twin/poses` da la pose de cada sistema de referencia de articulación a partir de los últimos informes de las articulaciones, `POST /dryrun/trajectory` ejecuta en simulación una trayectoria planificada y firma un veredicto en el que solo `pass` equivale a permiso, y `POST /drift/observe` vigila la diferencia entre el robot real y el simulado, con un envío opcional, apagado por defecto, a HYDRA-UMC-DATALAKE. No probado con un robot real; véase `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Arquitectura
 
 <p align="center">
@@ -144,6 +146,11 @@ El parámetro `?workspace=` de la API HTTP queda acotado por defecto al espacio 
 | `--timeout-ms` | `5000` | tiempo que se concede a cada sondeo de salud |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | ninguno | clave Ed25519 que activa la firma de certificados |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | ninguno | token que exige `POST /interlock/certify` |
+| `--twin-config FILE` | none | la configuración de las rutas siguientes: URDF, frescura, límites, umbrales de deriva, registro, lago de datos |
+| `--poses` | off | activa `GET /twin/poses` (exige `--twin-config`, la clave de firma y el token) |
+| `--dryrun` | off | activa `POST /dryrun/trajectory`, que firma un veredicto para una trayectoria |
+| `--drift` | off | activa `POST /drift/observe` y `GET /drift`, el monitor de deriva entre real y simulado |
+| `--drift-datalake` | off | envía además cada observación de deriva a HYDRA-UMC-DATALAKE (HTTP simple, solo loopback salvo que la configuración permita más) |
 
 ## 🚀 Inicio rápido
 

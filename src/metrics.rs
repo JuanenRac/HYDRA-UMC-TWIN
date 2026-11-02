@@ -24,6 +24,10 @@ pub static STATE_REPORTS_ACCEPTED: AtomicU64 = AtomicU64::new(0);
 pub static STATE_REPORTS_REFUSED: AtomicU64 = AtomicU64::new(0);
 pub static SIM_COMMANDS: AtomicU64 = AtomicU64::new(0);
 pub static SIM_STEPS: AtomicU64 = AtomicU64::new(0);
+pub static DRYRUN_PASS: AtomicU64 = AtomicU64::new(0);
+pub static DRYRUN_NOT_PASS: AtomicU64 = AtomicU64::new(0);
+pub static DRIFT_OBSERVATIONS: AtomicU64 = AtomicU64::new(0);
+pub static DRIFT_ALARMS: AtomicU64 = AtomicU64::new(0);
 
 static STARTED: OnceLock<Instant> = OnceLock::new();
 
@@ -136,6 +140,34 @@ pub fn render(gauges: &Gauges) -> String {
         "counter",
         "State reports refused (stale, malformed or too many joints).",
         load(&STATE_REPORTS_REFUSED),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_dryrun_pass_total",
+        "counter",
+        "Dry runs of a trajectory whose verdict was pass.",
+        load(&DRYRUN_PASS),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_dryrun_not_pass_total",
+        "counter",
+        "Dry runs of a trajectory whose verdict was fail or incomplete.",
+        load(&DRYRUN_NOT_PASS),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_drift_observations_total",
+        "counter",
+        "Pairs of a real and a simulated joint compared.",
+        load(&DRIFT_OBSERVATIONS),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_drift_alarms_total",
+        "counter",
+        "Times a joint went into the drift alarm.",
+        load(&DRIFT_ALARMS),
     );
     metric(
         &mut out,

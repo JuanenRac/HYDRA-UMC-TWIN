@@ -235,7 +235,6 @@ impl SimulatedRobot {
         })
     }
 
-    #[cfg(test)]
     pub fn position(&self, joint: &str) -> Option<f64> {
         self.joints.get(joint).map(|j| j.position)
     }

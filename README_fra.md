@@ -87,6 +87,8 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 
 **HYDRA-UMC-TWIN** est le parent d'intégration de la famille Digital Twin. Il lit les manifestes de ses trois enfants, indique si la famille est prête et en phase, sonde leur santé et signe des certificats d'interverrouillage qui disent au pont hardware-in-the-loop qu'un rapport de risque vient du jumeau. Le moteur physique lui-même reste prévu.
 
+Un jumeau cinématique minimal n'a pas besoin de moteur graphique : `GET /twin/poses` donne la pose de chaque repère d'articulation à partir des derniers rapports des articulations, `POST /dryrun/trajectory` exécute en simulation une trajectoire planifiée et signe un verdict dont seul `pass` vaut autorisation, et `POST /drift/observe` surveille l'écart entre le robot réel et le robot simulé, avec un envoi optionnel, désactivé par défaut, vers HYDRA-UMC-DATALAKE. Non essayé avec un robot réel ; voir `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Architecture
 
 <p align="center">
@@ -144,6 +146,11 @@ Le paramètre `?workspace=` de l'API HTTP est limité par défaut à l'espace de
 | `--timeout-ms` | `5000` | temps accordé à chaque sonde de santé |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | aucun | clé Ed25519 qui active la signature de certificats |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | aucun | jeton exigé par `POST /interlock/certify` |
+| `--twin-config FILE` | none | la configuration des routes suivantes : URDF, fraîcheur, limites, seuils de dérive, journal, lac de données |
+| `--poses` | off | active `GET /twin/poses` (exige `--twin-config`, la clé de signature et le jeton) |
+| `--dryrun` | off | active `POST /dryrun/trajectory`, qui signe un verdict pour une trajectoire |
+| `--drift` | off | active `POST /drift/observe` et `GET /drift`, le moniteur de dérive entre réel et simulé |
+| `--drift-datalake` | off | envoie aussi chaque observation de dérive à HYDRA-UMC-DATALAKE (HTTP simple, boucle locale sauf si la configuration autorise davantage) |
 
 ## 🚀 Démarrage rapide
 

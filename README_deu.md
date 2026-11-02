@@ -87,6 +87,8 @@ In Rust geschrieben, liest es heute die Manifeste seiner drei Kinder (PHYSICS-RE
 
 **HYDRA-UMC-TWIN** ist der Integrationsknoten der Digital-Twin-Familie. Er liest die Manifeste seiner drei Kinder, meldet, ob die Familie bereit und im Gleichschritt ist, prüft deren Gesundheit und signiert Interlock-Zertifikate, die der Hardware-in-the-Loop-Brücke sagen, dass ein Risikobericht vom Twin stammt. Die Physik-Engine selbst ist noch geplant.
 
+Ein minimaler kinematischer Zwilling braucht keine Grafik-Engine: `GET /twin/poses` liefert die Pose jedes Gelenk-Koordinatensystems aus den letzten Berichten der Gelenke, `POST /dryrun/trajectory` führt eine geplante Bahn in der Simulation aus und signiert ein Urteil, bei dem nur `pass` eine Erlaubnis ist, und `POST /drift/observe` überwacht die Abweichung zwischen realem und simuliertem Roboter, mit optionalem, standardmäßig ausgeschaltetem Senden an HYDRA-UMC-DATALAKE. Nicht mit einem echten Roboter erprobt; siehe `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Architektur
 
 <p align="center">
@@ -144,6 +146,11 @@ Die Überschreibung `?workspace=` der HTTP-API ist standardmäßig auf den berei
 | `--timeout-ms` | `5000` | Zeit, die jede Gesundheitsprüfung hat |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | keiner | Ed25519-Schlüssel, der das Signieren von Zertifikaten einschaltet |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | keiner | Token, den `POST /interlock/certify` verlangt |
+| `--twin-config FILE` | none | die Konfiguration der folgenden Routen: URDF, Aktualität, Grenzen, Drift-Schwellen, Protokoll, Data Lake |
+| `--poses` | off | schaltet `GET /twin/poses` ein (braucht `--twin-config`, den Signierschlüssel und das Token) |
+| `--dryrun` | off | schaltet `POST /dryrun/trajectory` ein, das ein Urteil für eine Bahn signiert |
+| `--drift` | off | schaltet `POST /drift/observe` und `GET /drift` ein, den Drift-Monitor zwischen real und simuliert |
+| `--drift-datalake` | off | sendet zusätzlich jede Drift-Beobachtung an HYDRA-UMC-DATALAKE (reines HTTP, nur Loopback, sofern die Konfiguration nicht mehr erlaubt) |
 
 ## 🚀 Schnellstart
 

@@ -87,6 +87,8 @@ Written in Rust, today it reads the manifests of its three children (PHYSICS-REP
 
 **HYDRA-UMC-TWIN** is the integration parent of the Digital Twin family. It reads the manifests of its three children, reports whether the family is ready and in step, probes their health, and signs interlock certificates that tell the hardware-in-the-loop bridge a risk report came from the twin. The physics engine itself is still planned.
 
+A minimal kinematic twin needs no graphics engine: `GET /twin/poses` gives the pose of every joint frame from the last reports of the joints, `POST /dryrun/trajectory` runs a planned trajectory in simulation and signs a verdict that only `pass` turns into permission, and `POST /drift/observe` watches the difference between the real robot and the simulated one, with an optional, off-by-default sending to HYDRA-UMC-DATALAKE. Not tried with a real robot; see `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Architecture
 
 <p align="center">
@@ -144,6 +146,11 @@ The `?workspace=` override of the HTTP API is bounded by default to the served w
 | `--timeout-ms` | `5000` | time allowed to each health probe |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | none | Ed25519 key that turns on certificate signing |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | none | token that `POST /interlock/certify` requires |
+| `--twin-config FILE` | none | the configuration of the routes below: URDF, freshness, limits, drift thresholds, log, data lake |
+| `--poses` | off | switch on `GET /twin/poses` (needs `--twin-config`, the signing key and the token) |
+| `--dryrun` | off | switch on `POST /dryrun/trajectory`, which signs a verdict for a trajectory |
+| `--drift` | off | switch on `POST /drift/observe` and `GET /drift`, the real-versus-simulated drift monitor |
+| `--drift-datalake` | off | also send each drift observation to HYDRA-UMC-DATALAKE (plain HTTP, loopback unless the configuration allows more) |
 
 ## 🚀 Quick start
 

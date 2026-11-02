@@ -87,6 +87,8 @@ GPL-3.0-or-later - see LICENSE
 
 **HYDRA-UMC-TWIN** 是 Digital Twin 系列的集成父项目。它读取三个子项目的清单，报告系列是否就绪且同步，探测其健康状况，并签署互锁证书，告诉硬件在环桥接某份风险报告来自孪生体。物理引擎本身仍在计划中。
 
+最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。
+
 ## 🏛️ 架构
 
 <p align="center">
@@ -144,6 +146,11 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 | `--timeout-ms` | `5000` | 每次健康探测允许的时间 |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | 无 | 启用证书签名的 Ed25519 密钥 |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | 无 | `POST /interlock/certify` 所需的令牌 |
+| `--twin-config FILE` | none | 下列路由的配置：URDF、新鲜度、限制、漂移阈值、日志、数据湖 |
+| `--poses` | off | 启用 `GET /twin/poses`（需要 `--twin-config`、签名密钥和令牌） |
+| `--dryrun` | off | 启用 `POST /dryrun/trajectory`，它为轨迹签署裁决 |
+| `--drift` | off | 启用 `POST /drift/observe` 和 `GET /drift`，即真实与仿真之间的漂移监视器 |
+| `--drift-datalake` | off | 同时将每次漂移观测发送到 HYDRA-UMC-DATALAKE（明文 HTTP，除非配置允许，否则仅限回环） |
 
 ## 🚀 快速开始
 

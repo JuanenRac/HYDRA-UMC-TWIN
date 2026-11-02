@@ -145,6 +145,22 @@ impl JointStateStore {
         }
     }
 
+    /// The newest report of every joint with the time since it arrived, ordered by joint name.
+    pub fn reports(&self, now: Instant) -> Vec<(JointStateReport, Duration)> {
+        let mut all: Vec<(JointStateReport, Duration)> = self
+            .joints
+            .values()
+            .map(|s| {
+                (
+                    s.report.clone(),
+                    now.saturating_duration_since(s.received_at),
+                )
+            })
+            .collect();
+        all.sort_by(|a, b| a.0.joint.cmp(&b.0.joint));
+        all
+    }
+
     /// The last position of every joint, whether it was commanded or measured.
     pub fn positions(&self) -> std::collections::BTreeMap<String, f64> {
         self.joints

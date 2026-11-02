@@ -210,10 +210,10 @@ fn first_line(text: &str) -> String {
 }
 
 /// A directory for the files of one prediction, removed when it is dropped.
-struct Scratch(PathBuf);
+pub(crate) struct Scratch(PathBuf);
 
 impl Scratch {
-    fn new() -> Result<Self, CollisionError> {
+    pub(crate) fn new() -> Result<Self, CollisionError> {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let dir = std::env::temp_dir().join(format!(
             "hydra-umc-twin-collision-{}-{}",
@@ -225,7 +225,7 @@ impl Scratch {
         Ok(Self(dir))
     }
 
-    fn write(&self, name: &str, value: &Value) -> Result<PathBuf, CollisionError> {
+    pub(crate) fn write(&self, name: &str, value: &Value) -> Result<PathBuf, CollisionError> {
         let path = self.0.join(name);
         std::fs::write(&path, value.to_string())
             .map_err(|e| CollisionError::Unavailable(format!("cannot write {name}: {e}")))?;
@@ -241,7 +241,7 @@ impl Drop for Scratch {
 
 /// Runs `command` for at most `timeout`; returns its exit code, its standard output and its standard error. A child that does not end in
 /// time is killed.
-fn run_with_timeout(
+pub(crate) fn run_with_timeout(
     mut command: Command,
     timeout: Duration,
 ) -> Result<(Option<i32>, String, String), CollisionError> {

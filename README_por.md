@@ -87,6 +87,8 @@ Escrito em Rust, hoje lê os manifestos dos seus três filhos (PHYSICS-REPLICA, 
 
 O **HYDRA-UMC-TWIN** é o pai de integração da família Digital Twin. Lê os manifestos dos seus três filhos, indica se a família está pronta e em sintonia, verifica a sua saúde e assina certificados de interbloqueio que dizem à ponte hardware-in-the-loop que um relatório de risco veio do gémeo. O motor de física em si continua previsto.
 
+Um gémeo cinemático mínimo não precisa de motor gráfico: `GET /twin/poses` dá a pose de cada referencial de articulação a partir dos últimos relatórios das articulações, `POST /dryrun/trajectory` executa em simulação uma trajetória planeada e assina um veredicto em que só `pass` equivale a permissão, e `POST /drift/observe` vigia a diferença entre o robô real e o simulado, com um envio opcional, desligado por omissão, para o HYDRA-UMC-DATALAKE. Não testado com um robô real; ver `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Arquitetura
 
 <p align="center">
@@ -144,6 +146,11 @@ O parâmetro `?workspace=` da API HTTP fica limitado por predefinição ao espa�
 | `--timeout-ms` | `5000` | tempo concedido a cada sonda de saúde |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | nenhum | chave Ed25519 que ativa a assinatura de certificados |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | nenhum | token exigido por `POST /interlock/certify` |
+| `--twin-config FILE` | none | a configuração das rotas seguintes: URDF, atualidade, limites, limiares de deriva, registo, data lake |
+| `--poses` | off | ativa `GET /twin/poses` (exige `--twin-config`, a chave de assinatura e o token) |
+| `--dryrun` | off | ativa `POST /dryrun/trajectory`, que assina um veredicto para uma trajetória |
+| `--drift` | off | ativa `POST /drift/observe` e `GET /drift`, o monitor de deriva entre real e simulado |
+| `--drift-datalake` | off | envia também cada observação de deriva para o HYDRA-UMC-DATALAKE (HTTP simples, só loopback, a menos que a configuração permita mais) |
 
 ## 🚀 Início rápido
 

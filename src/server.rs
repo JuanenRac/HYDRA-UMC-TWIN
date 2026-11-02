@@ -20,6 +20,9 @@ use tiny_http::{Header, Method, Response, Server};
 use crate::certificate::{random_nonce, RiskInput, Signer};
 use crate::family::{assess_family_sync, check_family_status};
 
+mod twin;
+pub use twin::{DriftRoute, Extras};
+
 fn json_header() -> Header {
     Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
 }
@@ -539,6 +542,8 @@ struct Context {
     collision: Option<crate::collision::CollisionRoute>,
     /// `--sim-config`: the simulated robot of the `/sim/...` routes. None: those routes do not exist.
     sim: Option<SimRoute>,
+    /// `--poses`, `--dryrun`, `--drift` (see `server/twin.rs`): each route that is off does not exist.
+    extras: Extras,
 }
 
 /// The simulated robot (see `dynamics.rs`) and the number of the last report it made of every joint.
@@ -808,6 +813,7 @@ pub fn run_with_collision(
 }
 
 /// `run_with_collision` plus the optional simulated robot.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub fn run_with_sim(
     server: Server,
@@ -820,6 +826,34 @@ pub fn run_with_sim(
     collision: Option<crate::collision::CollisionRoute>,
     sim: Option<SimRoute>,
 ) {
+    run_with_extras(
+        server,
+        workspace,
+        strict_root,
+        certifier,
+        workers,
+        health,
+        state_max_age_ms,
+        collision,
+        sim,
+        Extras::default(),
+    );
+}
+
+/// `run_with_sim` plus the kinematic twin: the poses, the dry run of trajectories and the drift monitor.
+#[allow(clippy::too_many_arguments)]
+pub fn run_with_extras(
+    server: Server,
+    workspace: PathBuf,
+    strict_root: Option<PathBuf>,
+    certifier: Option<Certifier>,
+    workers: usize,
+    health: Option<HealthRoute>,
+    state_max_age_ms: Option<u64>,
+    collision: Option<crate::collision::CollisionRoute>,
+    sim: Option<SimRoute>,
+    extras: Extras,
+) {
     let server = std::sync::Arc::new(server);
     let context = std::sync::Arc::new(Context {
         workspace,
@@ -830,6 +864,7 @@ pub fn run_with_sim(
         state_max_age_ms,
         collision,
         sim,
+        extras,
     });
     // the simulated time follows the wall clock when asked to (`--sim-tick-ms`)
     if let Some(tick) = context.sim.as_ref().and_then(|route| route.tick) {
@@ -894,6 +929,12 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
         && context.collision.is_some()
     {
         handle_predict_collision(request, context);
+        return;
+    }
+
+    // Only where the server was started with `--poses`, `--dryrun` or `--drift`; otherwise these paths are like any other (404 / 405).
+    if twin::owns(&request, context) {
+        twin::dispatch(request, context);
         return;
     }
 

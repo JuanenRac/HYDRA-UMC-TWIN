@@ -87,6 +87,8 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 
 **HYDRA-UMC-TWIN** は Digital Twin ファミリーの統合の親です。3 つの子のマニフェストを読み、ファミリーが準備できて揃っているかを報告し、その健全性を確認し、リスクレポートがツインから来たことをハードウェア・イン・ザ・ループのブリッジに伝えるインターロック証明書に署名します。物理エンジン自体は計画中です。
 
+最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。
+
 ## 🏛️ アーキテクチャ
 
 <p align="center">
@@ -144,6 +146,11 @@ HTTP API の `?workspace=` による上書きは、既定では配信中のワ�
 | `--timeout-ms` | `5000` | 各ヘルス確認に与える時間 |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | なし | 証明書の署名を有効にする Ed25519 鍵 |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | なし | `POST /interlock/certify` が要求するトークン |
+| `--twin-config FILE` | none | 以下のルートの設定：URDF、鮮度、上限、ドリフトのしきい値、ログ、データレイク |
+| `--poses` | off | `GET /twin/poses` を有効にします（`--twin-config`、署名鍵、トークンが必要） |
+| `--dryrun` | off | 軌道に対する判定に署名する `POST /dryrun/trajectory` を有効にします |
+| `--drift` | off | 実機とシミュレーションのドリフト監視 `POST /drift/observe` と `GET /drift` を有効にします |
+| `--drift-datalake` | off | 各ドリフト観測を HYDRA-UMC-DATALAKE にも送信します（平文 HTTP、設定で許可しない限りループバックのみ） |
 
 ## 🚀 クイックスタート
 

@@ -35,3 +35,5 @@ getrandom = "0.2"
 # The JSON Schema validation of the manifests of the children and of the twin state (src/schema.rs): the same crate and version as the
 # Rust client of the SDK, without its network and TLS features - the schemas are vendored, nothing is fetched.
 jsonschema = { version = "0.50", default-features = false }
+# The digest of a trajectory in the signed verdict of the dry run (src/dryrun.rs): the same crate and version that the signature crate already uses.
+sha2 = "0.10"

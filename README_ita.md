@@ -87,6 +87,8 @@ Scritto in Rust, oggi legge i manifesti dei suoi tre figli (PHYSICS-REPLICA, HIL
 
 **HYDRA-UMC-TWIN** è il genitore di integrazione della famiglia Digital Twin. Legge i manifesti dei suoi tre figli, indica se la famiglia è pronta e allineata, ne verifica lo stato di salute e firma certificati di interblocco che dicono al ponte hardware-in-the-loop che un rapporto di rischio proviene dal gemello. Il motore fisico vero e proprio è ancora previsto.
 
+Un gemello cinematico minimo non richiede un motore grafico: `GET /twin/poses` fornisce la posa di ogni sistema di riferimento dei giunti dagli ultimi rapporti dei giunti, `POST /dryrun/trajectory` esegue in simulazione una traiettoria pianificata e firma un verdetto in cui solo `pass` vale come permesso, e `POST /drift/observe` sorveglia la differenza tra il robot reale e quello simulato, con un invio facoltativo, spento per impostazione predefinita, a HYDRA-UMC-DATALAKE. Non provato con un robot reale; vedere `docs/KINEMATIC_TWIN.md`.
+
 ## 🏛️ Architettura
 
 <p align="center">
@@ -144,6 +146,11 @@ Il parametro `?workspace=` dell'API HTTP è limitato per impostazione predefinit
 | `--timeout-ms` | `5000` | tempo concesso a ogni sonda di salute |
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | nessuno | chiave Ed25519 che attiva la firma dei certificati |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | nessuno | token richiesto da `POST /interlock/certify` |
+| `--twin-config FILE` | none | la configurazione delle route seguenti: URDF, freschezza, limiti, soglie di deriva, registro, data lake |
+| `--poses` | off | attiva `GET /twin/poses` (richiede `--twin-config`, la chiave di firma e il token) |
+| `--dryrun` | off | attiva `POST /dryrun/trajectory`, che firma un verdetto per una traiettoria |
+| `--drift` | off | attiva `POST /drift/observe` e `GET /drift`, il monitor di deriva tra reale e simulato |
+| `--drift-datalake` | off | invia anche ogni osservazione di deriva a HYDRA-UMC-DATALAKE (HTTP semplice, solo loopback salvo diversa configurazione) |
 
 ## 🚀 Avvio rapido
 
