@@ -704,13 +704,23 @@ fn run_serve(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let extras = match load_twin(args, &workspace, certifier.is_some()) {
+    let mut extras = match load_twin(args, &workspace, certifier.is_some()) {
         Ok(extras) => extras,
         Err(message) => {
             eprintln!("[twin] fatal: {message}");
             return ExitCode::from(2);
         }
     };
+
+    // `GET /health` is closed unless the operator opens it: the flag, or HYDRA_UMC_TWIN_HEALTH_OPEN set to 1, true, yes or on
+    extras.health_open = has_flag(args, "--health-open")
+        || matches!(
+            env::var("HYDRA_UMC_TWIN_HEALTH_OPEN")
+                .ok()
+                .map(|v| v.trim().to_ascii_lowercase())
+                .as_deref(),
+            Some("1" | "true" | "yes" | "on")
+        );
 
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {

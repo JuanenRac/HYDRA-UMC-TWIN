@@ -25,6 +25,9 @@ pub struct Extras {
     pub dryrun: Option<DryRunRoute>,
     pub drift: Option<DriftRoute>,
     pub lang: Lang,
+    /// `--health-open`: opens `GET /health`. Closed (the default) the route answers 404 like a route that does not exist; open it answers a
+    /// caller on loopback, and any other caller needs the certify token (a twin without one never answers it).
+    pub health_open: bool,
 }
 
 impl Default for Extras {
@@ -34,6 +37,7 @@ impl Default for Extras {
             dryrun: None,
             drift: None,
             lang: Lang::En,
+            health_open: false,
         }
     }
 }

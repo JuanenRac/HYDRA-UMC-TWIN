@@ -409,6 +409,40 @@ fn handle_state_list(request: tiny_http::Request, context: &Context) {
     );
 }
 
+/// True when the peer of a request is on this machine.
+fn peer_is_loopback(request: &tiny_http::Request) -> bool {
+    request
+        .remote_addr()
+        .map(|a| a.ip().is_loopback())
+        .unwrap_or(false)
+}
+
+/// `GET /health`: the uniform health route of the family. Closed unless the operator opened it (`--health-open`); open, it answers a
+/// caller on loopback, and any other caller needs the certify token. The body names the service and its version and nothing else.
+fn handle_health(request: tiny_http::Request, context: &Context) {
+    if !context.extras.health_open {
+        write_json(request, 404, &json!({"error": "not found"}));
+        return;
+    }
+    let token_ok = context
+        .certifier
+        .as_ref()
+        .is_some_and(|c| bearer_matches(&request, &c.token));
+    if !peer_is_loopback(&request) && !token_ok {
+        write_json(
+            request,
+            401,
+            &json!({"error": "a valid bearer token is required"}),
+        );
+        return;
+    }
+    write_json(
+        request,
+        200,
+        &json!({"status": "ok", "service": "hydra-umc-twin", "version": env!("CARGO_PKG_VERSION")}),
+    );
+}
+
 /// `GET /metrics`: the counters of the service in the text format of Prometheus (see `metrics.rs`). Numbers about the service only.
 fn handle_metrics(request: tiny_http::Request, context: &Context) {
     let joints_tracked = context
@@ -903,6 +937,11 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
     let path = url.split('?').next().unwrap_or("").to_string();
     crate::metrics::count(&crate::metrics::REQUESTS);
 
+    if request.method() == &Method::Get && path == "/health" {
+        handle_health(request, context);
+        return;
+    }
+
     if request.method() == &Method::Get && path == "/metrics" {
         handle_metrics(request, context);
         return;
@@ -1309,6 +1348,55 @@ mod tests {
     }
 
     const CERTIFY_TOKEN: &str = "a-certify-token-of-sixteen+";
+
+    fn start_test_server_health(health_open: bool) -> u16 {
+        let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
+        let port = server
+            .server_addr()
+            .to_ip()
+            .expect("tiny_http always binds a real IP socket for an http:// server")
+            .port();
+        let workspace = tempdir();
+        thread::spawn(move || {
+            run_with_extras(
+                server,
+                workspace,
+                None,
+                None,
+                1,
+                None,
+                None,
+                None,
+                None,
+                Extras {
+                    health_open,
+                    ..Extras::default()
+                },
+            )
+        });
+        port
+    }
+
+    #[test]
+    fn health_is_closed_by_default() {
+        let port = start_test_server_health(false);
+        assert_eq!(get(port, "/health").0, 404);
+        // the plain server (no extras) behaves the same
+        let port = start_test_server(tempdir());
+        assert_eq!(get(port, "/health").0, 404);
+    }
+
+    #[test]
+    fn open_health_names_the_service_and_the_version_on_loopback() {
+        let port = start_test_server_health(true);
+        let (status, body) = get(port, "/health");
+        assert_eq!(status, 200);
+        let json: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(json["status"], "ok");
+        assert_eq!(json["service"], "hydra-umc-twin");
+        assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(json.as_object().unwrap().len(), 3);
+    }
 
     fn start_certifying_server() -> u16 {
         let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");

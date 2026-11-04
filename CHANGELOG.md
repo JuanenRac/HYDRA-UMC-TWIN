@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A uniform `GET /health`, closed by default, and the manifest declares it:** `serve --health-open` (or `HYDRA_UMC_TWIN_HEALTH_OPEN=1`) makes the twin answer `GET /health` with `{"status": "ok", "service": ..., "version": ...}`, the same body in every service of the family; without the switch the route answers `404` like a route that does not exist. A caller that is not on loopback must present the certify token (`401` otherwise), and a service without a token never answers it. The body carries no path, configuration or secret, and `service.health_path` of the manifest is `/health` now (the health checks ask `/stats` after a `404`). 2 tests.
+
 ## [0.1.5] - A kinematic twin of the robot poses, a signed dry run of a trajectory before it is played and a log of the drift between the real and the simulated robot
 
 - **A minimal kinematic twin, with no graphics engine.** `serve --poses --twin-config FILE` adds `GET /twin/poses`: the pose of every joint frame of the robot, computed from the last reports of its joints with the forward kinematics of HYDRA-UMC-PHYSICS-REPLICA (started as a process; the kinematics are not written twice) and answered as a `TwinState` document that is checked against the contract before it is sent, with the `source` (`real` or `simulated`) and whether each joint was `commanded` or `measured`. A joint the robot needs that was never reported, or not lately (`poses.max_age_ms`), is a `409` that names it and never a zero. Off by default; see `docs/KINEMATIC_TWIN.md`.

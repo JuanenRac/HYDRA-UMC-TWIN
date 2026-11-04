@@ -157,6 +157,8 @@ Both always answer HTTP `200` for a well-formed `GET` — a child being
 missing or contract-rejected is real data in the response body
 (`allPresent`/`allReady: false`), not an HTTP-level error.
 
+**`GET /health`** — closed by default: it answers `404` like a route that does not exist. With `serve --health-open` (or `HYDRA_UMC_TWIN_HEALTH_OPEN=1`) it answers `200` `{"status": "ok", "service": ..., "version": ...}` to a caller on loopback; a caller that is not on loopback must present the certify token (`401` otherwise), and a twin started without one never answers it. It carries no path, configuration or secret.
+
 **`GET /stats`** — `{"workspace": "<the server's own default workspace>"}`, `200`.
 
 **`GET /family-health`** (only with `serve --health-probes`, or `HYDRA_UMC_TWIN_HEALTH_PROBES=1`; otherwise `404`) — the report of `family-health` as `{"workspace", "children": [{"name", "probe": {"state": "healthy|unhealthy|unreachable|not_probed", ...}}], "allHealthy", "cached"}`. It runs a binary and calls a service, so the binary and the address are the ones of the configuration (`--physics-replica-bin`, `--hil-bridge-addr`, `--timeout-ms`), a `?workspace=` of the request is ignored, and the answer is cached for `--health-cache-ms` (default 5000) so a client that asks in a loop cannot make the server run a process in a loop. `allHealthy` is true when no probed child failed.
