@@ -80,6 +80,7 @@ GPL-3.0-or-later - see LICENSE
 * ⚡ **硬件在环（HIL）（计划中）：** 将应用程序和 Studio 连接到仿真器，就像连接到真实控制器一样。
 * 📊 **磨损预测（计划中）：** 基于模拟的机械应力估算组件寿命。
 * 🛡️ **安全验证（计划中）：** 在物理执行之前测试复杂轨迹和避碰。
+* 🩺 **统一的 `GET /health`，默认关闭：** `serve --health-open`（或 `HYDRA_UMC_TWIN_HEALTH_OPEN=1`）使服务以 `{"status": "ok", "service": ..., "version": ...}` 响应 `GET /health`，家族中每个服务的响应体相同；没有该开关时，该路由像不存在的路由一样返回 `404`。非回环地址的调用方必须出示服务的 bearer 令牌，响应体不含路径、配置或密钥。
 
 **诚实说明——今天实际运行的内容：** 无参数调用时仍会打印身份/版本/角色，但现在有三个真实的子命令。`family-status [--workspace 路径]` 从本地检出中读取 `HYDRA-UMC-PHYSICS-REPLICA`/`HYDRA-UMC-HIL-BRIDGE`/`HYDRA-UMC-SYNTHETIC-DATA-GEN` 各自真实的清单，并诚实地报告发现的内容。`family-sync [--workspace 路径]` 更进一步：它会让每个已存在的子项目通过一份真实的状态同步契约（最低成熟度 `functional`、兼容的最高主版本号），并为每个子项目报告 `READY`、`REJECTED (immature)`、`REJECTED (incompatible version)` 或 `MISSING`。`serve` 则把两者都以真实的 HTTP JSON 形式对外提供，而不再局限于一次性的 CLI 调用。目前还没有任何 Bevy 应用、渲染、物理帧循环、URDF 场景加载，也没有任何真实的网络同步传输层——具体已交付内容请参见 [`CHANGELOG.md`](CHANGELOG.md)，每个命令/端点请参见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)，尚待完成的内容请参见下方路线图。
 
