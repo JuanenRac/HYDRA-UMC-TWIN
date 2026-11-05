@@ -727,11 +727,11 @@ fn run_serve(args: &[String]) -> ExitCode {
 
     // The signing key of HYDRA-UMC-SERVER, from a file: with it a signed token of the server is accepted, nothing is open and a viewer may read but not change.
     // Off unless it is given.
-    match find_flag(args, "--identity-key-file")
+    if let Some(path) = find_flag(args, "--identity-key-file")
         .or_else(|| env::var("HYDRA_UMC_TWIN_IDENTITY_KEY_FILE").ok())
         .filter(|path| !path.is_empty())
     {
-        Some(path) => match server_identity::load_identity_key(&path) {
+        match server_identity::load_identity_key(&path) {
             Ok(key) => {
                 eprintln!("[twin] tokens of HYDRA-UMC-SERVER accepted: every route needs an identity, a viewer may read but not change");
                 extras.identity_key = Some(key);
@@ -740,8 +740,7 @@ fn run_serve(args: &[String]) -> ExitCode {
                 eprintln!("[twin] fatal: --identity-key-file: {e}");
                 return ExitCode::from(2);
             }
-        },
-        None => {}
+        }
     }
 
     let bind_addr = format!("{addr}:{port}");
