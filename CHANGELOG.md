@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.
+
 - **The identity of HYDRA-UMC-SERVER, off by default (`serve --identity-key-file FILE`, or `HYDRA_UMC_TWIN_IDENTITY_KEY_FILE`):** the twin verifies the signed token (HS256 JWT with `exp`, `username` and `role`) that the server issues at login and accepts it next to the certify token. A viewer may read but not change, and a request with no credential is refused even on loopback, `GET /health` and `GET /metrics` included: nothing is open. The routes of the interlock keep asking for the certify token. The key is read from a file, at least 32 characters; without the switch nothing changes.
 
 - **A uniform `GET /health`, closed by default, and the manifest declares it:** `serve --health-open` (or `HYDRA_UMC_TWIN_HEALTH_OPEN=1`) makes the twin answer `GET /health` with `{"status": "ok", "service": ..., "version": ...}`, the same body in every service of the family; without the switch the route answers `404` like a route that does not exist. A caller that is not on loopback must present the certify token (`401` otherwise), and a service without a token never answers it. The body carries no path, configuration or secret, and `service.health_path` of the manifest is `/health` now (the health checks ask `/stats` after a `404`). 2 tests.
