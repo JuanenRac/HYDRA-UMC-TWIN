@@ -428,7 +428,7 @@ fn handle_health(request: tiny_http::Request, context: &Context) {
         .certifier
         .as_ref()
         .is_some_and(|c| bearer_matches(&request, &c.token));
-    if !peer_is_loopback(&request) && !token_ok {
+    if context.extras.identity_key.is_none() && !peer_is_loopback(&request) && !token_ok {
         write_json(
             request,
             401,
@@ -937,6 +937,40 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
     let path = url.split('?').next().unwrap_or("").to_string();
     crate::metrics::count(&crate::metrics::REQUESTS);
 
+    // With the identity of HYDRA-UMC-SERVER on, nothing is open: the certify token (which the bridge holds) or a valid signed token of the server, and a viewer
+    // only reads. The routes of the interlock keep asking for the certify token after this.
+    if let Some(key) = context.extras.identity_key.as_deref() {
+        let presented = request
+            .headers()
+            .iter()
+            .find(|h| {
+                h.field
+                    .as_str()
+                    .as_str()
+                    .eq_ignore_ascii_case("authorization")
+            })
+            .map(|h| h.value.as_str().to_string());
+        let own = context.certifier.as_ref().map(|c| c.token.as_str());
+        if !crate::server_identity::allowed(
+            presented.as_deref(),
+            request.method().as_str(),
+            own,
+            key,
+            crate::server_identity::now_seconds(),
+        ) {
+            crate::metrics::count(&crate::metrics::UNAUTHORIZED);
+            crate::metrics::note_status(401);
+            let response = tiny_http::Response::from_string(
+                json!({"error": "a valid identity is required"}).to_string(),
+            )
+            .with_status_code(401)
+            .with_header(json_header())
+            .with_header(Header::from_bytes(&b"WWW-Authenticate"[..], &b"Bearer"[..]).unwrap());
+            let _ = request.respond(response);
+            return;
+        }
+    }
+
     if request.method() == &Method::Get && path == "/health" {
         handle_health(request, context);
         return;
@@ -1375,6 +1409,101 @@ mod tests {
             )
         });
         port
+    }
+
+    /// A token of HYDRA-UMC-SERVER signed with `key`, valid for ten minutes.
+    fn server_token(key: &[u8], role: &str) -> String {
+        fn b64(data: &[u8]) -> String {
+            const TABLE: &[u8; 64] =
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+            let mut out = String::new();
+            for chunk in data.chunks(3) {
+                let n = chunk
+                    .iter()
+                    .enumerate()
+                    .fold(0u32, |acc, (i, b)| acc | (u32::from(*b) << (16 - 8 * i)));
+                for i in 0..=chunk.len() {
+                    out.push(TABLE[((n >> (18 - 6 * i)) & 63) as usize] as char);
+                }
+            }
+            out
+        }
+        let head = b64(br#"{"alg":"HS256","typ":"JWT"}"#);
+        let exp = crate::server_identity::now_seconds() as u64 + 600;
+        let body = b64(format!(r#"{{"username":"ana","role":"{role}","exp":{exp}}}"#).as_bytes());
+        let mac = crate::hmac::hmac_sha256(key, format!("{head}.{body}").as_bytes());
+        format!("{head}.{body}.{}", b64(&mac))
+    }
+
+    fn call_with_token(port: u16, method: &str, path: &str, token: Option<&str>) -> u16 {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("connect must succeed");
+        let auth = token
+            .map(|t| format!("Authorization: Bearer {t}\r\n"))
+            .unwrap_or_default();
+        let request = format!(
+            "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n{auth}Content-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream.write_all(request.as_bytes()).unwrap();
+        let mut raw = String::new();
+        stream.read_to_string(&mut raw).unwrap();
+        raw.lines()
+            .next()
+            .unwrap_or("")
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn with_the_identity_of_the_server_nothing_is_open_and_a_viewer_only_reads() {
+        let key = b"0123456789abcdef0123456789abcdef".to_vec();
+        let server = bind("127.0.0.1:0").expect("bind on an OS-assigned port must succeed");
+        let port = server
+            .server_addr()
+            .to_ip()
+            .expect("tiny_http always binds a real IP socket for an http:// server")
+            .port();
+        let workspace = tempdir();
+        let identity_key = Some(key.clone());
+        thread::spawn(move || {
+            run_with_extras(
+                server,
+                workspace,
+                None,
+                None,
+                1,
+                None,
+                None,
+                None,
+                None,
+                Extras {
+                    health_open: true,
+                    identity_key,
+                    ..Extras::default()
+                },
+            )
+        });
+        for path in ["/family-status", "/metrics", "/health"] {
+            assert_eq!(call_with_token(port, "GET", path, None), 401, "GET {path}");
+            let viewer = server_token(&key, "viewer");
+            assert_eq!(
+                call_with_token(port, "GET", path, Some(viewer.as_str())),
+                200,
+                "GET {path} as a viewer"
+            );
+        }
+        let viewer = server_token(&key, "viewer");
+        assert_eq!(
+            call_with_token(port, "POST", "/interlock/certify", Some(viewer.as_str())),
+            401,
+            "a viewer does not change anything"
+        );
+        let forged = server_token(b"another-key-of-more-than-32-characters!", "admin");
+        assert_eq!(
+            call_with_token(port, "GET", "/family-status", Some(forged.as_str())),
+            401
+        );
     }
 
     #[test]

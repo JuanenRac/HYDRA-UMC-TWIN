@@ -28,6 +28,9 @@ pub struct Extras {
     /// `--health-open`: opens `GET /health`. Closed (the default) the route answers 404 like a route that does not exist; open it answers a
     /// caller on loopback, and any other caller needs the certify token (a twin without one never answers it).
     pub health_open: bool,
+    /// The signing key of HYDRA-UMC-SERVER (`--identity-key-file`, see `server_identity.rs`). With it a signed token of the server is accepted next to the certify
+    /// token, a viewer may read but not change, and nothing is open, not even `GET /health` or `GET /metrics`. None: the earlier rules.
+    pub identity_key: Option<Vec<u8>>,
 }
 
 impl Default for Extras {
@@ -38,6 +41,7 @@ impl Default for Extras {
             drift: None,
             lang: Lang::En,
             health_open: false,
+            identity_key: None,
         }
     }
 }

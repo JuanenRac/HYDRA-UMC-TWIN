@@ -22,12 +22,15 @@ mod dryrun;
 mod dynamics;
 mod family;
 mod health;
+#[allow(dead_code)] // only the HMAC of the signed token is used
+mod hmac;
 mod joint_state;
 mod manifest;
 mod metrics;
 mod poses;
 mod schema;
 mod server;
+mod server_identity;
 mod twincfg;
 
 use contract::SyncReadiness;
@@ -721,6 +724,25 @@ fn run_serve(args: &[String]) -> ExitCode {
                 .as_deref(),
             Some("1" | "true" | "yes" | "on")
         );
+
+    // The signing key of HYDRA-UMC-SERVER, from a file: with it a signed token of the server is accepted, nothing is open and a viewer may read but not change.
+    // Off unless it is given.
+    match find_flag(args, "--identity-key-file")
+        .or_else(|| env::var("HYDRA_UMC_TWIN_IDENTITY_KEY_FILE").ok())
+        .filter(|path| !path.is_empty())
+    {
+        Some(path) => match server_identity::load_identity_key(&path) {
+            Ok(key) => {
+                eprintln!("[twin] tokens of HYDRA-UMC-SERVER accepted: every route needs an identity, a viewer may read but not change");
+                extras.identity_key = Some(key);
+            }
+            Err(e) => {
+                eprintln!("[twin] fatal: --identity-key-file: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => {}
+    }
 
     let bind_addr = format!("{addr}:{port}");
     match server::bind(&bind_addr) {
