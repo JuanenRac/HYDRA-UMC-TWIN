@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] - The build test of the repository compiles only on CI or when allowed: for the stacks that compile (rust, go, android, flutter, firmware-c), tools/buildtest.py prints BUILDTEST=SKIPPED with exit status 2 on a plain PC, never a... (and 2 more changes)
+
 - **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.
 
 - **The identity of HYDRA-UMC-SERVER, off by default (`serve --identity-key-file FILE`, or `HYDRA_UMC_TWIN_IDENTITY_KEY_FILE`):** the twin verifies the signed token (HS256 JWT with `exp`, `username` and `role`) that the server issues at login and accepts it next to the certify token. A viewer may read but not change, and a request with no credential is refused even on loopback, `GET /health` and `GET /metrics` included: nothing is open. The routes of the interlock keep asking for the certify token. The key is read from a file, at least 32 characters; without the switch nothing changes.
