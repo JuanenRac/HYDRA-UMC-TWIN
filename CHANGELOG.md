@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.7] - A WebSocket that pushes the state, off by default (serve --ws, with --poses and/or --uav-input): the twin pushes the TwinState of the robot and the state of the vehicles to the clients that watch it, instead of being polled.... (and 2 more changes)
+
 - **A WebSocket that pushes the state, off by default (`serve --ws`, with `--poses` and/or `--uav-input`):** the twin pushes the `TwinState` of the robot and the state of the vehicles to the clients that watch it, instead of being polled. RFC 6455 is written in the twin itself (the handshake, the frames, ping, pong and close, the limits) and adds no dependency. It has its own listener (`ws.listen`, loopback unless `ws.allow_remote`), needs the same token as the other routes, refuses a browser `Origin` that is not in `ws.allowed_origins`, takes at most `ws.max_clients` sessions, drops a client that stays silent, closes a session at `ws.max_session_s` and limits what a client may send. The sentences are in the eight languages. Every number is in the configuration file.
 
 - **The HTTPS send to the data lake (`drift.datalake.url` with `https://`), over `--drift-datalake`:** TLS with rustls; it trusts only the certificate (or authority) in `drift.datalake.ca_file`, valid for the host or for `drift.datalake.server_name`, with no system store and no way to skip the check. An `http://` address stays plain and loopback-only unless `drift.datalake.allow_remote` says otherwise.
