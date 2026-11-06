@@ -149,11 +149,11 @@ The `?workspace=` override of the HTTP API is bounded by default to the served w
 | `--signing-key-file` / `HYDRA_UMC_TWIN_SIGNING_KEY_FILE` | none | Ed25519 key that turns on certificate signing |
 | `--certify-token-file` / `HYDRA_UMC_TWIN_CERTIFY_TOKEN` | none | token that `POST /interlock/certify` requires |
 | `--twin-config FILE` | none | the configuration of the routes below: URDF, freshness, limits, drift thresholds, log, data lake |
-| `--poses` | off | switch on `GET /twin/poses` (needs `--twin-config`, the signing key and the token) |
+| `--poses` | off | switch on `GET /twin/poses` (needs `--twin-config` and the credentials of the twin) |
 | `--dryrun` | off | switch on `POST /dryrun/trajectory`, which signs a verdict for a trajectory |
 | `--drift` | off | switch on `POST /drift/observe` and `GET /drift`, the real-versus-simulated drift monitor |
 | `--drift-datalake` | off | also send each drift observation to HYDRA-UMC-DATALAKE (plain HTTP on a loopback address, or HTTPS with the certificate named in the configuration) |
-| `--uav-input` | off | switch on `POST /twin/uav` and `GET /twin/uav`, the input for the position and attitude of an unmanned vehicle (needs `--twin-config`, the signing key and the token) |
+| `--uav-input` | off | switch on `POST /twin/uav` and `GET /twin/uav`, the input for the position and attitude of an unmanned vehicle (needs `--twin-config` and the credentials of the twin) |
 | `--ws` | off | open the WebSocket `/twin/ws` on its own listener, which pushes the state of the robot and of the vehicles (needs `--poses` or `--uav-input`) |
 
 ## 🚀 Quick start
