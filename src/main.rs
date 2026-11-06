@@ -31,6 +31,8 @@ mod poses;
 mod schema;
 mod server;
 mod server_identity;
+#[cfg(test)]
+mod test_cert;
 mod twincfg;
 mod uav;
 mod ws;

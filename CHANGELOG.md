@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **No date-and-time crate left in the dependency tree:** the throw-away certificate of the HTTPS tests came from a certificate-generating crate that pulled in `time`, which has a known denial-of-service advisory fixed only in a release that needs a newer Rust than the 1.85.1 of Debian trixie. The test certificate is now built by hand and signed with `ring` (the provider rustls already uses), the crate and everything it brought are gone from `Cargo.lock`, and CI fails if `time` comes back. The binary, the HTTPS send and its switches are unchanged.
+
 ## [0.1.7] - A WebSocket that pushes the state, off by default (serve --ws, with --poses and/or --uav-input): the twin pushes the TwinState of the robot and the state of the vehicles to the clients that watch it, instead of being polled.... (and 2 more changes)
 
 - **A WebSocket that pushes the state, off by default (`serve --ws`, with `--poses` and/or `--uav-input`):** the twin pushes the `TwinState` of the robot and the state of the vehicles to the clients that watch it, instead of being polled. RFC 6455 is written in the twin itself (the handshake, the frames, ping, pong and close, the limits) and adds no dependency. It has its own listener (`ws.listen`, loopback unless `ws.allow_remote`), needs the same token as the other routes, refuses a browser `Origin` that is not in `ws.allowed_origins`, takes at most `ws.max_clients` sessions, drops a client that stays silent, closes a session at `ws.max_session_s` and limits what a client may send. The sentences are in the eight languages. Every number is in the configuration file.

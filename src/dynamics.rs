@@ -187,7 +187,7 @@ impl SimulatedRobot {
 
     /// Let `seconds` pass (cut into steps of at most `MAX_SUBSTEP_S`).
     pub fn advance(&mut self, seconds: f64) -> Result<(), String> {
-        if !seconds.is_finite() || seconds < 0.0 || seconds > MAX_ADVANCE_S {
+        if !seconds.is_finite() || !(0.0..=MAX_ADVANCE_S).contains(&seconds) {
             return Err(format!(
                 "the time to advance must be between 0 and {MAX_ADVANCE_S} seconds"
             ));

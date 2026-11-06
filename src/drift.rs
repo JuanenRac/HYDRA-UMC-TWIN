@@ -828,14 +828,11 @@ mod tests {
 
     /// A key and a certificate for `names`, as PEM text and as what a TLS server takes.
     fn identity(names: &[&str]) -> (String, rustls::ServerConfig) {
-        let key = rcgen::generate_simple_self_signed(
-            names.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
-        )
-        .unwrap();
-        let pem = key.cert.pem();
-        let der = key.cert.der().clone();
+        let made = crate::test_cert::self_signed(names[0]);
+        let pem = made.pem;
+        let der = rustls::pki_types::CertificateDer::from(made.der);
         let private = rustls::pki_types::PrivateKeyDer::Pkcs8(
-            rustls::pki_types::PrivatePkcs8KeyDer::from(key.key_pair.serialize_der()),
+            rustls::pki_types::PrivatePkcs8KeyDer::from(made.key_pkcs8),
         );
         let config = rustls::ServerConfig::builder_with_provider(Arc::new(
             rustls::crypto::ring::default_provider(),

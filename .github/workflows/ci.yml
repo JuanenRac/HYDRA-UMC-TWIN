@@ -36,7 +36,24 @@ jobs:
         uses: dtolnay/rust-toolchain@ccc8c1f930153b792217f06c65a38f23a882993a # 1.85.1
         with:
           toolchain: 1.85.1
+          components: clippy, rustfmt
       - name: Build release with the locked dependency versions
         run: cargo build --release --locked
       - name: Check all targets with the locked dependency versions
         run: cargo check --all-targets --locked
+      - name: Format, lints and tests with Rust 1.85.1
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --all-targets --locked
+      - name: The date-and-time crate with the known advisory is not in the dependency tree
+        run: |
+          cargo tree --locked --all-targets --edges all --prefix none | sort -u
+          if cargo tree --locked --all-targets --edges all -i time; then
+            echo "the crate time is in the dependency tree" >&2
+            exit 1
+          fi
+          if grep -q 'name = "time"' Cargo.lock; then
+            echo "the crate time is in Cargo.lock" >&2
+            exit 1
+          fi

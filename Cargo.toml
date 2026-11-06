@@ -42,5 +42,6 @@ sha2 = "0.10"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [dev-dependencies]
-# A throw-away certificate for the tests of the HTTPS send: a test server that speaks TLS with a key generated on the spot.
-rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }
+# The throw-away certificate for the tests of the HTTPS send (src/test_cert.rs) is built by hand and signed with ring, the provider that rustls
+# already uses: no certificate-generating crate, so no date-and-time crate, even among the test dependencies.
+ring = "0.17"

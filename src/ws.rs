@@ -802,7 +802,11 @@ mod tests {
     use super::*;
 
     fn hex(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
+        use std::fmt::Write as _;
+        bytes.iter().fold(String::new(), |mut text, b| {
+            let _ = write!(text, "{b:02x}");
+            text
+        })
     }
 
     #[test]

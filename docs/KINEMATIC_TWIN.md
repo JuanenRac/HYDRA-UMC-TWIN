@@ -154,6 +154,8 @@ when the address is an IP or the name differs. A data lake whose certificate doe
 HYDRA-UMC-DATALAKE itself speaks plain HTTP: an `https://` address needs a TLS front for it (a reverse proxy on the same machine, for
 example). Not tried against a real data lake.
 
+The build keeps the crate `time` out of the dependency tree, even among the test dependencies: its fixed releases need a newer Rust than the 1.85.1 of Debian trixie. The certificate that the HTTPS tests use is built by hand and signed with `ring`, and CI fails if `time` appears in `Cargo.lock`.
+
 ## The state of an unmanned vehicle
 
 Only with `--uav-input`. HYDRA-UMC-BRIDGE-UAV joins the position and the attitude of a vehicle into a `TwinState` (one pose, `vehicle`, in the
