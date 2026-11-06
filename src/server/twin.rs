@@ -17,13 +17,18 @@ use super::*;
 use crate::drift::DriftMonitor;
 use crate::dryrun::{DryRunError, DryRunRoute};
 use crate::poses::{PoseError, PoseRoute};
-use crate::twincfg::{say, Lang, Say};
+use crate::twincfg::{say, Lang, Say, WsCfg};
+use crate::uav::{UavError, UavRoute};
 
 /// The routes of the kinematic twin that are on, and the language of the answers when a request does not ask for one.
 pub struct Extras {
     pub poses: Option<PoseRoute>,
     pub dryrun: Option<DryRunRoute>,
     pub drift: Option<DriftRoute>,
+    /// `--uav-input`: `POST /twin/uav` and `GET /twin/uav` (see `uav.rs`).
+    pub uav: Option<UavRoute>,
+    /// `--ws`: the WebSocket that pushes the state (see `ws.rs`); it has its own listener.
+    pub ws: Option<WsRoute>,
     pub lang: Lang,
     /// `--health-open`: opens `GET /health`. Closed (the default) the route answers 404 like a route that does not exist; open it answers a
     /// caller on loopback, and any other caller needs the certify token (a twin without one never answers it).
@@ -39,11 +44,19 @@ impl Default for Extras {
             poses: None,
             dryrun: None,
             drift: None,
+            uav: None,
+            ws: None,
             lang: Lang::En,
             health_open: false,
             identity_key: None,
         }
     }
+}
+
+/// The WebSocket: its configuration and the socket, already bound (so a busy address stops the start) and handed to the thread that serves it.
+pub struct WsRoute {
+    pub cfg: WsCfg,
+    pub listener: std::sync::Mutex<Option<std::net::TcpListener>>,
 }
 
 pub struct DriftRoute {
@@ -69,6 +82,7 @@ pub(super) fn owns(request: &tiny_http::Request, context: &Context) -> bool {
         || (post && path == "/dryrun/trajectory" && context.extras.dryrun.is_some())
         || (post && path == "/drift/observe" && context.extras.drift.is_some())
         || (get && path == "/drift" && context.extras.drift.is_some())
+        || ((get || post) && path == "/twin/uav" && context.extras.uav.is_some())
 }
 
 pub(super) fn dispatch(request: tiny_http::Request, context: &Context) {
@@ -77,6 +91,8 @@ pub(super) fn dispatch(request: tiny_http::Request, context: &Context) {
         "/twin/poses" => handle_poses(request, context),
         "/dryrun/trajectory" => handle_dryrun(request, context),
         "/drift/observe" => handle_drift_observe(request, context),
+        "/twin/uav" if request.method() == &Method::Post => handle_uav_state(request, context),
+        "/twin/uav" => handle_uav_list(request, context),
         _ => handle_drift_summary(request, context),
     }
 }
@@ -360,6 +376,217 @@ fn handle_drift_summary(request: tiny_http::Request, context: &Context) {
         .unwrap_or_else(|p| p.into_inner())
         .summary(lang);
     write_json(request, 200, &summary);
+}
+
+/// `POST /twin/uav`: the bridge of a vehicle hands over where it is and how it is turned, as a `TwinState`.
+fn handle_uav_state(request: tiny_http::Request, context: &Context) {
+    let lang = request_lang(&request, context);
+    let route = context.extras.uav.as_ref().expect("checked by owns");
+    let Some((request, raw)) = read_guarded_post(
+        request,
+        context.certifier.as_ref(),
+        route.cfg.max_body_bytes,
+    ) else {
+        return;
+    };
+    let state: serde_json::Value = match serde_json::from_slice(&raw) {
+        Ok(state) => state,
+        Err(e) => {
+            crate::metrics::count(&crate::metrics::UAV_REFUSED);
+            write_json(
+                request,
+                400,
+                &json!({"accepted": false, "error": format!("malformed state: {e}")}),
+            );
+            return;
+        }
+    };
+    match route.accept(state, Instant::now()) {
+        Ok((robot_id, sequence)) => {
+            crate::metrics::count(&crate::metrics::UAV_ACCEPTED);
+            write_json(
+                request,
+                200,
+                &json!({"accepted": true, "robot_id": robot_id, "sequence": sequence}),
+            );
+        }
+        Err(error) => {
+            crate::metrics::count(&crate::metrics::UAV_REFUSED);
+            let (status, body) = match &error {
+                UavError::Invalid(_) => (
+                    400,
+                    json!({"accepted": false, "code": "invalid", "error": error.to_string()}),
+                ),
+                UavError::Simulated => (
+                    422,
+                    json!({
+                        "accepted": false,
+                        "code": "simulated_refused",
+                        "error": error.to_string(),
+                        "message": say(lang, Say::UavSimulatedRefused),
+                    }),
+                ),
+                UavError::Stale { last_sequence } => (
+                    409,
+                    json!({
+                        "accepted": false,
+                        "code": "stale_sequence",
+                        "error": error.to_string(),
+                        "last_sequence": last_sequence,
+                    }),
+                ),
+                UavError::TooManyVehicles => (
+                    422,
+                    json!({"accepted": false, "code": "too_many_vehicles", "error": error.to_string()}),
+                ),
+            };
+            write_json(request, status, &body);
+        }
+    }
+}
+
+/// `GET /twin/uav`: the last state of every vehicle, how old it is and whether that is too old.
+fn handle_uav_list(request: tiny_http::Request, context: &Context) {
+    let Some(request) = guard_get(request, context) else {
+        return;
+    };
+    let lang = request_lang(&request, context);
+    let route = context.extras.uav.as_ref().expect("checked by owns");
+    let vehicles: Vec<serde_json::Value> = route
+        .snapshot(Instant::now())
+        .into_iter()
+        .map(|v| {
+            let mut entry = json!({
+                "robot_id": v.robot_id,
+                "age_ms": v.age_ms,
+                "stale": v.stale,
+                "state": v.state,
+            });
+            if v.stale {
+                entry["message"] = json!(say(lang, Say::UavStateStale));
+            }
+            entry
+        })
+        .collect();
+    write_json(
+        request,
+        200,
+        &json!({"vehicles": vehicles, "max_age_ms": route.cfg.max_age_ms}),
+    );
+}
+
+// ---- the WebSocket ----
+
+/// The messages the WebSocket pushes now: the poses of the robot (or why there are none) and the state of every vehicle. Nothing in them
+/// that the `GET` routes do not give to the same caller; a reason that could hold a path or an address is never copied, only a code.
+fn ws_messages(context: &Context, lang: Lang) -> Vec<String> {
+    let mut out = Vec::new();
+    let status = |code: &str, message: Option<&str>| {
+        json!({"type": "status", "code": code, "message": message}).to_string()
+    };
+    if let Some(route) = context.extras.poses.as_ref() {
+        let reports = context
+            .states
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .reports(Instant::now());
+        match route.twin_state(&reports, context.sim.is_some(), now_ms()) {
+            Ok(state) => {
+                if crate::schema::state_problems(&state).is_empty() {
+                    out.push(json!({"type": "twin_state", "state": state}).to_string());
+                } else {
+                    out.push(status("invalid_state", None));
+                }
+            }
+            Err(PoseError::Incomplete { missing, stale }) => out.push(
+                json!({
+                    "type": "status",
+                    "code": "incomplete",
+                    "message": say(lang, Say::PosesIncomplete),
+                    "missing": missing,
+                    "stale": stale,
+                })
+                .to_string(),
+            ),
+            Err(PoseError::Busy) => out.push(status("busy", None)),
+            Err(PoseError::Refused(_)) => out.push(status("refused", None)),
+            Err(PoseError::Timeout(_)) => out.push(status("timeout", None)),
+            Err(PoseError::Unavailable(_)) => out.push(status("unavailable", None)),
+        }
+    }
+    if let Some(route) = context.extras.uav.as_ref() {
+        for vehicle in route.snapshot(Instant::now()) {
+            if vehicle.stale {
+                out.push(
+                    json!({
+                        "type": "uav_status",
+                        "robot_id": vehicle.robot_id,
+                        "code": "stale",
+                        "message": say(lang, Say::UavStateStale),
+                    })
+                    .to_string(),
+                );
+            } else {
+                out.push(json!({"type": "uav_state", "state": vehicle.state}).to_string());
+            }
+        }
+    }
+    out
+}
+
+/// Starts the listener of `--ws` on its own thread. The caller of the opening request needs the same token as the other routes (or a signed
+/// token of the SERVER when the identity is on, where any role may read).
+pub(super) fn start_ws(context: &std::sync::Arc<Context>) {
+    let Some(route) = context.extras.ws.as_ref() else {
+        return;
+    };
+    let Some(listener) = route
+        .listener
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .take()
+    else {
+        return;
+    };
+    let cfg = route.cfg.clone();
+    let token = context.certifier.as_ref().map(|c| c.token.clone());
+    let key = context.extras.identity_key.clone();
+    let auth: std::sync::Arc<crate::ws::Auth> =
+        std::sync::Arc::new(move |header: Option<&str>| match key.as_deref() {
+            Some(key) => crate::server_identity::allowed(
+                header,
+                "GET",
+                token.as_deref(),
+                key,
+                crate::server_identity::now_seconds(),
+            ),
+            None => match (header.and_then(|v| v.split_once(' ')), token.as_deref()) {
+                (Some(("Bearer", presented)), Some(expected)) => {
+                    crate::hmac::constant_time_eq(presented.trim().as_bytes(), expected.as_bytes())
+                }
+                _ => false,
+            },
+        });
+    // one computation serves every session for half a push interval, so ten clients do not start ten processes
+    let shared = context.clone();
+    let cache: std::sync::Mutex<Option<(Instant, Lang, Vec<String>)>> = std::sync::Mutex::new(None);
+    let fresh_for = std::time::Duration::from_millis(cfg.interval_ms / 2);
+    let source: std::sync::Arc<crate::ws::Source> =
+        std::sync::Arc::new(move |lang: Lang| -> Vec<String> {
+            let mut cache = cache.lock().unwrap_or_else(|p| p.into_inner());
+            if let Some((at, cached_lang, messages)) = cache.as_ref() {
+                if *cached_lang == lang && at.elapsed() < fresh_for {
+                    return messages.clone();
+                }
+            }
+            let messages = ws_messages(&shared, lang);
+            *cache = Some((Instant::now(), lang, messages.clone()));
+            messages
+        });
+    let default_lang = context.extras.lang;
+    let _ = std::thread::Builder::new()
+        .name("twin-ws-accept".into())
+        .spawn(move || crate::ws::serve(listener, cfg, default_lang, auth, source));
 }
 
 #[cfg(test)]

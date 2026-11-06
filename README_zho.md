@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-173%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-223%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.6` |
 | 成熟度 | 可用 |
-| 测试 | 173 (`cargo test`) |
+| 测试 | 223 (`cargo test`) |
 | 技术栈 | Rust / tiny_http |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 173 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 223 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
 | 集成 | 🟠 | 在 CM5 测试台上与其他服务一起运行，其消息遵循 SDK 的共享契约 |
@@ -89,7 +89,7 @@ GPL-3.0-or-later - see LICENSE
 
 **HYDRA-UMC-TWIN** 是 Digital Twin 系列的集成父项目。它读取三个子项目的清单，报告系列是否就绪且同步，探测其健康状况，并签署互锁证书，告诉硬件在环桥接某份风险报告来自孪生体。物理引擎本身仍在计划中。
 
-最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。
+最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。WebSocket（默认关闭）向客户端推送状态，输入口从无人载具的桥接接收位置与姿态，发送到数据湖时可使用 HTTPS。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。
 
 ## 🏛️ 架构
 
@@ -152,7 +152,9 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 | `--poses` | off | 启用 `GET /twin/poses`（需要 `--twin-config`、签名密钥和令牌） |
 | `--dryrun` | off | 启用 `POST /dryrun/trajectory`，它为轨迹签署裁决 |
 | `--drift` | off | 启用 `POST /drift/observe` 和 `GET /drift`，即真实与仿真之间的漂移监视器 |
-| `--drift-datalake` | off | 同时将每次漂移观测发送到 HYDRA-UMC-DATALAKE（明文 HTTP，除非配置允许，否则仅限回环） |
+| `--drift-datalake` | off | 同时把每次漂移观测发送到 HYDRA-UMC-DATALAKE（回环地址上的明文 HTTP，或使用配置中指定证书的 HTTPS） |
+| `--uav-input` | off | 启用 `POST /twin/uav` 和 `GET /twin/uav`，即无人载具位置与姿态的输入（需要 `--twin-config`、签名密钥和令牌） |
+| `--ws` | off | 在独立的监听端口上开启 WebSocket `/twin/ws`，推送机器人和载具的状态（需要 `--poses` 或 `--uav-input`） |
 
 ## 🚀 快速开始
 
@@ -168,7 +170,7 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 
 ## 🧪 测试
 
-运行 `cargo test` 会执行 173 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `cargo test` 会执行 223 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -179,7 +181,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（173 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（223 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 

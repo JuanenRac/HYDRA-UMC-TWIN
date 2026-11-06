@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **A WebSocket that pushes the state, off by default (`serve --ws`, with `--poses` and/or `--uav-input`):** the twin pushes the `TwinState` of the robot and the state of the vehicles to the clients that watch it, instead of being polled. RFC 6455 is written in the twin itself (the handshake, the frames, ping, pong and close, the limits) and adds no dependency. It has its own listener (`ws.listen`, loopback unless `ws.allow_remote`), needs the same token as the other routes, refuses a browser `Origin` that is not in `ws.allowed_origins`, takes at most `ws.max_clients` sessions, drops a client that stays silent, closes a session at `ws.max_session_s` and limits what a client may send. The sentences are in the eight languages. Every number is in the configuration file.
+
+- **The HTTPS send to the data lake (`drift.datalake.url` with `https://`), over `--drift-datalake`:** TLS with rustls; it trusts only the certificate (or authority) in `drift.datalake.ca_file`, valid for the host or for `drift.datalake.server_name`, with no system store and no way to skip the check. An `http://` address stays plain and loopback-only unless `drift.datalake.allow_remote` says otherwise.
+
+- **An input for the state of a vehicle, off by default (`serve --uav-input`):** `POST /twin/uav` takes the `TwinState` that HYDRA-UMC-BRIDGE-UAV builds (position in metres from home and a unit quaternion), checks it against the contract and the limits of `uav.*` (a newer `sequence`, the pose `uav.pose_name` in the frame `base`, a bounded distance, a `simulated` state refused unless `uav.accept_simulated`, at most `uav.max_vehicles` vehicles) and keeps the last state of each vehicle; `GET /twin/uav` lists them with their age and marks a stale one. `GET /metrics` counts the sessions and the states.
+
 ## [0.1.6] - The build test of the repository compiles only on CI or when allowed: for the stacks that compile (rust, go, android, flutter, firmware-c), tools/buildtest.py prints BUILDTEST=SKIPPED with exit status 2 on a plain PC, never a... (and 2 more changes)
 
 - **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.

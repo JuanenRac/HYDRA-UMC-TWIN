@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-173%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-223%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.6` |
 | Maturité | Fonctionnel |
-| Tests | 173 (`cargo test`) |
+| Tests | 223 (`cargo test`) |
 | Technologie | Rust / tiny_http |
 | Cible | Le Raspberry Pi CM5 d'une cellule HYDRA-UMC |
 | Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
@@ -52,7 +52,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Domaine | État | Ce que cela veut dire ici |
 |---|---|---|
 | Logiciel | 🟡 | Fonctionne pour son usage principal ; la vérification d'honnêteté ci-dessus liste ce qui manque encore |
-| Tests | 🟢 | 173 tests automatiques, exécutés à chaque modification |
+| Tests | 🟢 | 223 tests automatiques, exécutés à chaque modification |
 | Matériel réel | 🔴 | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
 | Interface et protocoles | 🟡 | Les routes ou les messages proposés sont documentés et testés avec un client ; tous les clients ne les ont pas encore utilisés |
 | Intégration | 🟠 | Il fonctionne avec les autres services sur le banc d'essai CM5 et ses messages suivent les contrats partagés du SDK |
@@ -89,7 +89,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 
 **HYDRA-UMC-TWIN** est le parent d'intégration de la famille Digital Twin. Il lit les manifestes de ses trois enfants, indique si la famille est prête et en phase, sonde leur santé et signe des certificats d'interverrouillage qui disent au pont hardware-in-the-loop qu'un rapport de risque vient du jumeau. Le moteur physique lui-même reste prévu.
 
-Un jumeau cinématique minimal n'a pas besoin de moteur graphique : `GET /twin/poses` donne la pose de chaque repère d'articulation à partir des derniers rapports des articulations, `POST /dryrun/trajectory` exécute en simulation une trajectoire planifiée et signe un verdict dont seul `pass` vaut autorisation, et `POST /drift/observe` surveille l'écart entre le robot réel et le robot simulé, avec un envoi optionnel, désactivé par défaut, vers HYDRA-UMC-DATALAKE. Non essayé avec un robot réel ; voir `docs/KINEMATIC_TWIN.md`.
+Un jumeau cinématique minimal n'a pas besoin de moteur graphique : `GET /twin/poses` donne la pose de chaque repère d'articulation à partir des derniers rapports des articulations, `POST /dryrun/trajectory` exécute en simulation une trajectoire planifiée et signe un verdict dont seul `pass` vaut autorisation, et `POST /drift/observe` surveille l'écart entre le robot réel et le robot simulé, avec un envoi optionnel, désactivé par défaut, vers HYDRA-UMC-DATALAKE. Un WebSocket (désactivé par défaut) pousse l'état vers les clients, une entrée reçoit la position et l'attitude d'un véhicule sans pilote depuis son pont, et l'envoi au lac de données peut utiliser HTTPS. Non essayé avec un robot réel ; voir `docs/KINEMATIC_TWIN.md`.
 
 ## 🏛️ Architecture
 
@@ -152,7 +152,9 @@ Le paramètre `?workspace=` de l'API HTTP est limité par défaut à l'espace de
 | `--poses` | off | active `GET /twin/poses` (exige `--twin-config`, la clé de signature et le jeton) |
 | `--dryrun` | off | active `POST /dryrun/trajectory`, qui signe un verdict pour une trajectoire |
 | `--drift` | off | active `POST /drift/observe` et `GET /drift`, le moniteur de dérive entre réel et simulé |
-| `--drift-datalake` | off | envoie aussi chaque observation de dérive à HYDRA-UMC-DATALAKE (HTTP simple, boucle locale sauf si la configuration autorise davantage) |
+| `--drift-datalake` | off | envoie aussi chaque observation de dérive à HYDRA-UMC-DATALAKE (HTTP simple sur une adresse de boucle locale, ou HTTPS avec le certificat indiqué dans la configuration) |
+| `--uav-input` | off | active `POST /twin/uav` et `GET /twin/uav`, l'entrée pour la position et l'attitude d'un véhicule sans pilote (exige `--twin-config`, la clé de signature et le jeton) |
+| `--ws` | off | ouvre le WebSocket `/twin/ws` sur son propre écouteur, qui pousse l'état du robot et des véhicules (exige `--poses` ou `--uav-input`) |
 
 ## 🚀 Démarrage rapide
 
@@ -168,7 +170,7 @@ Nécessite la chaîne d'outils Rust stable (édition 2021) avec `cargo`.
 
 ## 🧪 Tests
 
-173 tests automatiques s'exécutent avec `cargo test`. Ils n'ont besoin ni de matériel ni de rien en dehors de cette machine.
+223 tests automatiques s'exécutent avec `cargo test`. Ils n'ont besoin ni de matériel ni de rien en dehors de cette machine.
 
 La CI exécute `HYDRA_UMC_CI=1 python tools/ci_validate.py`, qui vérifie le manifeste, les documents, les huit README et les images.
 
@@ -178,7 +180,7 @@ Nécessite la chaîne d'outils Rust (`cargo`/`rustc`, à installer via [rustup](
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (173 tests), puis `cargo build --release`
+./build.sh   # `cargo test` (223 tests), puis `cargo build --release`
 ./run.sh     # exécute target/release/hydra-umc-twin, affiche nom + version + rôle
 ```
 

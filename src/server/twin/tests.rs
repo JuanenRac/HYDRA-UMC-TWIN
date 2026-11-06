@@ -575,3 +575,314 @@ fn without_the_collision_prediction_a_verdict_is_never_a_pass_unless_the_configu
         }
     }
 }
+
+// ---- the input for the state of a vehicle and the WebSocket ----
+
+fn uav_body(robot: &str, sequence: u64, east: f64, source: &str) -> String {
+    serde_json::json!({
+        "schema_version": "1.0",
+        "source": source,
+        "robot_id": robot,
+        "frame": "base",
+        "timestamp_utc": "2030-01-01T00:00:00.000Z",
+        "sequence": sequence,
+        "joint_states": [],
+        "poses": [{
+            "name": "vehicle",
+            "pose": {
+                "schema_version": "1.0",
+                "frame": "base",
+                "position": {"x": east, "y": 20.0, "z": 12.5},
+                "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0},
+            },
+        }],
+    })
+    .to_string()
+}
+
+fn uav_extras(cfg: crate::twincfg::UavCfg) -> Extras {
+    Extras {
+        uav: Some(crate::uav::UavRoute::new(cfg)),
+        ..Extras::default()
+    }
+}
+
+#[test]
+fn without_its_switch_the_uav_route_does_not_exist() {
+    let port = start(
+        Setup {
+            extras: Extras::default(),
+            sim: false,
+            collision: false,
+        },
+        None,
+        "uav-off",
+    );
+    assert_eq!(request(port, "GET", "/twin/uav", &auth(), "").0, 404);
+    assert_eq!(
+        request(
+            port,
+            "POST",
+            "/twin/uav",
+            &auth(),
+            &uav_body("u", 1, 1.0, "real")
+        )
+        .0,
+        405
+    );
+}
+
+#[test]
+fn a_state_of_a_vehicle_needs_the_token_is_kept_and_listed_and_a_bad_one_is_refused() {
+    let port = start(
+        Setup {
+            extras: uav_extras(Default::default()),
+            sim: false,
+            collision: false,
+        },
+        None,
+        "uav-on",
+    );
+    let good = uav_body("uav-1", 1, 10.0, "real");
+    let json_head = "Content-Type: application/json\r\n";
+    assert_eq!(request(port, "POST", "/twin/uav", json_head, &good).0, 401);
+    assert_eq!(request(port, "GET", "/twin/uav", "", "").0, 401);
+    let browser = format!("{}Origin: http://evil.example\r\n", auth());
+    assert_eq!(request(port, "POST", "/twin/uav", &browser, &good).0, 403);
+    let (status, body) = request(port, "POST", "/twin/uav", &auth(), &good);
+    assert_eq!(status, 200, "{body}");
+    let answer = json_of(&body);
+    assert_eq!(answer["accepted"], true);
+    assert_eq!(answer["robot_id"], "uav-1");
+    assert_eq!(answer["sequence"], 1);
+    // the same sequence again, or an older one, is a 409 and does not replace the state
+    let (status, body) = request(
+        port,
+        "POST",
+        "/twin/uav",
+        &auth(),
+        &uav_body("uav-1", 1, 99.0, "real"),
+    );
+    assert_eq!(status, 409, "{body}");
+    assert_eq!(json_of(&body)["last_sequence"], 1);
+    // a simulated state is refused with a sentence in the language asked for
+    let (status, body) = request(
+        port,
+        "POST",
+        "/twin/uav?lang=de",
+        &auth(),
+        &uav_body("uav-2", 1, 1.0, "simulated"),
+    );
+    assert_eq!(status, 422, "{body}");
+    assert_eq!(
+        json_of(&body)["message"],
+        say(Lang::De, Say::UavSimulatedRefused)
+    );
+    for bad in [
+        "nope".to_string(),
+        "{}".to_string(),
+        uav_body("uav-3", 1, 1.0e9, "real"),
+    ] {
+        assert_eq!(
+            request(port, "POST", "/twin/uav", &auth(), &bad).0,
+            400,
+            "{bad}"
+        );
+    }
+    // a body above the limit is a 413
+    let big = format!("{{\"pad\":\"{}\"}}", "x".repeat(20_000));
+    assert_eq!(request(port, "POST", "/twin/uav", &auth(), &big).0, 413);
+    let (status, body) = request(port, "GET", "/twin/uav", &auth(), "");
+    assert_eq!(status, 200, "{body}");
+    let list = json_of(&body);
+    let vehicles = list["vehicles"].as_array().unwrap();
+    assert_eq!(vehicles.len(), 1);
+    assert_eq!(vehicles[0]["robot_id"], "uav-1");
+    assert_eq!(vehicles[0]["stale"], false);
+    assert_eq!(
+        vehicles[0]["state"]["poses"][0]["pose"]["position"]["x"],
+        10.0
+    );
+}
+
+#[test]
+fn the_state_of_a_vehicle_is_shown_as_stale_when_it_is_too_old() {
+    let port = start(
+        Setup {
+            extras: uav_extras(crate::twincfg::UavCfg {
+                max_age_ms: 50,
+                ..Default::default()
+            }),
+            sim: false,
+            collision: false,
+        },
+        None,
+        "uav-stale",
+    );
+    assert_eq!(
+        request(
+            port,
+            "POST",
+            "/twin/uav",
+            &auth(),
+            &uav_body("u", 1, 1.0, "real")
+        )
+        .0,
+        200
+    );
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    let (_, body) = request(port, "GET", "/twin/uav?lang=es", &auth(), "");
+    let list = json_of(&body);
+    assert_eq!(list["vehicles"][0]["stale"], true);
+    assert_eq!(
+        list["vehicles"][0]["message"],
+        say(Lang::Es, Say::UavStateStale)
+    );
+}
+
+/// Opens a WebSocket on `port` and returns the stream, the head of the answer and what followed it.
+fn ws_open(port: u16, path: &str, extra: &str) -> (TcpStream, String, Vec<u8>) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    let text = format!(
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n{extra}\r\n"
+    );
+    stream.write_all(text.as_bytes()).unwrap();
+    let mut raw = Vec::new();
+    let mut buf = [0u8; 2048];
+    loop {
+        if let Some(end) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
+            return (
+                stream,
+                String::from_utf8_lossy(&raw[..end]).to_string(),
+                raw[end + 4..].to_vec(),
+            );
+        }
+        let n = stream.read(&mut buf).unwrap();
+        assert!(n > 0, "closed before the head: {raw:?}");
+        raw.extend_from_slice(&buf[..n]);
+    }
+}
+
+/// The next text message of the twin (pings and the like are skipped); None when the connection ends or nothing comes in time.
+fn ws_next_text(stream: &mut TcpStream, pending: &mut Vec<u8>) -> Option<serde_json::Value> {
+    let mut buf = [0u8; 8192];
+    loop {
+        if pending.len() >= 2 {
+            let opcode = pending[0] & 0x0F;
+            let (length, header) = match pending[1] & 0x7F {
+                126 if pending.len() >= 4 => {
+                    (u16::from_be_bytes([pending[2], pending[3]]) as usize, 4)
+                }
+                126 | 127 => (usize::MAX, 0),
+                n => (n as usize, 2),
+            };
+            if length != usize::MAX && pending.len() >= header + length {
+                let payload = pending[header..header + length].to_vec();
+                pending.drain(..header + length);
+                if opcode == 1 {
+                    return Some(serde_json::from_slice(&payload).unwrap());
+                }
+                continue;
+            }
+        }
+        match stream.read(&mut buf) {
+            Ok(0) | Err(_) => return None,
+            Ok(n) => pending.extend_from_slice(&buf[..n]),
+        }
+    }
+}
+
+#[test]
+fn the_websocket_pushes_the_robot_and_the_vehicles_to_a_client_with_the_token() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let ws_port = listener.local_addr().unwrap().port();
+    let extras = Extras {
+        poses: Some(PoseRoute::new(
+            PathBuf::from("no-such-binary"),
+            PathBuf::from("no-such.urdf"),
+            "arm".into(),
+            crate::twincfg::PosesCfg {
+                joints: vec!["shoulder".into()],
+                max_age_ms: 60_000,
+                timeout_ms: 1_000,
+            },
+        )),
+        uav: Some(crate::uav::UavRoute::new(Default::default())),
+        ws: Some(WsRoute {
+            cfg: crate::twincfg::WsCfg {
+                interval_ms: 50,
+                ..Default::default()
+            },
+            listener: std::sync::Mutex::new(Some(listener)),
+        }),
+        ..Extras::default()
+    };
+    let port = start(
+        Setup {
+            extras,
+            sim: false,
+            collision: false,
+        },
+        None,
+        "ws",
+    );
+    // no token, no session
+    let (_, head, _) = ws_open(ws_port, "/twin/ws", "");
+    assert!(head.starts_with("HTTP/1.1 401"), "{head}");
+    let (mut stream, head, mut pending) = ws_open(
+        ws_port,
+        "/twin/ws?lang=fr",
+        &format!("Authorization: Bearer {TOKEN}\r\n"),
+    );
+    assert!(head.starts_with("HTTP/1.1 101"), "{head}");
+    // the robot has reported nothing: the client is told which joint is missing, in French
+    let first = ws_next_text(&mut stream, &mut pending).unwrap();
+    assert_eq!(first["type"], "status");
+    assert_eq!(first["code"], "incomplete");
+    assert_eq!(first["missing"], serde_json::json!(["shoulder"]));
+    assert_eq!(first["message"], say(Lang::Fr, Say::PosesIncomplete));
+    // a vehicle that reports is pushed as soon as the twin has it
+    assert_eq!(
+        request(
+            port,
+            "POST",
+            "/twin/uav",
+            &auth(),
+            &uav_body("uav-1", 1, 5.0, "real")
+        )
+        .0,
+        200
+    );
+    let mut seen = None;
+    for _ in 0..100 {
+        match ws_next_text(&mut stream, &mut pending) {
+            Some(message) if message["type"] == "uav_state" => {
+                seen = Some(message);
+                break;
+            }
+            Some(_) => {}
+            None => break,
+        }
+    }
+    let message = seen.expect("the state of the vehicle was not pushed");
+    assert_eq!(message["state"]["robot_id"], "uav-1");
+    assert_eq!(message["state"]["poses"][0]["pose"]["position"]["x"], 5.0);
+}
+
+#[test]
+fn the_websocket_route_does_not_exist_on_the_http_port() {
+    // the WebSocket has its own listener: the HTTP server never upgrades a request
+    let port = start(
+        Setup {
+            extras: uav_extras(Default::default()),
+            sim: false,
+            collision: false,
+        },
+        None,
+        "ws-off",
+    );
+    assert_eq!(request(port, "GET", "/twin/ws", &auth(), "").0, 404);
+}

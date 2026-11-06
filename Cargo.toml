@@ -37,3 +37,10 @@ getrandom = "0.2"
 jsonschema = { version = "0.50", default-features = false }
 # The digest of a trajectory in the signed verdict of the dry run (src/dryrun.rs): the same crate and version that the signature crate already uses.
 sha2 = "0.10"
+# The HTTPS send to the data lake (src/drift.rs): rustls with the ring provider, no system store (only the certificate named in the
+# configuration is trusted), no default features (no logging, no second crypto provider).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
+[dev-dependencies]
+# A throw-away certificate for the tests of the HTTPS send: a test server that speaks TLS with a key generated on the spot.
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem"] }

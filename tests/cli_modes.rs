@@ -379,3 +379,53 @@ fn the_collision_prediction_is_off_and_refuses_half_configurations() {
         "{stderr}"
     );
 }
+
+#[test]
+fn the_websocket_and_the_vehicle_input_are_off_and_refuse_half_configurations() {
+    let dir = scratch("ws-uav");
+    let w = p(&dir);
+    // the websocket pushes what the poses and the vehicle input hold: without either it has nothing to say
+    let (code, _, stderr) = run(&["serve", "--workspace", &w, "--ws"]);
+    assert_eq!(code, Some(2));
+    assert!(
+        stderr.contains("--ws needs --poses or --uav-input"),
+        "{stderr}"
+    );
+    // a switch needs the token of the routes and the configuration file
+    let (code, _, stderr) = run(&["serve", "--workspace", &w, "--uav-input"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("--uav-input"), "{stderr}");
+    assert!(stderr.contains("signing key"), "{stderr}");
+    let key = dir.join("key.txt");
+    let token = dir.join("token.txt");
+    std::fs::write(&token, "a-certify-token-of-sixteen+\n").unwrap();
+    let (code, _, stderr) = run(&["keygen", "--key-file", &p(&key)]);
+    assert_eq!(code, Some(0), "{stderr}");
+    let base = [
+        "serve",
+        "--workspace",
+        &w,
+        "--signing-key-file",
+        &p(&key),
+        "--certify-token-file",
+        &p(&token),
+        "--uav-input",
+    ];
+    let (code, _, stderr) = run(&base);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("--twin-config FILE"), "{stderr}");
+    // a configuration that listens on every interface for the websocket is refused unless it says so
+    let config = dir.join("twin.json");
+    std::fs::write(&config, r#"{"ws":{"listen":"0.0.0.0:0"}}"#).unwrap();
+    let mut args = base.to_vec();
+    let config_arg = p(&config);
+    args.extend(["--ws", "--twin-config", &config_arg]);
+    let (code, _, stderr) = run(&args);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("ws.allow_remote"), "{stderr}");
+    // and a field the file does not know is named
+    std::fs::write(&config, r#"{"ws":{"port":1}}"#).unwrap();
+    let (code, _, stderr) = run(&args);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("port"), "{stderr}");
+}

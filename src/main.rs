@@ -32,6 +32,8 @@ mod schema;
 mod server;
 mod server_identity;
 mod twincfg;
+mod uav;
+mod ws;
 
 use contract::SyncReadiness;
 use family::FamilySyncOutcome;
@@ -421,8 +423,8 @@ fn physics_binary(
     Ok(binary)
 }
 
-/// `--twin-config FILE` with `--poses`, `--dryrun` and/or `--drift` (each off by default, and `--drift-datalake` to send the observations of
-/// the drift to HYDRA-UMC-DATALAKE): the routes of the kinematic twin. A flag without its switch, a switch without the file, and a route
+/// `--twin-config FILE` with `--poses`, `--dryrun`, `--drift`, `--uav-input` and/or `--ws` (each off by default, and `--drift-datalake` to send the
+/// observations of the drift to HYDRA-UMC-DATALAKE): the routes of the kinematic twin. A flag without its switch, a switch without the file, and a route
 /// that needs the token without the signing key never start the server.
 fn load_twin(
     args: &[String],
@@ -434,26 +436,35 @@ fn load_twin(
         has_flag(args, "--dryrun"),
         has_flag(args, "--drift"),
     );
+    let (uav_on, ws_on) = (has_flag(args, "--uav-input"), has_flag(args, "--ws"));
     let datalake_on = has_flag(args, "--drift-datalake");
     let file = find_flag(args, "--twin-config");
-    if !poses_on && !dryrun_on && !drift_on {
+    if !poses_on && !dryrun_on && !drift_on && !uav_on {
+        if ws_on {
+            return Err("--ws needs --poses or --uav-input (it pushes their state; it is off unless asked for)".into());
+        }
         if datalake_on {
             return Err(
                 "--drift-datalake needs --drift (the sending is off unless asked for)".into(),
             );
         }
         if file.is_some() {
-            return Err("--twin-config needs at least one of --poses, --dryrun, --drift (every route is off unless asked for)".into());
+            return Err("--twin-config needs at least one of --poses, --dryrun, --drift, --uav-input (every route is off unless asked for)".into());
         }
         return Ok(server::Extras::default());
     }
     if datalake_on && !drift_on {
         return Err("--drift-datalake needs --drift".into());
     }
-    if !have_token {
-        return Err("--poses, --dryrun and --drift need the signing key and the certify token (the routes use that token)".into());
+    if ws_on && !poses_on && !uav_on {
+        return Err("--ws needs --poses or --uav-input (it pushes their state)".into());
     }
-    let file = PathBuf::from(file.ok_or("--poses, --dryrun and --drift need --twin-config FILE")?);
+    if !have_token {
+        return Err("--poses, --dryrun, --drift, --uav-input and --ws need the signing key and the certify token (the routes use that token)".into());
+    }
+    let file = PathBuf::from(
+        file.ok_or("--poses, --dryrun, --drift, --uav-input and --ws need --twin-config FILE")?,
+    );
     let config = twincfg::TwinConfig::load(&file)?;
     let base = file
         .parent()
@@ -542,6 +553,22 @@ fn load_twin(
                 log,
                 sink,
             )),
+        });
+    }
+    if uav_on {
+        extras.uav = Some(uav::UavRoute::new(config.uav.clone()));
+    }
+    if ws_on {
+        ws::check_listen(&config.ws)?;
+        let listener = std::net::TcpListener::bind(&config.ws.listen).map_err(|e| {
+            format!(
+                "could not listen for the WebSocket on {}: {e}",
+                config.ws.listen
+            )
+        })?;
+        extras.ws = Some(server::WsRoute {
+            cfg: config.ws.clone(),
+            listener: std::sync::Mutex::new(Some(listener)),
         });
     }
     Ok(extras)
@@ -793,6 +820,8 @@ fn run_serve(args: &[String]) -> ExitCode {
                 (extras.poses.is_some(), "GET /twin/poses gives the pose of every joint of the robot from the last reports of its joints (forward kinematics of HYDRA-UMC-PHYSICS-REPLICA)"),
                 (extras.dryrun.is_some(), "POST /dryrun/trajectory runs a trajectory in simulation and signs a verdict (only pass allows anything)"),
                 (extras.drift.is_some(), "POST /drift/observe and GET /drift watch the difference between the real and the simulated joints"),
+                (extras.uav.is_some(), "POST /twin/uav and GET /twin/uav take and show the state (position and attitude) of an unmanned vehicle from its bridge (information only; not tried with a real vehicle)"),
+                (extras.ws.is_some(), "the WebSocket /twin/ws pushes the state of the robot and of the vehicles to the clients that hold the token (own listener, see ws.listen)"),
             ] {
                 if on {
                     eprintln!("[twin] {line}");

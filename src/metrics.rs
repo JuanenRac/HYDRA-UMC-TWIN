@@ -28,6 +28,10 @@ pub static DRYRUN_PASS: AtomicU64 = AtomicU64::new(0);
 pub static DRYRUN_NOT_PASS: AtomicU64 = AtomicU64::new(0);
 pub static DRIFT_OBSERVATIONS: AtomicU64 = AtomicU64::new(0);
 pub static DRIFT_ALARMS: AtomicU64 = AtomicU64::new(0);
+pub static WS_SESSIONS: AtomicU64 = AtomicU64::new(0);
+pub static WS_REFUSED: AtomicU64 = AtomicU64::new(0);
+pub static UAV_ACCEPTED: AtomicU64 = AtomicU64::new(0);
+pub static UAV_REFUSED: AtomicU64 = AtomicU64::new(0);
 
 static STARTED: OnceLock<Instant> = OnceLock::new();
 
@@ -168,6 +172,34 @@ pub fn render(gauges: &Gauges) -> String {
         "counter",
         "Times a joint went into the drift alarm.",
         load(&DRIFT_ALARMS),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_ws_sessions_total",
+        "counter",
+        "WebSocket sessions opened.",
+        load(&WS_SESSIONS),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_ws_refused_total",
+        "counter",
+        "WebSocket sessions refused (token, origin or too many sessions).",
+        load(&WS_REFUSED),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_uav_states_accepted_total",
+        "counter",
+        "States of a vehicle accepted.",
+        load(&UAV_ACCEPTED),
+    );
+    metric(
+        &mut out,
+        "hydra_umc_twin_uav_states_refused_total",
+        "counter",
+        "States of a vehicle refused.",
+        load(&UAV_REFUSED),
     );
     metric(
         &mut out,

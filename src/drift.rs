@@ -15,8 +15,10 @@
 //! What is kept: the counters of every joint (`GET /drift`), a JSON Lines log of what is not `ok` and of each change of level (a file of
 //! bounded size that is rotated once), and, only if the server was started with `--drift-datalake`, every observation sent to
 //! HYDRA-UMC-DATALAKE as a sample of `POST /ingest` (`sourceId`, `kind`, `timestamp`, `sequence`, `fields`) by a thread of its own: a data
-//! lake that is down or slow costs the twin nothing but a counter (`dropped`, `failed`). The send speaks plain HTTP and accepts only a loopback
-//! address unless `drift.datalake.allow_remote` says otherwise; the token is read from a file and never printed or logged.
+//! lake that is down or slow costs the twin nothing but a counter (`dropped`, `failed`). An `http://` address is plain HTTP and only a loopback
+//! one is accepted unless `drift.datalake.allow_remote` says otherwise; an `https://` address is TLS (rustls) and trusts only the certificate
+//! (or CA) in the PEM file `drift.datalake.ca_file`, checked against the host of the address or `drift.datalake.server_name`: there is no system
+//! store and no way to skip the check. The token is read from a file and never printed or logged.
 
 use std::collections::BTreeMap;
 use std::io::{Read, Write};
@@ -27,6 +29,9 @@ use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::time::Duration;
 
+use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 use serde_json::{json, Value};
 
 use crate::twincfg::{say, DatalakeCfg, DriftCfg, Lang, Say, Threshold};
@@ -279,53 +284,117 @@ pub struct DatalakeSink {
     pub dropped: Arc<AtomicU64>,
 }
 
-/// `http://host:port` split into the address to connect to and the `Host` header.
-fn parse_url(url: &str, allow_remote: bool) -> Result<String, String> {
-    let rest = url.trim().strip_prefix("http://").ok_or(
-        "drift.datalake.url must start with http:// (only plain HTTP is spoken; use a loopback or a trusted LAN address)",
-    )?;
+/// `host` and `port` of the authority of an address; no path, no credentials.
+fn split_authority(rest: &str, default_port: &str) -> Result<(String, String), String> {
     let authority = rest.trim_end_matches('/');
     if authority.is_empty() || authority.contains('/') || authority.contains('@') {
         return Err(
-            "drift.datalake.url must be http://host:port with no path or credentials".into(),
+            "drift.datalake.url must be scheme://host:port with no path or credentials".into(),
         );
     }
     let (host, port) = match authority.rsplit_once(':') {
         Some((h, p)) if !h.ends_with(']') || p.chars().all(|c| c.is_ascii_digit()) => (h, p),
-        _ => (authority, "80"),
+        _ => (authority, default_port),
     };
     if port.parse::<u16>().is_err() {
         return Err("drift.datalake.url has no valid port".into());
     }
     let bare = host.trim_start_matches('[').trim_end_matches(']');
-    let loopback = bare == "localhost"
+    if bare.is_empty() {
+        return Err("drift.datalake.url has no host".into());
+    }
+    Ok((host.to_string(), port.to_string()))
+}
+
+fn is_loopback(host: &str) -> bool {
+    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    bare == "localhost"
         || bare
             .parse::<std::net::IpAddr>()
             .map(|ip| ip.is_loopback())
-            .unwrap_or(false);
-    if !loopback && !allow_remote {
-        return Err("drift.datalake.url is not a loopback address: the token and the samples would travel in clear text; set drift.datalake.allow_remote to accept that".into());
+            .unwrap_or(false)
+}
+
+/// `http://host:port` split into the address to connect to and the `Host` header.
+fn parse_url(url: &str, allow_remote: bool) -> Result<String, String> {
+    let rest = url.trim().strip_prefix("http://").ok_or(
+        "drift.datalake.url must start with http:// or https:// (http:// is plain text: use a loopback or a trusted LAN address, or https://)",
+    )?;
+    let (host, port) = split_authority(rest, "80")?;
+    if !is_loopback(&host) && !allow_remote {
+        return Err("drift.datalake.url is not a loopback address: the token and the samples would travel in clear text; set drift.datalake.allow_remote to accept that, or use https://".into());
     }
     Ok(format!("{host}:{port}"))
 }
 
-/// One POST, `Connection: close`, and the status of the answer.
-fn http_post(
+/// Where the samples go: the address to connect to and, for `https://`, the name the certificate must be valid for.
+struct Endpoint {
+    address: String,
+    secure_name: Option<String>,
+}
+
+fn parse_endpoint(url: &str, server_name: &str, allow_remote: bool) -> Result<Endpoint, String> {
+    match url.trim().strip_prefix("https://") {
+        Some(rest) => {
+            let (host, port) = split_authority(rest, "443")?;
+            let name = if server_name.trim().is_empty() {
+                host.trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .to_string()
+            } else {
+                server_name.trim().to_string()
+            };
+            Ok(Endpoint {
+                address: format!("{host}:{port}"),
+                secure_name: Some(name),
+            })
+        }
+        None => Ok(Endpoint {
+            address: parse_url(url, allow_remote)?,
+            secure_name: None,
+        }),
+    }
+}
+
+/// The TLS client: it trusts the certificates of `ca_pem` and nothing else.
+fn tls_config(ca_pem: &[u8]) -> Result<Arc<ClientConfig>, String> {
+    let mut roots = RootCertStore::empty();
+    let mut found = 0;
+    for certificate in CertificateDer::pem_slice_iter(ca_pem) {
+        let certificate = certificate.map_err(|e| {
+            format!("drift.datalake.ca_file is not a PEM file of certificates: {e}")
+        })?;
+        roots.add(certificate).map_err(|e| {
+            format!("drift.datalake.ca_file holds a certificate that cannot be used: {e}")
+        })?;
+        found += 1;
+    }
+    if found == 0 {
+        return Err("drift.datalake.ca_file holds no certificate".into());
+    }
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let config = ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| format!("TLS cannot be set up: {e}"))?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    Ok(Arc::new(config))
+}
+
+/// How the thread that sends reaches the data lake.
+struct Target {
+    address: String,
+    tls: Option<(Arc<ClientConfig>, ServerName<'static>)>,
+}
+
+/// The request on an open stream (plain or TLS) and the status of the answer.
+fn exchange<S: Read + Write>(
+    stream: &mut S,
     address: &str,
     path: &str,
     token: Option<&str>,
     body: &str,
-    timeout: Duration,
 ) -> Result<u16, String> {
-    let target = address
-        .to_socket_addrs()
-        .map_err(|e| format!("cannot resolve {address}: {e}"))?
-        .next()
-        .ok_or("no address")?;
-    let mut stream =
-        TcpStream::connect_timeout(&target, timeout).map_err(|e| format!("cannot connect: {e}"))?;
-    let _ = stream.set_read_timeout(Some(timeout));
-    let _ = stream.set_write_timeout(Some(timeout));
     let auth = token
         .map(|t| format!("Authorization: Bearer {t}\r\n"))
         .unwrap_or_default();
@@ -336,6 +405,7 @@ fn http_post(
     stream
         .write_all(request.as_bytes())
         .map_err(|e| format!("cannot send: {e}"))?;
+    stream.flush().map_err(|e| format!("cannot send: {e}"))?;
     let mut head = [0u8; 64];
     let mut got = 0;
     while got < head.len() {
@@ -357,10 +427,63 @@ fn http_post(
         .ok_or_else(|| "the answer is not HTTP".to_string())
 }
 
+/// One POST, `Connection: close`, and the status of the answer.
+fn http_post(
+    target: &Target,
+    path: &str,
+    token: Option<&str>,
+    body: &str,
+    timeout: Duration,
+) -> Result<u16, String> {
+    let address = target.address.as_str();
+    let resolved = address
+        .to_socket_addrs()
+        .map_err(|e| format!("cannot resolve {address}: {e}"))?
+        .next()
+        .ok_or("no address")?;
+    let mut stream = TcpStream::connect_timeout(&resolved, timeout)
+        .map_err(|e| format!("cannot connect: {e}"))?;
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
+    match &target.tls {
+        None => exchange(&mut stream, address, path, token, body),
+        Some((config, name)) => {
+            let connection = ClientConnection::new(config.clone(), name.clone())
+                .map_err(|e| format!("TLS cannot start: {e}"))?;
+            let mut secure = StreamOwned::new(connection, stream);
+            exchange(&mut secure, address, path, token, body)
+        }
+    }
+}
+
 impl DatalakeSink {
     /// Starts the thread that sends. `token` is the content of the token file, if there is one.
     pub fn start(cfg: &DatalakeCfg, token: Option<String>) -> Result<Self, String> {
-        let address = parse_url(&cfg.url, cfg.allow_remote)?;
+        Self::start_with_ca(cfg, token, None)
+    }
+
+    /// Like `start`; `ca_pem` is the content of `drift.datalake.ca_file`, which an `https://` address needs.
+    pub fn start_with_ca(
+        cfg: &DatalakeCfg,
+        token: Option<String>,
+        ca_pem: Option<&[u8]>,
+    ) -> Result<Self, String> {
+        let endpoint = parse_endpoint(&cfg.url, &cfg.server_name, cfg.allow_remote)?;
+        let tls = match endpoint.secure_name {
+            None => None,
+            Some(name) => {
+                let ca = ca_pem.ok_or(
+                    "an https:// address needs the certificate to trust: drift.datalake.ca_file",
+                )?;
+                let server_name = ServerName::try_from(name.clone())
+                    .map_err(|_| format!("{name} is not a valid name for a certificate"))?;
+                Some((tls_config(ca)?, server_name))
+            }
+        };
+        let target = Target {
+            address: endpoint.address,
+            tls,
+        };
         let (tx, rx) = sync_channel::<String>(cfg.queue);
         let (sent, failed, dropped) = (
             Arc::new(AtomicU64::new(0)),
@@ -371,7 +494,7 @@ impl DatalakeSink {
         let timeout = Duration::from_millis(cfg.timeout_ms);
         std::thread::spawn(move || {
             for body in rx {
-                match http_post(&address, "/ingest", token.as_deref(), &body, timeout) {
+                match http_post(&target, "/ingest", token.as_deref(), &body, timeout) {
                     // 202 is the answer of the data lake to an accepted sample
                     Ok(202) => s.fetch_add(1, Ordering::Relaxed),
                     _ => f.fetch_add(1, Ordering::Relaxed),
@@ -677,6 +800,178 @@ mod tests {
         }
         wait_for(&failed, 1);
         assert!(failed.load(Ordering::Relaxed) + dropped.load(Ordering::Relaxed) >= 2);
+    }
+
+    #[test]
+    fn an_https_address_may_be_remote_but_names_the_certificate_it_must_present() {
+        let e = parse_endpoint("https://lake.example:8443", "", false).unwrap();
+        assert_eq!(e.address, "lake.example:8443");
+        assert_eq!(e.secure_name.as_deref(), Some("lake.example"));
+        let e = parse_endpoint("https://192.168.0.10", "datalake.lan", false).unwrap();
+        assert_eq!(e.address, "192.168.0.10:443");
+        assert_eq!(e.secure_name.as_deref(), Some("datalake.lan"));
+        // a plain address is as before
+        assert!(parse_endpoint("http://192.168.0.10:8095", "", false).is_err());
+        assert!(parse_endpoint("http://127.0.0.1:8095", "", false)
+            .unwrap()
+            .secure_name
+            .is_none());
+        for bad in [
+            "https://",
+            "https://u@lake:1",
+            "https://lake:70000",
+            "ftp://x",
+        ] {
+            assert!(parse_endpoint(bad, "", true).is_err(), "{bad}");
+        }
+    }
+
+    /// A key and a certificate for `names`, as PEM text and as what a TLS server takes.
+    fn identity(names: &[&str]) -> (String, rustls::ServerConfig) {
+        let key = rcgen::generate_simple_self_signed(
+            names.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let pem = key.cert.pem();
+        let der = key.cert.der().clone();
+        let private = rustls::pki_types::PrivateKeyDer::Pkcs8(
+            rustls::pki_types::PrivatePkcs8KeyDer::from(key.key_pair.serialize_der()),
+        );
+        let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(vec![der], private)
+        .unwrap();
+        (pem, config)
+    }
+
+    /// A stand-in for a data lake that speaks TLS: answers one request with `status` and hands the request to the test. A client that does not
+    /// trust it ends the handshake and nothing is handed over.
+    fn fake_secure_datalake(
+        config: rustls::ServerConfig,
+        status: u16,
+    ) -> (u16, std::sync::mpsc::Receiver<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let config = Arc::new(config);
+        std::thread::spawn(move || {
+            let Ok((tcp, _)) = listener.accept() else {
+                return;
+            };
+            let _ = tcp.set_read_timeout(Some(Duration::from_secs(10)));
+            let Ok(connection) = rustls::ServerConnection::new(config) else {
+                return;
+            };
+            let mut stream = StreamOwned::new(connection, tcp);
+            let mut raw = Vec::new();
+            let mut buf = [0u8; 2048];
+            loop {
+                let n = match stream.read(&mut buf) {
+                    Ok(0) | Err(_) => return,
+                    Ok(n) => n,
+                };
+                raw.extend_from_slice(&buf[..n]);
+                let text = String::from_utf8_lossy(&raw).to_string();
+                if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                    let length: usize = head
+                        .lines()
+                        .find_map(|l| l.strip_prefix("Content-Length: "))
+                        .and_then(|v| v.trim().parse().ok())
+                        .unwrap_or(0);
+                    if body.len() >= length {
+                        break;
+                    }
+                }
+            }
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status} X\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            );
+            let _ = stream.flush();
+            stream.conn.send_close_notify();
+            let _ = stream.flush();
+            let _ = tx.send(String::from_utf8_lossy(&raw).to_string());
+        });
+        (port, rx)
+    }
+
+    fn secure_cfg(port: u16, server_name: &str) -> DatalakeCfg {
+        DatalakeCfg {
+            url: format!("https://127.0.0.1:{port}"),
+            server_name: server_name.into(),
+            timeout_ms: 2_000,
+            ..DatalakeCfg::default()
+        }
+    }
+
+    #[test]
+    fn a_sample_reaches_a_data_lake_over_tls_when_the_certificate_is_the_one_trusted() {
+        let (pem, server) = identity(&["localhost"]);
+        let (port, requests) = fake_secure_datalake(server, 202);
+        let sink = DatalakeSink::start_with_ca(
+            &secure_cfg(port, "localhost"),
+            Some("0123456789abcdef".into()),
+            Some(pem.as_bytes()),
+        )
+        .unwrap();
+        let sent = sink.sent.clone();
+        let mut m = DriftMonitor::new(cfg(), None, Some(sink));
+        m.observe("shoulder", 1.1, 1.0, 1_800_000_000_000).unwrap();
+        let request = requests.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(
+            request.starts_with("POST /ingest HTTP/1.1\r\n"),
+            "{request}"
+        );
+        assert!(request.contains("Authorization: Bearer 0123456789abcdef\r\n"));
+        wait_for(&sent, 1);
+        assert_eq!(m.summary(Lang::En)["datalake"]["failed"], 0);
+    }
+
+    #[test]
+    fn a_data_lake_with_another_certificate_or_another_name_gets_nothing() {
+        // the certificate is not the one trusted
+        let (_, server) = identity(&["localhost"]);
+        let (other_pem, _) = identity(&["localhost"]);
+        let (port, requests) = fake_secure_datalake(server, 202);
+        let sink = DatalakeSink::start_with_ca(
+            &secure_cfg(port, "localhost"),
+            Some("0123456789abcdef".into()),
+            Some(other_pem.as_bytes()),
+        )
+        .unwrap();
+        let failed = sink.failed.clone();
+        let mut m = DriftMonitor::new(cfg(), None, Some(sink));
+        m.observe("shoulder", 1.1, 1.0, 1_800_000_000_000).unwrap();
+        wait_for(&failed, 1);
+        assert!(requests.recv_timeout(Duration::from_millis(300)).is_err());
+        // the certificate is the one trusted but it is not valid for the name asked for
+        let (pem, server) = identity(&["localhost"]);
+        let (port, requests) = fake_secure_datalake(server, 202);
+        let sink = DatalakeSink::start_with_ca(
+            &secure_cfg(port, "datalake.example"),
+            None,
+            Some(pem.as_bytes()),
+        )
+        .unwrap();
+        let failed = sink.failed.clone();
+        let mut m = DriftMonitor::new(cfg(), None, Some(sink));
+        m.observe("shoulder", 1.1, 1.0, 1_800_000_000_000).unwrap();
+        wait_for(&failed, 1);
+        assert!(requests.recv_timeout(Duration::from_millis(300)).is_err());
+    }
+
+    #[test]
+    fn an_https_address_without_a_usable_certificate_never_starts() {
+        let (pem, _) = identity(&["localhost"]);
+        let cfg = secure_cfg(8443, "");
+        assert!(DatalakeSink::start(&cfg, None).is_err());
+        assert!(DatalakeSink::start_with_ca(&cfg, None, Some(b"")).is_err());
+        assert!(DatalakeSink::start_with_ca(&cfg, None, Some(b"not a certificate")).is_err());
+        assert!(DatalakeSink::start_with_ca(&cfg, None, Some(pem.as_bytes())).is_ok());
     }
 
     #[test]

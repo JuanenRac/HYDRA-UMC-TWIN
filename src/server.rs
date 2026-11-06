@@ -21,7 +21,7 @@ use crate::certificate::{random_nonce, RiskInput, Signer};
 use crate::family::{assess_family_sync, check_family_status};
 
 mod twin;
-pub use twin::{DriftRoute, Extras};
+pub use twin::{DriftRoute, Extras, WsRoute};
 
 fn json_header() -> Header {
     Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap()
@@ -900,6 +900,8 @@ pub fn run_with_extras(
         sim,
         extras,
     });
+    // the WebSocket of `--ws` has its own listener and threads
+    twin::start_ws(&context);
     // the simulated time follows the wall clock when asked to (`--sim-tick-ms`)
     if let Some(tick) = context.sim.as_ref().and_then(|route| route.tick) {
         let context = context.clone();

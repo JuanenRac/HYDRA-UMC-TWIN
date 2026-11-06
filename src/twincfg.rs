@@ -84,11 +84,14 @@ pub enum Say {
     DriftOk,
     DriftWarn,
     DriftAlarm,
+    WsSessionEnded,
+    UavSimulatedRefused,
+    UavStateStale,
 }
 
 impl Say {
     #[cfg(test)]
-    pub const ALL: [Say; 7] = [
+    pub const ALL: [Say; 10] = [
         Say::VerdictPass,
         Say::VerdictFail,
         Say::VerdictIncomplete,
@@ -96,6 +99,9 @@ impl Say {
         Say::DriftOk,
         Say::DriftWarn,
         Say::DriftAlarm,
+        Say::WsSessionEnded,
+        Say::UavSimulatedRefused,
+        Say::UavStateStale,
     ];
 }
 
@@ -172,6 +178,36 @@ pub fn say(lang: Lang, what: Say) -> &'static str {
             "真实关节持续偏离仿真关节并超过报警阈值：校准可能已经漂移。",
             "A articulação real continua a afastar-se da simulada além do limiar de alarme: a calibração pode ter derivado.",
         ],
+        Say::WsSessionEnded => [
+            "The session reached its time limit and the twin closed it; connect again to go on.",
+            "La sesion llego a su limite de tiempo y el gemelo la cerro; vuelve a conectar para seguir.",
+            "Die Sitzung hat ihre Zeitgrenze erreicht und der Zwilling hat sie geschlossen; verbinden Sie sich erneut, um fortzufahren.",
+            "La session a atteint sa limite de durée et le jumeau l'a fermée ; reconnectez-vous pour continuer.",
+            "La sessione ha raggiunto il limite di tempo e il gemello l'ha chiusa; riconnettiti per continuare.",
+            "セッションが時間制限に達したため、ツインが切断しました。続けるには再接続してください。",
+            "会话已达到时间上限，孪生体已将其关闭；请重新连接以继续。",
+            "A sessão atingiu o limite de tempo e o gémeo fechou-a; volte a ligar para continuar.",
+        ],
+        Say::UavSimulatedRefused => [
+            "This twin does not accept simulated vehicle states; only states of a real vehicle.",
+            "Este gemelo no acepta estados simulados de un vehiculo; solo estados de un vehiculo real.",
+            "Dieser Zwilling nimmt keine simulierten Fahrzeugzustände an, nur Zustände eines echten Fahrzeugs.",
+            "Ce jumeau n'accepte pas les états simulés d'un véhicule, seulement ceux d'un véhicule réel.",
+            "Questo gemello non accetta stati simulati di un veicolo, solo stati di un veicolo reale.",
+            "このツインは車両のシミュレーション状態を受け付けません。実車両の状態のみ受け付けます。",
+            "此孪生体不接受车辆的仿真状态，只接受真实车辆的状态。",
+            "Este gémeo não aceita estados simulados de um veículo, apenas estados de um veículo real.",
+        ],
+        Say::UavStateStale => [
+            "The last state of this vehicle is too old to be trusted.",
+            "El ultimo estado de este vehiculo es demasiado antiguo para fiarse de el.",
+            "Der letzte Zustand dieses Fahrzeugs ist zu alt, um ihm zu vertrauen.",
+            "Le dernier état de ce véhicule est trop ancien pour qu'on s'y fie.",
+            "L'ultimo stato di questo veicolo è troppo vecchio per fidarsene.",
+            "この車両の最新の状態は古すぎて信頼できません。",
+            "该车辆的最新状态过旧，不可信。",
+            "O último estado deste veículo é demasiado antigo para merecer confiança.",
+        ],
     };
     let index = match lang {
         Lang::En => 0,
@@ -243,7 +279,7 @@ pub struct Threshold {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct DatalakeCfg {
-    /// `http://host:port` of HYDRA-UMC-DATALAKE. Only plain HTTP is spoken.
+    /// `http://host:port` or `https://host:port` of HYDRA-UMC-DATALAKE.
     pub url: String,
     pub source_id: String,
     pub kind: String,
@@ -254,6 +290,11 @@ pub struct DatalakeCfg {
     pub timeout_ms: u64,
     /// With false (the default) only a loopback address is accepted, because the token and the samples would travel in clear text.
     pub allow_remote: bool,
+    /// With an `https://` address: the PEM file with the certificate (or the CA) that the data lake must present. Nothing else is trusted, so
+    /// there is no system store and no way to skip the check; an `https://` address without this file is an error.
+    pub ca_file: String,
+    /// With an `https://` address: the name the certificate must be valid for; empty: the host of the address.
+    pub server_name: String,
 }
 
 impl Default for DatalakeCfg {
@@ -266,6 +307,81 @@ impl Default for DatalakeCfg {
             queue: 256,
             timeout_ms: 2_000,
             allow_remote: false,
+            ca_file: String::new(),
+            server_name: String::new(),
+        }
+    }
+}
+
+/// The WebSocket the twin pushes its state through (`serve --ws`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct WsCfg {
+    /// The address of its own listener (the HTTP server of the twin has no upgrade of its own), loopback by default.
+    pub listen: String,
+    /// Sessions at once; one more is refused with a 503.
+    pub max_clients: usize,
+    /// How often the state is pushed.
+    pub interval_ms: u64,
+    /// How often the twin sends a ping to see that the client is alive.
+    pub ping_interval_ms: u64,
+    /// A client that sends nothing at all (not even the pong of a ping) for this long is dropped.
+    pub idle_timeout_ms: u64,
+    /// The longest a session lasts; then the twin closes it and the client connects again (and so shows its token again).
+    pub max_session_s: u64,
+    /// How long a client has to send its whole opening request.
+    pub handshake_timeout_ms: u64,
+    /// The largest frame accepted from a client (a client has nothing to say but pongs and closes).
+    pub max_frame_bytes: usize,
+    /// The `Origin` values accepted. A request that carries an `Origin` (a browser) and is not in this list is refused; one that carries none is not a browser.
+    pub allowed_origins: Vec<String>,
+    /// With false (the default) only a loopback address may be listened on, because the token would travel in clear text.
+    pub allow_remote: bool,
+}
+
+impl Default for WsCfg {
+    fn default() -> Self {
+        Self {
+            listen: "127.0.0.1:8112".into(),
+            max_clients: 4,
+            interval_ms: 500,
+            ping_interval_ms: 15_000,
+            idle_timeout_ms: 45_000,
+            max_session_s: 3_600,
+            handshake_timeout_ms: 5_000,
+            max_frame_bytes: 4_096,
+            allowed_origins: Vec::new(),
+            allow_remote: false,
+        }
+    }
+}
+
+/// The input for the state of a UAV (`serve --uav-input`).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+pub struct UavCfg {
+    /// The pose that carries the vehicle in the TwinState it sends.
+    pub pose_name: String,
+    pub max_body_bytes: u64,
+    /// Vehicles followed at once; the state of another one is refused.
+    pub max_vehicles: usize,
+    /// A state older than this (milliseconds since it arrived) is shown as stale.
+    pub max_age_ms: u64,
+    /// With false (the default) a state that says `simulated` is refused: the twin takes a simulated vehicle for a real one only on purpose.
+    pub accept_simulated: bool,
+    /// A position farther than this from the home point (metres on any axis) is refused as a mistake.
+    pub max_distance_m: f64,
+}
+
+impl Default for UavCfg {
+    fn default() -> Self {
+        Self {
+            pose_name: "vehicle".into(),
+            max_body_bytes: 8_192,
+            max_vehicles: 8,
+            max_age_ms: 5_000,
+            accept_simulated: false,
+            max_distance_m: 100_000.0,
         }
     }
 }
@@ -312,6 +428,8 @@ pub struct TwinConfig {
     pub poses: PosesCfg,
     pub dryrun: DryRunCfg,
     pub drift: DriftCfg,
+    pub ws: WsCfg,
+    pub uav: UavCfg,
 }
 
 impl Default for TwinConfig {
@@ -324,6 +442,8 @@ impl Default for TwinConfig {
             poses: PosesCfg::default(),
             dryrun: DryRunCfg::default(),
             drift: DriftCfg::default(),
+            ws: WsCfg::default(),
+            uav: UavCfg::default(),
         }
     }
 }
@@ -419,6 +539,60 @@ impl TwinConfig {
         if l.source_id.trim().is_empty() || l.kind.trim().is_empty() {
             return Err("drift.datalake.source_id and kind must not be empty".into());
         }
+        if l.url.trim_start().starts_with("https://") && l.ca_file.trim().is_empty() {
+            return Err("drift.datalake.url is https://: drift.datalake.ca_file must name the PEM file of the certificate to trust".into());
+        }
+        if l.server_name
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace())
+        {
+            return Err(
+                "drift.datalake.server_name must not have spaces or control characters".into(),
+            );
+        }
+        let w = &self.ws;
+        if w.listen.trim().is_empty()
+            || w.listen
+                .chars()
+                .any(|c| c.is_control() || c.is_whitespace())
+        {
+            return Err("ws.listen must be an address such as 127.0.0.1:8112".into());
+        }
+        in_range("ws.max_clients", w.max_clients as u64, 1, 256)?;
+        in_range("ws.interval_ms", w.interval_ms, 50, 60_000)?;
+        in_range("ws.ping_interval_ms", w.ping_interval_ms, 1_000, 600_000)?;
+        in_range("ws.idle_timeout_ms", w.idle_timeout_ms, 2_000, 3_600_000)?;
+        if w.idle_timeout_ms <= w.ping_interval_ms {
+            return Err("ws.idle_timeout_ms must be above ws.ping_interval_ms, or a client that answers every ping would be dropped".into());
+        }
+        in_range("ws.max_session_s", w.max_session_s, 10, 604_800)?;
+        in_range(
+            "ws.handshake_timeout_ms",
+            w.handshake_timeout_ms,
+            100,
+            60_000,
+        )?;
+        in_range("ws.max_frame_bytes", w.max_frame_bytes as u64, 125, 1 << 20)?;
+        for origin in &w.allowed_origins {
+            if origin.trim().is_empty()
+                || origin.chars().any(|c| c.is_control() || c.is_whitespace())
+            {
+                return Err("ws.allowed_origins: an origin must be like https://studio.example, with no spaces".into());
+            }
+        }
+        let u = &self.uav;
+        if u.pose_name.trim().is_empty()
+            || u.pose_name.len() > 64
+            || u.pose_name.chars().any(|c| c.is_control())
+        {
+            return Err(
+                "uav.pose_name must have 1 to 64 characters and no control character".into(),
+            );
+        }
+        in_range("uav.max_body_bytes", u.max_body_bytes, 256, 1 << 20)?;
+        in_range("uav.max_vehicles", u.max_vehicles as u64, 1, 1_024)?;
+        in_range("uav.max_age_ms", u.max_age_ms, 1, 3_600_000)?;
+        positive("uav.max_distance_m", u.max_distance_m)?;
         Ok(())
     }
 }
@@ -450,6 +624,16 @@ mod tests {
         assert_eq!(c.drift.alarm_after, 3);
         assert!(c.dryrun.require_collision_check);
         assert!(!c.drift.datalake.allow_remote);
+        assert!(!c.uav.accept_simulated);
+        assert!(c.ws.allowed_origins.is_empty());
+        assert!(c.ws.listen.starts_with("127.0.0.1:"));
+    }
+
+    #[test]
+    fn an_https_address_is_valid_only_with_the_certificate_to_trust() {
+        let ok =
+            r#"{"drift":{"datalake":{"url":"https://lake.example:8443","ca_file":"lake-ca.pem"}}}"#;
+        assert!(TwinConfig::parse(ok).is_ok());
     }
 
     #[test]
@@ -468,6 +652,14 @@ mod tests {
             r#"{"dryrun":{"max_samples":1}}"#,
             r#"{"language":"xx"}"#,
             r#"{"robot_id":""}"#,
+            r#"{"ws":{"port":1}}"#,
+            r#"{"ws":{"max_clients":0}}"#,
+            r#"{"ws":{"ping_interval_ms":30000,"idle_timeout_ms":30000}}"#,
+            r#"{"ws":{"allowed_origins":["a b"]}}"#,
+            r#"{"uav":{"max_vehicles":0}}"#,
+            r#"{"uav":{"max_distance_m":-1}}"#,
+            r#"{"uav":{"pose_name":""}}"#,
+            r#"{"drift":{"datalake":{"url":"https://lake.example:8443"}}}"#,
         ] {
             assert!(TwinConfig::parse(bad).is_err(), "{bad}");
         }

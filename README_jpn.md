@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-173%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-223%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.6` |
 | 成熟度 | 機能する |
-| テスト | 173 (`cargo test`) |
+| テスト | 223 (`cargo test`) |
 | 技術 | Rust / tiny_http |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 173 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 223 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | インターフェースとプロトコル | 🟡 | 提供するルートやメッセージは文書化され、クライアントで試験済みです。すべてのクライアントがまだ使ったわけではありません |
 | 連携 | 🟠 | CM5 のテストベンチで他のサービスと一緒に動作し、メッセージは SDK の共通契約に従います |
@@ -89,7 +89,7 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 
 **HYDRA-UMC-TWIN** は Digital Twin ファミリーの統合の親です。3 つの子のマニフェストを読み、ファミリーが準備できて揃っているかを報告し、その健全性を確認し、リスクレポートがツインから来たことをハードウェア・イン・ザ・ループのブリッジに伝えるインターロック証明書に署名します。物理エンジン自体は計画中です。
 
-最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。
+最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。WebSocket（既定ではオフ）がクライアントへ状態を配信し、入力口が無人機のブリッジから位置と姿勢を受け取り、データレイクへの送信は HTTPS も使えます。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。
 
 ## 🏛️ アーキテクチャ
 
@@ -152,7 +152,9 @@ HTTP API の `?workspace=` による上書きは、既定では配信中のワ�
 | `--poses` | off | `GET /twin/poses` を有効にします（`--twin-config`、署名鍵、トークンが必要） |
 | `--dryrun` | off | 軌道に対する判定に署名する `POST /dryrun/trajectory` を有効にします |
 | `--drift` | off | 実機とシミュレーションのドリフト監視 `POST /drift/observe` と `GET /drift` を有効にします |
-| `--drift-datalake` | off | 各ドリフト観測を HYDRA-UMC-DATALAKE にも送信します（平文 HTTP、設定で許可しない限りループバックのみ） |
+| `--drift-datalake` | off | 各ドリフト観測を HYDRA-UMC-DATALAKE にも送信します（ループバックアドレスへの平文 HTTP、または設定で指定した証明書を用いる HTTPS） |
+| `--uav-input` | off | 無人機の位置と姿勢を受け取る `POST /twin/uav` と `GET /twin/uav` を有効にします（`--twin-config`、署名鍵、トークンが必要） |
+| `--ws` | off | ロボットと車両の状態を配信する WebSocket `/twin/ws` を専用のリスナーで開きます（`--poses` または `--uav-input` が必要） |
 
 ## 🚀 クイックスタート
 
@@ -168,7 +170,7 @@ HTTP API の `?workspace=` による上書きは、既定では配信中のワ�
 
 ## 🧪 テスト
 
-`cargo test` で自動テスト 173 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`cargo test` で自動テスト 223 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -179,7 +181,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（173 件のテスト）、その後 `cargo build --release`
+./build.sh   # 、`cargo test`（223 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 
