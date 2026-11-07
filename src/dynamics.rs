@@ -6,14 +6,22 @@
 //! A simple physics model of a robot that does not exist: every joint follows the position it is ordered to, the way a real joint does,
 //! with a top speed, a top acceleration and the two ends of its travel.
 //!
-//! This is not a rigid-body engine: there are no masses, no gravity, no contacts and no motor model. Each joint is a point that moves on a
-//! line and obeys three limits, which is what the hardware-in-the-loop bridge needs to be exercised without a robot: a command that is
-//! delivered makes the joint move over time (it does not jump), it never leaves its travel, it never goes faster than its limits and it
-//! stops at the position it was sent to without overshooting. The step is fixed and small, so the same orders and the same time steps give
-//! the same positions every time.
+//! By default this is not a rigid-body model: a joint is a point that moves on a line and obeys three limits, which is what the
+//! hardware-in-the-loop bridge needs to be exercised without a robot: a command that is delivered makes the joint move over time (it does
+//! not jump), it never leaves its travel, it never goes faster than its limits and it stops at the position it was sent to without
+//! overshooting. The step is fixed and small, so the same orders and the same time steps give the same positions every time.
+//!
+//! A joint that has a `rigid` block is a rigid link instead: an inertia, a viscous damping, the torque of gravity on the link and a motor
+//! that pulls the joint to its target with a proportional-derivative law that saturates at a top torque. The equation of motion is
+//! `inertia * acceleration = motor torque - damping * velocity - gravity_torque * sin(position)` (the position is measured from the
+//! hanging-down rest of the link), integrated with the fourth-order Runge-Kutta rule, the same equation and the same rule as one joint of
+//! the articulated engine of PHYSICS-REPLICA (`rigidbody.rs`), which `compare-dynamics` of HIL-BRIDGE compares against a recording. What it
+//! does not model: the coupling between joints (each rigid joint is its own link), contacts, friction other than viscous, and flexible
+//! parts; the numbers are those of a model, not measurements of a robot, so anything built on it is evidence=simulator.
 //!
 //! The model is read from a JSON file (`--sim-config`), which is where the numbers of the robot belong:
-//! `{"joints":[{"name":"elbow","lower":-1.5,"upper":1.5,"max_velocity":1.0,"max_acceleration":4.0,"initial":0.0}]}`.
+//! `{"joints":[{"name":"elbow","lower":-1.5,"upper":1.5,"max_velocity":1.0,"max_acceleration":4.0,"initial":0.0,
+//! "rigid":{"inertia":0.2,"damping":0.05,"gravity_torque":2.0,"kp":50.0,"kd":5.0,"max_torque":20.0}}]}`.
 
 use std::collections::BTreeMap;
 
@@ -29,6 +37,80 @@ pub const MAX_SIM_JOINTS: usize = 256;
 const SETTLE_DISTANCE: f64 = 1e-6;
 const SETTLE_VELOCITY: f64 = 1e-5;
 
+/// The rigid link of a joint (see the header of this file). Every number is in SI units: kg m^2, N m s/rad, N m, N m/rad, N m s/rad, N m.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RigidSpec {
+    /// The inertia of the link about the joint axis (above zero).
+    pub inertia: f64,
+    /// The viscous damping of the joint (zero or more).
+    #[serde(default)]
+    pub damping: f64,
+    /// The largest torque that gravity makes on the link, mass * g * distance of the centre of mass (zero for a horizontal axis).
+    #[serde(default)]
+    pub gravity_torque: f64,
+    /// The stiffness of the motor towards the target (zero or more).
+    #[serde(default)]
+    pub kp: f64,
+    /// The damping of the motor against the speed (zero or more).
+    #[serde(default)]
+    pub kd: f64,
+    /// The most torque the motor gives (above zero).
+    pub max_torque: f64,
+}
+
+/// A step of `MAX_SUBSTEP_S` is stable for the Runge-Kutta rule when the motor stiffness and damping per unit of inertia stay below these.
+const MAX_STIFFNESS_PER_INERTIA: f64 = (2.0 / MAX_SUBSTEP_S) * (2.0 / MAX_SUBSTEP_S);
+const MAX_DAMPING_PER_INERTIA: f64 = 2.0 / MAX_SUBSTEP_S;
+/// A rigid joint that moves slower and accelerates less than this has come to rest.
+const REST_VELOCITY: f64 = 1e-4;
+const REST_ACCELERATION: f64 = 1e-3;
+
+impl RigidSpec {
+    fn validate(&self, joint: &str) -> Result<(), String> {
+        let finite = [
+            self.inertia,
+            self.damping,
+            self.gravity_torque,
+            self.kp,
+            self.kd,
+            self.max_torque,
+        ]
+        .iter()
+        .all(|v| v.is_finite());
+        if !finite {
+            return Err(format!(
+                "the rigid link of the joint {joint} has a number that is not finite"
+            ));
+        }
+        if self.inertia <= 0.0 || self.max_torque <= 0.0 {
+            return Err(format!(
+                "the rigid link of the joint {joint} needs a positive inertia and max_torque"
+            ));
+        }
+        if self.damping < 0.0 || self.gravity_torque < 0.0 || self.kp < 0.0 || self.kd < 0.0 {
+            return Err(format!(
+                "the rigid link of the joint {joint} needs damping, gravity_torque, kp and kd of zero or more"
+            ));
+        }
+        if self.kp / self.inertia > MAX_STIFFNESS_PER_INERTIA
+            || (self.kd + self.damping) / self.inertia > MAX_DAMPING_PER_INERTIA
+        {
+            return Err(format!(
+                "the rigid link of the joint {joint} is too stiff for the step of the simulation (kp / inertia at most {MAX_STIFFNESS_PER_INERTIA}, (kd + damping) / inertia at most {MAX_DAMPING_PER_INERTIA})"
+            ));
+        }
+        Ok(())
+    }
+
+    /// The angular acceleration of the link for a position, a speed and the target the motor pulls to.
+    fn acceleration(&self, target: f64, position: f64, velocity: f64) -> f64 {
+        let motor = (self.kp * (target - position) - self.kd * velocity)
+            .clamp(-self.max_torque, self.max_torque);
+        (motor - self.damping * velocity - self.gravity_torque * position.sin()) / self.inertia
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JointSpec {
@@ -39,6 +121,9 @@ pub struct JointSpec {
     pub max_acceleration: f64,
     #[serde(default)]
     pub initial: f64,
+    /// A rigid link in place of the kinematic joint (None: the joint follows its limits only).
+    #[serde(default)]
+    pub rigid: Option<RigidSpec>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -102,6 +187,9 @@ impl SimConfig {
                     joint.name
                 ));
             }
+            if let Some(rigid) = &joint.rigid {
+                rigid.validate(&joint.name)?;
+            }
         }
         Ok(())
     }
@@ -123,6 +211,8 @@ struct Joint {
     position: f64,
     velocity: f64,
     target: f64,
+    /// The acceleration of the last step (only a rigid joint keeps it: it tells a joint at rest from one that is about to move).
+    acceleration: f64,
 }
 
 /// What a command did: the target that was kept and whether it had to be pulled back inside the travel of the joint.
@@ -153,6 +243,7 @@ impl SimulatedRobot {
                         position: spec.initial,
                         velocity: 0.0,
                         target: spec.initial,
+                        acceleration: 0.0,
                     },
                 )
             })
@@ -199,7 +290,11 @@ impl SimulatedRobot {
         let dt = seconds / steps as f64;
         for _ in 0..steps {
             for joint in self.joints.values_mut() {
-                step_joint(joint, dt);
+                if joint.spec.rigid.is_some() {
+                    step_rigid(joint, dt);
+                } else {
+                    step_joint(joint, dt);
+                }
             }
         }
         self.clock_s += seconds;
@@ -225,7 +320,12 @@ impl SimulatedRobot {
         let Some(entry) = self.joints.get_mut(joint) else {
             return Err(format!("unknown joint: {joint}"));
         };
-        let braking = entry.velocity * entry.velocity.abs() / (2.0 * entry.spec.max_acceleration);
+        // a rigid joint is held where it is: the damping of its motor brakes it, as the inertia and the torque decide
+        let braking = if entry.spec.rigid.is_some() {
+            0.0
+        } else {
+            entry.velocity * entry.velocity.abs() / (2.0 * entry.spec.max_acceleration)
+        };
         let target = (entry.position + braking).clamp(entry.spec.lower, entry.spec.upper);
         entry.target = target;
         Ok(CommandOutcome {
@@ -241,8 +341,46 @@ impl SimulatedRobot {
 }
 
 fn settled(joint: &Joint) -> bool {
+    if joint.spec.rigid.is_some() {
+        // gravity bends the link under its motor, so a rigid joint rests where it stops, not necessarily on its target
+        return joint.velocity.abs() <= REST_VELOCITY
+            && joint.acceleration.abs() <= REST_ACCELERATION;
+    }
     (joint.target - joint.position).abs() <= SETTLE_DISTANCE
         && joint.velocity.abs() <= SETTLE_VELOCITY
+}
+
+/// One step of a rigid joint with the classical fourth-order Runge-Kutta rule. The speed never passes the top speed of the joint and the joint
+/// never leaves its travel (it stops at an end, and an end that the torque pushes against is a rest).
+fn step_rigid(joint: &mut Joint, dt: f64) {
+    let Some(rigid) = joint.spec.rigid else {
+        return;
+    };
+    let (x, v, target) = (joint.position, joint.velocity, joint.target);
+    let a1 = rigid.acceleration(target, x, v);
+    let (x1, v1) = (x + 0.5 * dt * v, v + 0.5 * dt * a1);
+    let a2 = rigid.acceleration(target, x1, v1);
+    let (x2, v2) = (x + 0.5 * dt * v1, v + 0.5 * dt * a2);
+    let a3 = rigid.acceleration(target, x2, v2);
+    let (x3, v3) = (x + dt * v2, v + dt * a3);
+    let a4 = rigid.acceleration(target, x3, v3);
+    joint.position = x + dt / 6.0 * (v + 2.0 * v1 + 2.0 * v2 + v3);
+    joint.velocity = (v + dt / 6.0 * (a1 + 2.0 * a2 + 2.0 * a3 + a4))
+        .clamp(-joint.spec.max_velocity, joint.spec.max_velocity);
+    joint.acceleration = rigid.acceleration(target, joint.position, joint.velocity);
+    if joint.position <= joint.spec.lower {
+        joint.position = joint.spec.lower;
+        joint.velocity = joint.velocity.max(0.0);
+        if joint.acceleration < 0.0 {
+            joint.acceleration = 0.0;
+        }
+    } else if joint.position >= joint.spec.upper {
+        joint.position = joint.spec.upper;
+        joint.velocity = joint.velocity.min(0.0);
+        if joint.acceleration > 0.0 {
+            joint.acceleration = 0.0;
+        }
+    }
 }
 
 /// One step of one joint. The speed after the step is the fastest one toward the target from which the joint can still stop on it with its top
@@ -555,5 +693,254 @@ mod tests {
         robot.advance(1.0).unwrap();
         assert_eq!(robot.position("j"), Some(0.001));
         assert!(!robot.snapshot()[0].moving);
+    }
+
+    fn rigid_robot(rigid: &str, initial: f64, target: Option<f64>) -> SimulatedRobot {
+        let config = SimConfig::parse(&format!(
+            r#"{{"joints":[{{"name":"link","lower":-3.0,"upper":3.0,"max_velocity":20,"max_acceleration":50,"initial":{initial},"rigid":{rigid}}}]}}"#
+        ))
+        .unwrap();
+        let mut robot = SimulatedRobot::new(&config);
+        if let Some(target) = target {
+            robot.command("link", target).unwrap();
+        }
+        robot
+    }
+
+    fn link(robot: &SimulatedRobot) -> JointSnapshot {
+        robot.snapshot().into_iter().next().unwrap()
+    }
+
+    const FREE_LINK: &str = r#"{"inertia":0.1,"gravity_torque":1.0,"max_torque":10.0}"#;
+
+    #[test]
+    fn a_free_rigid_link_swings_with_the_period_of_a_pendulum() {
+        // small oscillations: omega = sqrt(gravity_torque / inertia)
+        let omega = (1.0f64 / 0.1).sqrt();
+        let period = 2.0 * std::f64::consts::PI / omega;
+        let mut robot = rigid_robot(FREE_LINK, 0.05, None);
+        robot.advance(period / 4.0).unwrap();
+        assert!(
+            link(&robot).position.abs() < 1e-3,
+            "a quarter period later it passes through the rest: {}",
+            link(&robot).position
+        );
+        robot.advance(period / 4.0).unwrap();
+        assert!((link(&robot).position + 0.05).abs() < 1e-3);
+        robot.advance(period / 2.0).unwrap();
+        assert!((link(&robot).position - 0.05).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_free_rigid_link_keeps_its_energy() {
+        let energy = |robot: &SimulatedRobot| {
+            let joint = link(robot);
+            0.5 * 0.1 * joint.velocity * joint.velocity + 1.0 * (1.0 - joint.position.cos())
+        };
+        let mut robot = rigid_robot(FREE_LINK, 1.0, None);
+        let start = energy(&robot);
+        for _ in 0..40 {
+            robot.advance(0.25).unwrap();
+            assert!(
+                (energy(&robot) - start).abs() < 1e-6 * start,
+                "the energy drifted: {} against {start}",
+                energy(&robot)
+            );
+        }
+    }
+
+    #[test]
+    fn damping_takes_energy_out_and_the_link_comes_to_rest() {
+        let damped = r#"{"inertia":0.1,"damping":0.2,"gravity_torque":1.0,"max_torque":10.0}"#;
+        let mut robot = rigid_robot(damped, 1.0, None);
+        let mut last = f64::MAX;
+        for _ in 0..4 {
+            robot.advance(5.0).unwrap();
+            let joint = link(&robot);
+            let energy = 0.5 * 0.1 * joint.velocity * joint.velocity + (1.0 - joint.position.cos());
+            assert!(
+                energy < last,
+                "the energy must fall: {energy} against {last}"
+            );
+            last = energy;
+        }
+        robot.advance(60.0).unwrap();
+        let joint = link(&robot);
+        assert!(joint.position.abs() < 1e-3 && joint.velocity.abs() < 1e-3);
+        assert!(!joint.moving, "a link at rest is not moving");
+    }
+
+    #[test]
+    fn a_motor_holds_the_link_under_gravity_with_the_sag_that_its_stiffness_leaves() {
+        let motor = r#"{"inertia":0.2,"damping":0.05,"gravity_torque":2.0,"kp":50.0,"kd":5.0,"max_torque":20.0}"#;
+        let target = 0.5;
+        let mut robot = rigid_robot(motor, 0.0, Some(target));
+        robot.advance(30.0).unwrap();
+        // the rest where kp * (target - x) = gravity_torque * sin(x), found by bisection
+        let (mut low, mut high) = (0.0f64, target);
+        for _ in 0..80 {
+            let mid = 0.5 * (low + high);
+            if 50.0 * (target - mid) - 2.0 * mid.sin() > 0.0 {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        let joint = link(&robot);
+        assert!(
+            (joint.position - low).abs() < 1e-6,
+            "{} against {low}",
+            joint.position
+        );
+        assert!(
+            joint.position < target,
+            "gravity sags the link below the target"
+        );
+        assert!(!joint.moving);
+    }
+
+    #[test]
+    fn the_motor_cannot_give_more_than_its_top_torque() {
+        // a stiffness that asks for far more than the motor gives: the acceleration is the top torque over the inertia (gravity is zero here)
+        let weak = r#"{"inertia":0.5,"kp":1000.0,"max_torque":2.0}"#;
+        let mut robot = rigid_robot(weak, 0.0, Some(2.0));
+        robot.advance(0.1).unwrap();
+        let expected_velocity = 2.0 / 0.5 * 0.1;
+        let expected_position = 0.5 * (2.0 / 0.5) * 0.1 * 0.1;
+        let joint = link(&robot);
+        assert!(
+            (joint.velocity - expected_velocity).abs() < 1e-9,
+            "{}",
+            joint.velocity
+        );
+        assert!(
+            (joint.position - expected_position).abs() < 1e-9,
+            "{}",
+            joint.position
+        );
+    }
+
+    #[test]
+    fn a_rigid_link_stops_at_the_end_of_its_travel() {
+        let strong = r#"{"inertia":0.1,"kp":100.0,"max_torque":50.0}"#;
+        let config = SimConfig::parse(&format!(
+            r#"{{"joints":[{{"name":"link","lower":-1.0,"upper":1.0,"max_velocity":20,"max_acceleration":50,"rigid":{strong}}}]}}"#
+        ))
+        .unwrap();
+        let mut robot = SimulatedRobot::new(&config);
+        robot.command("link", 5.0).unwrap(); // pulled back to the end of the travel
+        let mut highest = 0.0f64;
+        for _ in 0..800 {
+            robot.advance(0.005).unwrap();
+            highest = highest.max(robot.position("link").unwrap());
+        }
+        assert!(highest <= 1.0, "it left the travel: {highest}");
+        assert_eq!(robot.position("link"), Some(1.0));
+        assert!(!link(&robot).moving, "pushing against the end is a rest");
+    }
+
+    #[test]
+    fn a_stop_holds_a_rigid_link_where_it_is_and_the_motor_brakes_it() {
+        let motor = r#"{"inertia":0.2,"gravity_torque":0.0,"kp":50.0,"kd":10.0,"max_torque":20.0}"#;
+        let mut robot = rigid_robot(motor, 0.0, Some(1.0));
+        robot.advance(0.1).unwrap();
+        let before = link(&robot);
+        assert!(before.moving && before.velocity > 0.0);
+        let outcome = robot.stop("link").unwrap();
+        assert_eq!(outcome.target, before.position);
+        robot.advance(10.0).unwrap();
+        let after = link(&robot);
+        assert!(
+            after.position >= before.position - 1e-9,
+            "it did not go back"
+        );
+        assert!(
+            after.position < 1.0,
+            "it did not carry on to the old target"
+        );
+        assert!(!after.moving);
+    }
+
+    #[test]
+    fn a_rigid_joint_and_a_kinematic_one_live_in_the_same_robot() {
+        let config = SimConfig::parse(
+            r#"{"joints":[
+                {"name":"a_kinematic","lower":-1,"upper":1,"max_velocity":1,"max_acceleration":4},
+                {"name":"b_rigid","lower":-1,"upper":1,"max_velocity":5,"max_acceleration":4,"rigid":{"inertia":0.1,"kp":20,"kd":2,"max_torque":5}}
+            ]}"#,
+        )
+        .unwrap();
+        let mut robot = SimulatedRobot::new(&config);
+        robot.command("a_kinematic", 0.5).unwrap();
+        robot.command("b_rigid", 0.5).unwrap();
+        robot.advance(20.0).unwrap();
+        assert_eq!(robot.position("a_kinematic"), Some(0.5));
+        assert!((robot.position("b_rigid").unwrap() - 0.5).abs() < 1e-6);
+        assert!(robot.snapshot().iter().all(|j| !j.moving));
+    }
+
+    #[test]
+    fn the_same_orders_give_the_same_positions_every_time() {
+        let motor = r#"{"inertia":0.2,"damping":0.05,"gravity_torque":2.0,"kp":50.0,"kd":5.0,"max_torque":20.0}"#;
+        let run = || {
+            let mut robot = rigid_robot(motor, 0.1, Some(0.7));
+            for _ in 0..200 {
+                robot.advance(0.013).unwrap();
+            }
+            let joint = link(&robot);
+            (joint.position.to_bits(), joint.velocity.to_bits())
+        };
+        assert_eq!(run(), run());
+    }
+
+    #[test]
+    fn a_rigid_block_with_a_wrong_number_is_refused() {
+        let bad = |rigid: &str| {
+            SimConfig::parse(&format!(
+                r#"{{"joints":[{{"name":"j","lower":-1,"upper":1,"max_velocity":1,"max_acceleration":1,"rigid":{rigid}}}]}}"#
+            ))
+        };
+        assert!(bad(r#"{"inertia":0.1,"max_torque":1}"#).is_ok());
+        for refused in [
+            r#"{"inertia":0,"max_torque":1}"#,
+            r#"{"inertia":-1,"max_torque":1}"#,
+            r#"{"inertia":0.1,"max_torque":0}"#,
+            r#"{"inertia":0.1,"max_torque":1,"damping":-0.1}"#,
+            r#"{"inertia":0.1,"max_torque":1,"gravity_torque":-1}"#,
+            r#"{"inertia":0.1,"max_torque":1,"kp":-1}"#,
+            r#"{"inertia":0.1,"max_torque":1,"kd":-1}"#,
+            r#"{"inertia":0.1,"max_torque":1,"mass":3}"#,
+            r#"{"max_torque":1}"#,
+            r#"{"inertia":0.1}"#,
+        ] {
+            assert!(bad(refused).is_err(), "should be refused: {refused}");
+        }
+    }
+
+    #[test]
+    fn a_motor_too_stiff_for_the_step_is_refused_not_left_to_blow_up() {
+        let stiff_limit = MAX_STIFFNESS_PER_INERTIA * 0.1;
+        let inside = stiff_limit * 0.99;
+        let make = |kp: f64, kd: f64| {
+            SimConfig::parse(&format!(
+                r#"{{"joints":[{{"name":"j","lower":-1,"upper":1,"max_velocity":1,"max_acceleration":1,"rigid":{{"inertia":0.1,"kp":{kp},"kd":{kd},"max_torque":1}}}}]}}"#
+            ))
+        };
+        assert!(make(inside, 0.0).is_ok());
+        assert!(make(stiff_limit * 1.01, 0.0).is_err());
+        assert!(make(1.0, MAX_DAMPING_PER_INERTIA * 0.1 * 1.01).is_err());
+        assert!(make(1.0, MAX_DAMPING_PER_INERTIA * 0.1 * 0.99).is_ok());
+    }
+
+    #[test]
+    fn the_stiffest_motor_that_is_accepted_stays_stable() {
+        let stiff = MAX_STIFFNESS_PER_INERTIA * 0.1 * 0.99;
+        let rigid = format!(r#"{{"inertia":0.1,"kp":{stiff},"kd":0.0,"max_torque":1000}}"#);
+        let mut robot = rigid_robot(&rigid, 0.0, Some(0.001));
+        for _ in 0..400 {
+            robot.advance(0.005).unwrap();
+            let joint = link(&robot);
+            assert!(joint.position.is_finite() && joint.position.abs() < 1.0);
+        }
     }
 }

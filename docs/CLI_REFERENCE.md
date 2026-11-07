@@ -258,8 +258,8 @@ Off by default. With `--collision-predict`, `--collision-urdf PATH`, `--collisio
 ## `serve --sim-config FILE`: a simulated robot, `/sim/...` and `GET /metrics`
 
 Off by default. `--sim-config FILE` (with the signing key and the token of the interlock routes, which these routes use) gives the twin a **simulated robot**: a model in which
-every joint follows the position it is ordered to with a top speed, a top acceleration and the two ends of its travel. It is not a rigid-body engine (no masses, gravity,
-contacts or motors): it is what the hardware-in-the-loop bridge needs to be run without a robot. A joint accelerates, cruises, brakes and stops on its target without overshooting
+every joint follows the position it is ordered to with a top speed, a top acceleration and the two ends of its travel. By default it is not a rigid-body model (no masses, gravity
+or motors): it is what the hardware-in-the-loop bridge needs to be run without a robot. A joint with a `rigid` block is a rigid link instead (below). A joint accelerates, cruises, brakes and stops on its target without overshooting
 it and without a jump of speed; a new order that sends it back brakes it first; a position outside the travel is pulled back to the nearest end (and the answer says so); the same
 orders and the same time steps give the same positions every time. The file is where the numbers of the robot belong:
 
@@ -268,6 +268,22 @@ orders and the same time steps give the same positions every time. The file is w
 ```
 
 Unknown fields, a name used twice, a travel that is not `lower < upper`, a non-positive limit or a start outside the travel stop the server with the reason.
+
+### A rigid link: the `rigid` block of a joint
+
+```json
+{"joints":[{"name":"elbow","lower":-1.5,"upper":1.5,"max_velocity":5.0,"max_acceleration":4.0,"initial":0.0,
+  "rigid":{"inertia":0.2,"damping":0.05,"gravity_torque":2.0,"kp":50.0,"kd":5.0,"max_torque":20.0}}]}
+```
+
+The joint is then a link with an inertia (kg m^2, above zero), a viscous `damping` (N m s/rad), the largest torque that gravity makes on it (`gravity_torque`, N m, zero for a horizontal axis),
+and a motor that pulls it to its target with a proportional-derivative law (`kp` N m/rad, `kd` N m s/rad) that saturates at `max_torque` (N m, above zero). The equation is
+`inertia * acceleration = motor torque - damping * velocity - gravity_torque * sin(position)`, with the position measured from the hanging-down rest of the link, integrated with the
+fourth-order Runge-Kutta rule: the same equation and rule as one joint of the articulated engine of HYDRA-UMC-PHYSICS-REPLICA. `max_velocity` is still a hard ceiling on the speed and the
+travel is still never left; `max_acceleration` is not used by a rigid link. A rigid joint rests where it stops, which under gravity is below its target by what the stiffness leaves
+(`moving` is false when its speed and acceleration are both near zero); `stop` holds it where it is and the motor brakes it. A motor too stiff for the step of the simulation (`kp / inertia`
+above 160000, or `(kd + damping) / inertia` above 400) stops the server with the reason, because it would not be stable. What it does not model: the coupling between joints (each rigid
+joint is its own link), contacts, friction other than viscous, and flexible parts. The numbers are those of a model, not measurements of a robot.
 
 | Route | What it does |
 |---|---|
