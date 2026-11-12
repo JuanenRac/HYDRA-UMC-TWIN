@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-254%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-288%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -170,7 +170,7 @@ Benötigt die stabile Rust-Toolchain (Edition 2021) mit `cargo`.
 
 ## 🧪 Tests
 
-254 automatische Tests laufen mit `cargo test`. Sie brauchen weder Hardware noch etwas außerhalb dieses Rechners.
+288 automatische Tests laufen mit `cargo test`. Sie brauchen weder Hardware noch etwas außerhalb dieses Rechners.
 
 Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das Manifest, die Dokumente, die acht READMEs und die Bilder.
 
@@ -180,7 +180,7 @@ Erfordert die Rust-Toolchain (`cargo`/`rustc`, Installation via [rustup](https:/
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (254 Tests), dann `cargo build --release`
+./build.sh   # `cargo test` (288 Tests), dann `cargo build --release`
 ./run.sh     # führt target/release/hydra-umc-twin aus, gibt Name + Version + Rolle aus
 ```
 
