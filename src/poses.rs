@@ -325,3 +325,6 @@ mod tests {
         assert_eq!(r.running.load(Ordering::SeqCst), MAX_CONCURRENT);
     }
 }
+
+#[cfg(all(test, unix))]
+mod child_tests;

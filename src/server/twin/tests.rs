@@ -886,3 +886,6 @@ fn the_websocket_route_does_not_exist_on_the_http_port() {
     );
     assert_eq!(request(port, "GET", "/twin/ws", &auth(), "").0, 404);
 }
+
+#[cfg(unix)]
+mod fake_child;
