@@ -4,6 +4,7 @@
 
 All notable changes to this project are documented here.
 
+- **Tests of the binary when it starts:** integration tests that start `serve` on a free loopback port and read it over a real socket (the health route as it is configured, a route that does not exist, and the port closed once the node is stopped); no behaviour changes.
 ## [0.1.8] - **README: the platform statement:** a note says that where the README speaks of the CM5 it means the pilot bench that runs today, and that the target platform of HYDRA-UMC, an NVIDIA Jetson Orin NX 16 GB, is a design that has not been built or tested.
 - The rigid joints of the simulated robot can be coupled through the articulated engine: a `coupled` block in `--sim-config` (`{"urdf": ..., "binary": ..., "timeout_ms": ...}`, off unless given) turns the joints that have a `rigid` block into the joints of one r
 
