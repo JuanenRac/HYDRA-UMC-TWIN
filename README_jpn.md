@@ -91,6 +91,8 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 
 最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。WebSocket（既定ではオフ）がクライアントへ状態を配信し、入力口が無人機のブリッジから位置と姿勢を受け取り、データレイクへの送信は HTTPS も使えます。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。
 
+> **プラットフォーム：** この README の「CM5」は、現在動作している試験用ベンチを指します。HYDRA-UMC の目標プラットフォームは NVIDIA Jetson Orin NX 16 GB ですが、これは製作も試験もされていない設計です。
+
 ## 🏛️ アーキテクチャ
 
 <p align="center">

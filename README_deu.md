@@ -91,6 +91,8 @@ In Rust geschrieben, liest es heute die Manifeste seiner drei Kinder (PHYSICS-RE
 
 Ein minimaler kinematischer Zwilling braucht keine Grafik-Engine: `GET /twin/poses` liefert die Pose jedes Gelenk-Koordinatensystems aus den letzten Berichten der Gelenke, `POST /dryrun/trajectory` führt eine geplante Bahn in der Simulation aus und signiert ein Urteil, bei dem nur `pass` eine Erlaubnis ist, und `POST /drift/observe` überwacht die Abweichung zwischen realem und simuliertem Roboter, mit optionalem, standardmäßig ausgeschaltetem Senden an HYDRA-UMC-DATALAKE. Ein WebSocket (standardmäßig aus) sendet den Zustand an die Clients, ein Eingang nimmt Position und Lage eines unbemannten Fahrzeugs von seiner Bridge entgegen, und das Senden an den Data Lake kann HTTPS nutzen. Nicht mit einem echten Roboter erprobt; siehe `docs/KINEMATIC_TWIN.md`.
 
+> **Plattform:** Wo dieses README CM5 sagt, ist der Pilotprüfstand gemeint, der heute läuft; die Zielplattform von HYDRA-UMC ist ein NVIDIA Jetson Orin NX 16 GB, ein Entwurf, der weder gebaut noch getestet wurde.
+
 ## 🏛️ Architektur
 
 <p align="center">

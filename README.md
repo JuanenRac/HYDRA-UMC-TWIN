@@ -91,6 +91,8 @@ Written in Rust, today it reads the manifests of its three children (PHYSICS-REP
 
 A minimal kinematic twin needs no graphics engine: `GET /twin/poses` gives the pose of every joint frame from the last reports of the joints, `POST /dryrun/trajectory` runs a planned trajectory in simulation and signs a verdict that only `pass` turns into permission, and `POST /drift/observe` watches the difference between the real robot and the simulated one, with an optional, off-by-default sending to HYDRA-UMC-DATALAKE. A WebSocket (off by default) pushes the state to the clients, an input takes the position and attitude of an unmanned vehicle from its bridge, and the sending to the data lake can use HTTPS. Not tried with a real robot; see `docs/KINEMATIC_TWIN.md`.
 
+> **Platform:** where this README says CM5, it means the pilot bench that runs today; the target platform of HYDRA-UMC is an NVIDIA Jetson Orin NX 16 GB, a design that has not been built or tested.
+
 ## 🏛️ Architecture
 
 <p align="center">

@@ -91,6 +91,8 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 
 Un jumeau cinématique minimal n'a pas besoin de moteur graphique : `GET /twin/poses` donne la pose de chaque repère d'articulation à partir des derniers rapports des articulations, `POST /dryrun/trajectory` exécute en simulation une trajectoire planifiée et signe un verdict dont seul `pass` vaut autorisation, et `POST /drift/observe` surveille l'écart entre le robot réel et le robot simulé, avec un envoi optionnel, désactivé par défaut, vers HYDRA-UMC-DATALAKE. Un WebSocket (désactivé par défaut) pousse l'état vers les clients, une entrée reçoit la position et l'attitude d'un véhicule sans pilote depuis son pont, et l'envoi au lac de données peut utiliser HTTPS. Non essayé avec un robot réel ; voir `docs/KINEMATIC_TWIN.md`.
 
+> **Plateforme :** là où ce README dit CM5, il s'agit du banc pilote qui fonctionne aujourd'hui ; la plateforme visée par HYDRA-UMC est un NVIDIA Jetson Orin NX 16 Go, une conception ni construite ni testée.
+
 ## 🏛️ Architecture
 
 <p align="center">

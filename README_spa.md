@@ -91,6 +91,8 @@ Escrito en Rust, hoy lee los manifiestos de sus tres hijos (PHYSICS-REPLICA, HIL
 
 Un gemelo cinemático mínimo no necesita motor gráfico: `GET /twin/poses` da la pose de cada sistema de referencia de articulación a partir de los últimos informes de las articulaciones, `POST /dryrun/trajectory` ejecuta en simulación una trayectoria planificada y firma un veredicto en el que solo `pass` equivale a permiso, y `POST /drift/observe` vigila la diferencia entre el robot real y el simulado, con un envío opcional, apagado por defecto, a HYDRA-UMC-DATALAKE. Un WebSocket (apagado por defecto) envía el estado a los clientes, una entrada recibe la posición y la actitud de un vehículo no tripulado desde su puente, y el envío al lago de datos puede usar HTTPS. No probado con un robot real; véase `docs/KINEMATIC_TWIN.md`.
 
+> **Plataforma:** donde este README dice CM5, se refiere al banco piloto que funciona hoy; la plataforma objetivo de HYDRA-UMC es una NVIDIA Jetson Orin NX de 16 GB, un diseño que no se ha construido ni probado.
+
 ## 🏛️ Arquitectura
 
 <p align="center">

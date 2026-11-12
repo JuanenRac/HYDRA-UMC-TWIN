@@ -91,6 +91,8 @@ GPL-3.0-or-later - see LICENSE
 
 最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。WebSocket（默认关闭）向客户端推送状态，输入口从无人载具的桥接接收位置与姿态，发送到数据湖时可使用 HTTPS。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。
 
+> **平台：** 本 README 中的 CM5 指的是目前正在运行的试验台；HYDRA-UMC 的目标平台是 NVIDIA Jetson Orin NX 16 GB，这是尚未制造或测试的设计。
+
 ## 🏛️ 架构
 
 <p align="center">

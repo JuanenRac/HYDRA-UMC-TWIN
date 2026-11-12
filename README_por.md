@@ -91,6 +91,8 @@ O **HYDRA-UMC-TWIN** é o pai de integração da família Digital Twin. Lê os m
 
 Um gémeo cinemático mínimo não precisa de motor gráfico: `GET /twin/poses` dá a pose de cada referencial de articulação a partir dos últimos relatórios das articulações, `POST /dryrun/trajectory` executa em simulação uma trajetória planeada e assina um veredicto em que só `pass` equivale a permissão, e `POST /drift/observe` vigia a diferença entre o robô real e o simulado, com um envio opcional, desligado por omissão, para o HYDRA-UMC-DATALAKE. Um WebSocket (desligado por omissão) envia o estado aos clientes, uma entrada recebe a posição e a atitude de um veículo não tripulado a partir da sua ponte, e o envio para o data lake pode usar HTTPS. Não testado com um robô real; ver `docs/KINEMATIC_TWIN.md`.
 
+> **Plataforma:** onde este README diz CM5, refere-se ao banco piloto que funciona hoje; a plataforma objetivo do HYDRA-UMC é uma NVIDIA Jetson Orin NX de 16 GB, um desenho que não foi construído nem testado.
+
 ## 🏛️ Arquitetura
 
 <p align="center">
