@@ -17,6 +17,7 @@
 mod certificate;
 mod collision;
 mod contract;
+mod coupled;
 mod drift;
 mod dryrun;
 mod dynamics;

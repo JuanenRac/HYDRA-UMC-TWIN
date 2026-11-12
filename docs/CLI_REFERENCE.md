@@ -283,7 +283,24 @@ fourth-order Runge-Kutta rule: the same equation and rule as one joint of the ar
 travel is still never left; `max_acceleration` is not used by a rigid link. A rigid joint rests where it stops, which under gravity is below its target by what the stiffness leaves
 (`moving` is false when its speed and acceleration are both near zero); `stop` holds it where it is and the motor brakes it. A motor too stiff for the step of the simulation (`kp / inertia`
 above 160000, or `(kd + damping) / inertia` above 400) stops the server with the reason, because it would not be stable. What it does not model: the coupling between joints (each rigid
-joint is its own link), contacts, friction other than viscous, and flexible parts. The numbers are those of a model, not measurements of a robot.
+joint is its own link unless the `coupled` block below is given), contacts, friction other than viscous, and flexible parts. The numbers are those of a model, not measurements of a robot.
+
+### Joints that pull on each other: the `coupled` block (off unless given)
+
+```json
+{"coupled":{"urdf":"robot.urdf","binary":"/usr/local/bin/hydra-umc-physics-replica","timeout_ms":5000},
+ "joints":[{"name":"shoulder","lower":-3,"upper":3,"max_velocity":2,"max_acceleration":4,"rigid":{"inertia":0.2,"kp":50,"kd":5,"max_torque":20}},
+           {"name":"elbow","lower":-2,"upper":2,"max_velocity":2,"max_acceleration":4,"rigid":{"inertia":0.1,"kp":30,"kd":3,"max_torque":10}}]}
+```
+
+With the block, the joints that have a `rigid` block stop being links of their own and become the joints of the robot of `urdf`: the articulated engine of HYDRA-UMC-PHYSICS-REPLICA
+(`simulate`, with the targets and the `kp`, `kd` and `max_torque` of each joint) works out the mass matrix and the bias of the whole arm from the inertial blocks of the URDF and gravity, so
+the motion of one joint pulls on the others. The program is started once for each interval the simulation advances (one `POST /sim/step`, or one tick), never once per integration step.
+The `inertia`, `damping` and `gravity_torque` of a joint are not used then (the URDF gives the masses; the engine has no joint damping); the motor numbers are. The rigid joints of the file must be
+exactly the movable joints of the URDF: a joint of the URDF with no rigid joint, or the other way round, is an error that names the problem. A child that fails, ends after `timeout_ms`
+(100 to 60000, 5000 by default), refuses the state or answers something that is not finite is an error of the step, and the simulated robot is left where it was. The program and the URDF come
+from the file, never from a request. The travel and the top speed of each joint still hold after the step. Joints without a `rigid` block follow their limits as before. A model, not a
+measurement of a robot: evidence is the simulator.
 
 | Route | What it does |
 |---|---|

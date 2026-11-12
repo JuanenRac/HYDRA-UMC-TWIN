@@ -130,6 +130,9 @@ pub struct JointSpec {
 #[serde(deny_unknown_fields)]
 pub struct SimConfig {
     pub joints: Vec<JointSpec>,
+    /// The rigid joints as the joints of one articulated robot, computed by PHYSICS-REPLICA (None: each rigid joint is a link of its own, as before).
+    #[serde(default)]
+    pub coupled: Option<crate::coupled::CoupledSpec>,
 }
 
 impl SimConfig {
@@ -148,6 +151,12 @@ impl SimConfig {
             return Err(format!(
                 "the simulation has more than {MAX_SIM_JOINTS} joints"
             ));
+        }
+        if let Some(coupled) = &self.coupled {
+            coupled.validate()?;
+            if !self.joints.iter().any(|j| j.rigid.is_some()) {
+                return Err("the coupled block needs at least one joint with a rigid block".into());
+            }
         }
         let mut seen = std::collections::BTreeSet::new();
         for joint in &self.joints {
@@ -226,6 +235,8 @@ pub struct CommandOutcome {
 #[derive(Debug, Clone)]
 pub struct SimulatedRobot {
     joints: BTreeMap<String, Joint>,
+    /// The articulated engine that moves the rigid joints together (None: each rigid joint moves alone).
+    coupled: Option<crate::coupled::CoupledSpec>,
     /// Total simulated time (seconds).
     clock_s: f64,
 }
@@ -250,6 +261,7 @@ impl SimulatedRobot {
             .collect();
         SimulatedRobot {
             joints,
+            coupled: config.coupled.clone(),
             clock_s: 0.0,
         }
     }
@@ -288,8 +300,16 @@ impl SimulatedRobot {
             return Ok(());
         }
         let dt = seconds / steps as f64;
+        // the rigid joints of a coupled robot move together: one call for the whole interval, made before anything changes
+        let coupled = match &self.coupled {
+            Some(spec) => Some(self.advance_coupled(spec, seconds)?),
+            None => None,
+        };
         for _ in 0..steps {
             for joint in self.joints.values_mut() {
+                if coupled.is_some() && joint.spec.rigid.is_some() {
+                    continue;
+                }
                 if joint.spec.rigid.is_some() {
                     step_rigid(joint, dt);
                 } else {
@@ -297,8 +317,39 @@ impl SimulatedRobot {
                 }
             }
         }
+        if let Some(outcome) = coupled {
+            for out in outcome {
+                if let Some(joint) = self.joints.get_mut(&out.name) {
+                    apply_coupled(joint, out.position, out.velocity, seconds);
+                }
+            }
+        }
         self.clock_s += seconds;
         Ok(())
+    }
+
+    /// The state of every rigid joint after `seconds`, from the articulated engine (the robot is not changed here).
+    fn advance_coupled(
+        &self,
+        spec: &crate::coupled::CoupledSpec,
+        seconds: f64,
+    ) -> Result<Vec<crate::coupled::JointOut>, String> {
+        let rigid: Vec<crate::coupled::JointIn> = self
+            .joints
+            .values()
+            .filter_map(|joint| {
+                joint.spec.rigid.map(|r| crate::coupled::JointIn {
+                    name: joint.spec.name.clone(),
+                    position: joint.position,
+                    velocity: joint.velocity,
+                    target: joint.target,
+                    kp: r.kp,
+                    kd: r.kd,
+                    max_torque: r.max_torque,
+                })
+            })
+            .collect();
+        crate::coupled::advance(spec, &rigid, seconds)
     }
 
     pub fn snapshot(&self) -> Vec<JointSnapshot> {
@@ -337,6 +388,24 @@ impl SimulatedRobot {
 
     pub fn position(&self, joint: &str) -> Option<f64> {
         self.joints.get(joint).map(|j| j.position)
+    }
+}
+
+/// Take the state the articulated engine gave a rigid joint, with the same guards as a step of its own: the speed never passes the top speed and the
+/// joint never leaves its travel (it stops at an end; the acceleration is the change of speed over the interval).
+fn apply_coupled(joint: &mut Joint, position: f64, velocity: f64, seconds: f64) {
+    let before = joint.velocity;
+    joint.position = position;
+    joint.velocity = velocity.clamp(-joint.spec.max_velocity, joint.spec.max_velocity);
+    joint.acceleration = (joint.velocity - before) / seconds;
+    if joint.position <= joint.spec.lower {
+        joint.position = joint.spec.lower;
+        joint.velocity = joint.velocity.max(0.0);
+        joint.acceleration = joint.acceleration.max(0.0);
+    } else if joint.position >= joint.spec.upper {
+        joint.position = joint.spec.upper;
+        joint.velocity = joint.velocity.min(0.0);
+        joint.acceleration = joint.acceleration.min(0.0);
     }
 }
 
