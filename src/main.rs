@@ -870,6 +870,9 @@ fn main() -> ExitCode {
 }
 
 #[cfg(test)]
+mod main_tests;
+
+#[cfg(test)]
 mod workspace_bound_tests {
     use super::default_workspace_bound;
 

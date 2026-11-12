@@ -889,3 +889,5 @@ fn the_websocket_route_does_not_exist_on_the_http_port() {
 
 #[cfg(unix)]
 mod fake_child;
+#[cfg(unix)]
+mod fake_dryrun;
