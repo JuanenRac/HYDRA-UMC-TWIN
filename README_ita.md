@@ -34,7 +34,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| Versione | `0.1.7` |
+| Versione | `0.1.8` |
 | Maturità | Funzionale |
 | Test | 288 (`cargo test`) |
 | Tecnologia | Rust / tiny_http |

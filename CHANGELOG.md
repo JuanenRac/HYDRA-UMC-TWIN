@@ -1,8 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.1.8] - The rigid joints of the simulated robot can be coupled through the articulated engine: a `coupled` block in `--sim-config` (`{"urdf": ..., "binary": ..., "timeout_ms": ...}`, off unless given) turns the joints that have a `rigid` block into the joints of one r
 
 - **The rigid joints of the simulated robot can be coupled through the articulated engine:** a `coupled` block in `--sim-config` (`{"urdf": ..., "binary": ..., "timeout_ms": ...}`, off unless given) turns the joints that have a `rigid` block into the joints of one robot, so the motion of one joint pulls on the others: once for each interval the simulation advances, the twin runs `simulate` of HYDRA-UMC-PHYSICS-REPLICA with the targets and the motor numbers of each joint (the mass matrix and the bias come from the inertial blocks of the URDF and gravity), and takes the last state. The travel and the top speed of each joint still hold, the motor law is the one the twin already used, and the joints without a rigid block are unchanged. A child that fails, ends too late, refuses the state, answers for other joints than the rigid ones or answers a number that is not finite is an error of the step that leaves the robot where it was. Tested with a stand-in for the engine (one call per interval and none without the block, the command line, the guards, each failure, and that an answer equal to the own model of a single link gives the same robot); the equations of the engine itself are tested in PHYSICS-REPLICA. Simulation only: evidence is the simulator.
 
