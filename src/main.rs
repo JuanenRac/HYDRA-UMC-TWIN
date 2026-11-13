@@ -33,6 +33,8 @@ mod schema;
 mod server;
 mod server_identity;
 #[cfg(test)]
+mod simulation_bench;
+#[cfg(test)]
 mod test_cert;
 mod twincfg;
 mod uav;
