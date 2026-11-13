@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **The collision check of the dry run is tested against a child with two faces:** a fake replica that passes the trajectory check and answers the collision prediction with a clear verdict, a contact, an answer with no verdict, an answer that disagrees with its exit status, a refusal, a crash, a hang and a request over the limit of states; each failure is named and none is read as clear. The floor of the coverage job rises to 93.9 % of the lines.
 All notable changes to this project are documented here.
 
 - **A simulation bench and a coverage floor on CI:** the workflow `Simulation bench` runs the tests of `src/simulation_bench.rs`: two simulated robots receive the same seeded orders and the drift monitor watches the difference while faults are injected into the one that stands for the real machine (a joint that sticks, an encoder that jumps, a lost order, an actuator that is too slow, one bad reading). It names the joint, stays quiet on a healthy machine with a noisy sensor, takes three readings to raise an alarm, and no order, however far outside the travel, takes a joint past its limits or its top speed. The workflow `Coverage` measures the line coverage with `cargo llvm-cov` and fails under a floor. 9 new tests.
