@@ -81,6 +81,7 @@ fn run(seed: u64, fault: &Fault) -> Report {
         None,
     );
     let mut first_alarm = [None; 3];
+    let mut worst = Level::Ok;
     for tick in 0..TICKS {
         if tick % ORDER_EVERY == 0 {
             for (index, joint) in JOINTS.iter().enumerate() {
@@ -122,6 +123,7 @@ fn run(seed: u64, fault: &Fault) -> Report {
                     tick as u64 * 20,
                 )
                 .unwrap();
+            worst = worst.max(seen.level);
             if seen.level == Level::Alarm && first_alarm[index].is_none() {
                 first_alarm[index] = Some(tick);
             }
@@ -134,11 +136,6 @@ fn run(seed: u64, fault: &Fault) -> Report {
         let index = JOINTS.iter().position(|j| *j == name).unwrap();
         alarms[index] = entry["alarms"].as_u64().unwrap();
     }
-    let worst = match summary["level"].as_str().unwrap() {
-        "alarm" => Level::Alarm,
-        "warn" => Level::Warn,
-        _ => Level::Ok,
-    };
     Report {
         first_alarm,
         alarms,
