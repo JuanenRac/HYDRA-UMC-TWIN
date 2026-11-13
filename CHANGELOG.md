@@ -4,6 +4,8 @@
 
 All notable changes to this project are documented here.
 
+- **A simulation bench and a coverage floor on CI:** the workflow `Simulation bench` runs the tests of `src/simulation_bench.rs`: two simulated robots receive the same seeded orders and the drift monitor watches the difference while faults are injected into the one that stands for the real machine (a joint that sticks, an encoder that jumps, a lost order, an actuator that is too slow, one bad reading). It names the joint, stays quiet on a healthy machine with a noisy sensor, takes three readings to raise an alarm, and no order, however far outside the travel, takes a joint past its limits or its top speed. The workflow `Coverage` measures the line coverage with `cargo llvm-cov` and fails under a floor. 9 new tests.
+
 ## [0.1.8] - **README: the platform statement:** a note says that where the README speaks of the CM5 it means the pilot bench that runs today, and that the target platform of HYDRA-UMC, an NVIDIA Jetson Orin NX 16 GB, is a design that has not been built or tested.
 - The rigid joints of the simulated robot can be coupled through the articulated engine: a `coupled` block in `--sim-config` (`{"urdf": ..., "binary": ..., "timeout_ms": ...}`, off unless given) turns the joints that have a `rigid` block into the joints of one r
 
