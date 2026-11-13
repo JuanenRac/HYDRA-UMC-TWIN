@@ -11,11 +11,11 @@
   ],
   "deployment_target": "cm5",
   "maturity": "functional",
-  "evidence": "none",
+  "evidence": "host-test",
   "family": "Digital Twin & Simulation",
   "parent": null,
   "build": "cargo build --release.",
-  "notes": "Functional v0: real family-readiness check (`family-status` subcommand) reads each of the 3 real children's own hydra-umc.project.json and reports presence/version/maturity/role. Plus a real state-sync contract (src/contract.rs): a child must be at least `functional` maturity and report a major version no higher than this Twin's verified-compatible ceiling (0 today) before it is treated as sync-ready - an incompatible simulator version or an immature child is refused with a real reason, exposed via the new `family-sync` subcommand. Honest for an integration hub that runs no rendering/physics engine itself - the real Bevy-based engine and MuJoCo/PhysX backend stay future work, blocked on a real GPU/graphics toolchain and the children's own engines maturing.",
+  "notes": "Functional v0: real family-readiness check (`family-status` subcommand) reads each of the 3 real children's own hydra-umc.project.json and reports presence/version/maturity/role. Plus a real state-sync contract (src/contract.rs): a child must be at least `functional` maturity and report a major version no higher than this Twin's verified-compatible ceiling (0 today) before it is treated as sync-ready - an incompatible simulator version or an immature child is refused with a real reason, exposed via the new `family-sync` subcommand. Honest for an integration hub that runs no rendering/physics engine itself - the real Bevy-based engine and MuJoCo/PhysX backend stay future work, blocked on a real GPU/graphics toolchain and the children's own engines maturing. Evidence is host-test: the automated test suite runs in CI on the host; nothing here has run against a simulator bench or real hardware.",
   "native_version": {
     "file": "Cargo.toml",
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
