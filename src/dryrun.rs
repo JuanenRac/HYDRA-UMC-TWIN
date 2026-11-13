@@ -735,4 +735,97 @@ mod tests {
         assert_eq!(r.check(&samples(), None), Err(DryRunError::Busy));
         assert_eq!(r.running.load(Ordering::SeqCst), MAX_CONCURRENT);
     }
+
+    /// A child that answers `check-trajectory` as a clean run and `predict-collision` with the given text and exit status.
+    #[cfg(unix)]
+    fn two_faced_child(
+        dir: &std::path::Path,
+        predict_output: &str,
+        predict_code: i32,
+        predict_hangs: bool,
+    ) -> PathBuf {
+        let hang = if predict_hangs { "sleep 30\n" } else { "" };
+        let body = format!(
+            "#!/bin/sh\ncase \"$1\" in\n  check-trajectory)\n    echo '{{\"ok\":true,\"complete\":true}}'\n    exit 0 ;;\n  predict-collision)\n    {hang}    echo '{predict_output}'\n    [ {predict_code} -eq 2 ] && echo 'predict-collision: unknown joint wrist' >&2\n    exit {predict_code} ;;\nesac\nexit 64\n"
+        );
+        let path = dir.join("two-faced.sh");
+        std::fs::write(&path, body).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[cfg(unix)]
+    fn collision_route(
+        binary: &std::path::Path,
+        timeout_ms: u64,
+        max_states: usize,
+    ) -> CollisionRoute {
+        CollisionRoute::new(
+            binary.to_path_buf(),
+            PathBuf::from("robot.urdf"),
+            PathBuf::from("zones.json"),
+            PathBuf::from("physics.cfg"),
+            Duration::from_millis(timeout_ms),
+            max_states,
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_prediction_of_a_collision_is_part_of_the_dry_run_and_each_failure_of_it_is_named() {
+        let _turn = SCRIPT_TURN.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = scratch_dir("collision");
+        let reported = BTreeMap::from([("a".to_string(), 0.0)]);
+        let run = |output: &str, code: i32, hangs: bool, timeout_ms: u64, max_states: usize| {
+            let child = two_faced_child(&dir, output, code, hangs);
+            let dry = route(child.to_str().unwrap(), quick());
+            let collision = collision_route(&child, timeout_ms, max_states);
+            dry.check(&samples(), Some((&collision, &reported)))
+        };
+        let clear = run(
+            r#"{"collision":false,"level":"clear"}"#,
+            0,
+            false,
+            20_000,
+            10,
+        )
+        .unwrap();
+        let finding = clear.collision.unwrap();
+        assert!(!finding.collision);
+        assert_eq!(finding.level, "clear");
+        let contact = run(r#"{"collision":true}"#, 1, false, 20_000, 10).unwrap();
+        let finding = contact.collision.unwrap();
+        assert!(finding.collision);
+        assert_eq!(finding.level, "unknown");
+        // an answer without a verdict, or one that disagrees with the exit status, is never read as "clear"
+        assert!(matches!(
+            run(r#"{"level":"clear"}"#, 0, false, 20_000, 10),
+            Err(DryRunError::Unavailable(_))
+        ));
+        assert!(matches!(
+            run(r#"{"collision":false}"#, 1, false, 20_000, 10),
+            Err(DryRunError::Unavailable(_))
+        ));
+        match run("", 2, false, 20_000, 10) {
+            Err(DryRunError::Refused(reason)) => {
+                assert!(reason.contains("unknown joint"), "{reason}")
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(matches!(
+            run("", 101, false, 20_000, 10),
+            Err(DryRunError::Unavailable(_))
+        ));
+        assert_eq!(
+            run("{}", 0, true, 1_000, 10),
+            Err(DryRunError::Timeout(1_000))
+        );
+        // more samples than the prediction accepts is a bad request, and the prediction child is not asked
+        assert!(matches!(
+            run(r#"{"collision":false}"#, 0, false, 20_000, 1),
+            Err(DryRunError::BadRequest(_))
+        ));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }
