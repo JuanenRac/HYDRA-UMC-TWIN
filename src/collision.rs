@@ -347,6 +347,30 @@ mod tests {
     }
 
     #[test]
+    fn a_state_with_more_joints_than_a_robot_can_have_is_a_bad_request() {
+        let r = route("x");
+        let joints: Vec<String> = (0..=crate::joint_state::MAX_JOINTS)
+            .map(|i| format!("\"j{i}\":0"))
+            .collect();
+        let body = format!("{{\"states\":[{{{}}}]}}", joints.join(","));
+        match r.parse_request(body.as_bytes()) {
+            Err(CollisionError::BadRequest(reason)) => {
+                assert!(reason.contains("too many joints"), "{reason}")
+            }
+            other => panic!("{other:?}"),
+        }
+        // exactly the limit is still a request
+        let at_limit: Vec<String> = (0..crate::joint_state::MAX_JOINTS)
+            .map(|i| format!("\"j{i}\":0"))
+            .collect();
+        let body = format!("{{\"states\":[{{{}}}]}}", at_limit.join(","));
+        assert_eq!(
+            r.parse_request(body.as_bytes()).unwrap()[0].len(),
+            crate::joint_state::MAX_JOINTS
+        );
+    }
+
+    #[test]
     fn a_child_that_does_not_exist_is_unavailable_never_clear() {
         let r = route("definitely-not-a-binary-9f2c");
         let states = vec![BTreeMap::from([("a".to_string(), 1.0)])];
