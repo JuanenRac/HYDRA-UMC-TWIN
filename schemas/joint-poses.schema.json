@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://juanenrac.github.io/HYDRA-UMC-SDK/contracts/json-schema/v1/joint-poses.schema.json",
+  "title": "JointPoses",
+  "description": "The pose of every joint of a robot model at one set of joint positions, as the physics replica answers forward kinematics (`POST /fk`, and `fk --envelope` on its command line): the position in meters and the orientation as a unit quaternion (w, x, y, z) of each joint, all in one declared frame. The poses are listed from the root of the chain to the tip; a tool centre point asked for with an offset comes last under the name `tcp`. The quaternion of a pose is a unit quaternion within 1e-5 (checked by the clients, a schema cannot express it). The schema is closed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "frame", "poses"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "frame": {"enum": ["base"], "description": "The frame the poses are written in: the root link of the model, which is the base of the robot."},
+    "checked": {"type": "boolean", "description": "True when the joint positions were checked against the limits of the model before the poses were computed."},
+    "note": {"type": "string", "maxLength": 1000},
+    "poses": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["joint", "position", "quaternion"],
+        "properties": {
+          "joint": {"type": "string", "minLength": 1, "maxLength": 128},
+          "position": {
+            "type": "object", "required": ["x", "y", "z"], "additionalProperties": false,
+            "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
+          },
+          "quaternion": {
+            "type": "object", "required": ["w", "x", "y", "z"], "additionalProperties": false,
+            "properties": {"w": {"type": "number"}, "x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
+          }
+        }
+      }
+    }
+  }
+}

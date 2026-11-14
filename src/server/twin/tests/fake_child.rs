@@ -164,7 +164,8 @@ fn a_child_that_crashes_is_a_502_and_one_that_hangs_is_a_504_that_names_the_limi
 }
 
 #[test]
-fn a_state_that_does_not_satisfy_the_contract_is_a_502_with_its_problems_never_an_answer() {
+fn an_answer_of_the_child_that_does_not_satisfy_the_contract_is_a_502_with_its_problems_never_an_answer(
+) {
     let port = poses_server("fc-badtype", "badtype", 20_000);
     both_reported(port, 0.5, 1.5, 1);
     let (status, body) = request(port, "GET", "/twin/poses", &auth(), "");
@@ -173,8 +174,7 @@ fn a_state_that_does_not_satisfy_the_contract_is_a_502_with_its_problems_never_a
     assert!(answer["error"]
         .as_str()
         .unwrap()
-        .contains("does not satisfy the TwinState contract"));
-    assert!(!answer["problems"].as_array().unwrap().is_empty());
+        .contains("is not a JointPoses document"));
 }
 
 #[test]

@@ -43,6 +43,10 @@ case "$mode" in
   no_quaternion) echo '[{{"joint":"a","position":{{"x":1,"y":2,"z":3}}}}]'; exit 0 ;;
   no_joint) echo '[{{"position":{{"x":1,"y":2,"z":3}},"quaternion":{{"w":1,"x":0,"y":0,"z":0}}}}]'; exit 0 ;;
   slow) sleep 5; exit 0 ;;
+  bad_length) echo '[{{"joint":"a","position":{{"x":1,"y":2,"z":3}},"quaternion":{{"w":1,"x":1,"y":0,"z":0}}}}]'; exit 0 ;;
+  twice) echo '[{{"joint":"a","position":{{"x":1,"y":2,"z":3}},"quaternion":{{"w":1,"x":0,"y":0,"z":0}}}},{{"joint":"a","position":{{"x":1,"y":2,"z":3}},"quaternion":{{"w":1,"x":0,"y":0,"z":0}}}}]'; exit 0 ;;
+  extra_field) echo '[{{"joint":"a","position":{{"x":1,"y":2,"z":3}},"quaternion":{{"w":1,"x":0,"y":0,"z":0}},"velocity":1}}]'; exit 0 ;;
+  text_number) echo '[{{"joint":"a","position":{{"x":"1","y":2,"z":3}},"quaternion":{{"w":1,"x":0,"y":0,"z":0}}}}]'; exit 0 ;;
 esac
 out="["
 sep=""
@@ -328,6 +332,10 @@ fn an_answer_that_is_not_a_list_of_poses_is_unavailable_never_an_empty_pose() {
             "no_joint",
             "a pose of the child has no joint, position or quaternion",
         ),
+        ("bad_length", "is not a JointPoses document"),
+        ("twice", "appears twice"),
+        ("extra_field", "is not a JointPoses document"),
+        ("text_number", "is not a JointPoses document"),
     ] {
         fake.mode(mode);
         match route.twin_state(&reports, false, 0) {
