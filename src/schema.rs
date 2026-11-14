@@ -18,9 +18,12 @@ use serde_json::Value;
 
 const PROJECT_MANIFEST_SCHEMA: &str = include_str!("../schemas/project-manifest.schema.json");
 const TWIN_STATE_SCHEMA: &str = include_str!("../schemas/twin-state.schema.json");
+const JOINT_POSES_SCHEMA: &str = include_str!("../schemas/joint-poses.schema.json");
 
 /// How far from 1 the length of a unit quaternion may be (the same tolerance as the SDK clients).
 const QUATERNION_TOLERANCE: f64 = 1e-6;
+/// The tolerance of the `JointPoses` contract for the quaternion of a joint.
+const JOINT_QUATERNION_TOLERANCE: f64 = 1e-5;
 
 fn compile(name: &str, text: &str) -> Validator {
     let schema: Value = serde_json::from_str(text)
@@ -41,6 +44,11 @@ fn state_validator() -> &'static Validator {
     VALIDATOR.get_or_init(|| compile("twin state", TWIN_STATE_SCHEMA))
 }
 
+fn joint_poses_validator() -> &'static Validator {
+    static VALIDATOR: OnceLock<Validator> = OnceLock::new();
+    VALIDATOR.get_or_init(|| compile("joint poses", JOINT_POSES_SCHEMA))
+}
+
 fn violations(validator: &Validator, value: &Value) -> Vec<String> {
     let mut found: Vec<String> = validator
         .iter_errors(value)
@@ -55,6 +63,32 @@ fn violations(validator: &Validator, value: &Value) -> Vec<String> {
         .collect();
     found.sort();
     found.dedup();
+    found
+}
+
+/// What is wrong with a document of the `JointPoses` contract (what `fk` of the physics replica answers): what the schema finds, the unit length
+/// of every quaternion (1e-5, as the clients of the SDK check it) and a joint named twice. Empty when the document is valid.
+pub fn joint_poses_problems(poses: &Value) -> Vec<String> {
+    let mut found = violations(joint_poses_validator(), poses);
+    if let Some(list) = poses.get("poses").and_then(Value::as_array) {
+        let mut seen = std::collections::HashSet::new();
+        for (index, entry) in list.iter().enumerate() {
+            if let Some(length) = entry.get("quaternion").and_then(quaternion_length) {
+                if !length.is_finite() || (length - 1.0).abs() > JOINT_QUATERNION_TOLERANCE {
+                    found.push(format!(
+                        "/poses/{index}/quaternion: the quaternion has length {length}, not 1"
+                    ));
+                }
+            }
+            if let Some(name) = entry.get("joint").and_then(Value::as_str) {
+                if !seen.insert(name.to_string()) {
+                    found.push(format!(
+                        "/poses/{index}/joint: the joint {name:?} appears twice"
+                    ));
+                }
+            }
+        }
+    }
     found
 }
 
@@ -129,6 +163,43 @@ mod tests {
                 "orientation": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}
             }}]
         })
+    }
+
+    fn joint_poses() -> Value {
+        json!({
+            "schema_version": "1.0", "frame": "base",
+            "poses": [
+                {"joint": "shoulder", "position": {"x": 0.0, "y": 0.0, "z": 0.1}, "quaternion": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}},
+                {"joint": "tcp", "position": {"x": 0.3, "y": 0.0, "z": 0.2}, "quaternion": {"w": 1.0, "x": 0.0, "y": 0.0, "z": 0.0}}
+            ]
+        })
+    }
+
+    #[test]
+    fn joint_poses_of_the_contract_have_no_problems() {
+        assert_eq!(joint_poses_problems(&joint_poses()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn joint_poses_that_break_the_contract_are_described() {
+        let mut bad = joint_poses();
+        bad["poses"][0]["quaternion"] = json!({"w": 1.0, "x": 1.0, "y": 0.0, "z": 0.0});
+        assert!(joint_poses_problems(&bad).join("\n").contains("not 1"));
+        let mut twice = joint_poses();
+        twice["poses"][1]["joint"] = json!("shoulder");
+        assert!(joint_poses_problems(&twice).join("\n").contains("twice"));
+        let mut extra = joint_poses();
+        extra["poses"][0]["velocity"] = json!(1.0);
+        assert!(!joint_poses_problems(&extra).is_empty());
+        let mut text = joint_poses();
+        text["poses"][0]["position"]["x"] = json!("0.0");
+        assert!(!joint_poses_problems(&text).is_empty());
+        let mut frame = joint_poses();
+        frame["frame"] = json!("world");
+        assert!(!joint_poses_problems(&frame).is_empty());
+        let mut empty = joint_poses();
+        empty["poses"] = json!([]);
+        assert!(!joint_poses_problems(&empty).is_empty());
     }
 
     #[test]

@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **The answer of the forward kinematics is checked against the `JointPoses` contract of the SDK when the twin reads it:** the schema (closed, numbers, at most 256 poses, frame `base`), the unit length of every quaternion (1e-5) and a joint named twice are checked on what the physics replica answers, before the pose is put in the state, and a child that answers something else is a `502` that says what is wrong. The schema is vendored in `schemas/` like the others.
 - **The collision check of the dry run is tested against a child with two faces:** a fake replica that passes the trajectory check and answers the collision prediction with a clear verdict, a contact, an answer with no verdict, an answer that disagrees with its exit status, a refusal, a crash, a hang and a request over the limit of states; each failure is named and none is read as clear. The floor of the coverage job rises to 93.9 % of the lines.
 All notable changes to this project are documented here.
 

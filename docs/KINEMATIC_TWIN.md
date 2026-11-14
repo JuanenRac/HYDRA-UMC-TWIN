@@ -59,6 +59,8 @@ Answers a document of the `TwinState` contract of the SDK (`schemas/twin-state.s
 their position, whether it was `commanded` or `measured` and its age, and the pose of every joint frame, in metres and as a unit
 quaternion, in the base frame. `source` is `simulated` when the server runs the simulated robot and `real` otherwise.
 
+What the kinematics of PHYSICS-REPLICA answer is checked first against the `JointPoses` contract of the SDK (`schemas/joint-poses.schema.json`: closed objects, numbers, at most 256 poses, quaternions of unit length within 1e-5, no joint twice); an answer that breaks it is a `502` that says what is wrong.
+
 A joint the robot needs and the twin has not heard of, or has not heard of for `poses.max_age_ms`, is a `409` that names it (`missing`,
 `stale`); the pose is never computed with a zero in its place. Other answers: `422` (the kinematics refused the positions), `502` (they
 could not be run), `503` (two are running), `504` (they did not end in time). The positions of the last computation are remembered, so a

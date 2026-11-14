@@ -203,6 +203,7 @@ impl PoseRoute {
             .filter(|l| !l.is_empty())
             .ok_or_else(|| PoseError::Unavailable("the child answered no pose".into()))?;
         let mut poses = Vec::with_capacity(list.len());
+        let mut checked = Vec::with_capacity(list.len());
         for entry in list {
             let (name, p, q) = (
                 entry.get("joint").and_then(Value::as_str),
@@ -214,6 +215,7 @@ impl PoseRoute {
                     "a pose of the child has no joint, position or quaternion".into(),
                 ));
             };
+            checked.push(entry.clone());
             poses.push(json!({
                 "name": name,
                 "pose": {
@@ -223,6 +225,18 @@ impl PoseRoute {
                     "orientation": {"w": q["w"], "x": q["x"], "y": q["y"], "z": q["z"]},
                 }
             }));
+        }
+        // what the child answered has to be a document of the JointPoses contract (closed, numbers, unit quaternions, no joint twice)
+        let problems = crate::schema::joint_poses_problems(&json!({
+            "schema_version": "1.0",
+            "frame": "base",
+            "poses": checked,
+        }));
+        if !problems.is_empty() {
+            return Err(PoseError::Unavailable(format!(
+                "the answer of the child is not a JointPoses document: {}",
+                problems.join("; ").chars().take(300).collect::<String>()
+            )));
         }
         Ok(poses)
     }
