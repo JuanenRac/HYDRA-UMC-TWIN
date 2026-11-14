@@ -181,6 +181,52 @@ fn drift_extras(max_age_ms: u64, alarm_after: u32) -> Extras {
     }
 }
 
+/// A server that holds no certifier: the routes that need one answer 404 and never a verdict.
+fn start_without_signing(extras: Extras, tag: &str) -> u16 {
+    let server = bind("127.0.0.1:0").expect("bind");
+    let port = server.server_addr().to_ip().expect("ip").port();
+    let dir = tempdir(tag);
+    std::thread::spawn(move || {
+        run_with_extras(
+            server,
+            dir,
+            None,
+            None,
+            DEFAULT_WORKERS,
+            None,
+            None,
+            None,
+            None,
+            extras,
+        )
+    });
+    port
+}
+
+#[test]
+fn a_server_that_signs_nothing_answers_404_on_the_routes_that_need_a_signature() {
+    let port = start_without_signing(drift_extras(2000, 3), "no-signing");
+    let (status, body) = request(port, "GET", "/drift", &auth(), "");
+    assert_eq!(status, 404, "{body}");
+    assert_eq!(
+        json_of(&body)["error"],
+        "signing is not configured on this server"
+    );
+    for (path, payload) in [
+        ("/drift/observe", r#"{"joint":"a","real":1,"simulated":1}"#),
+        ("/drift/observe", "{}"),
+    ] {
+        let (status, body) = request(port, "POST", path, &auth(), payload);
+        assert_eq!(status, 404, "{path}: {body}");
+        assert_eq!(
+            json_of(&body)["error"],
+            "signing is not configured on this server"
+        );
+    }
+    // the token does not matter when there is nothing to check it against
+    assert_eq!(request(port, "GET", "/drift", "", "").0, 404);
+}
+
 #[test]
 fn without_their_switches_the_routes_do_not_exist() {
     let port = start(
