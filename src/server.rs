@@ -1213,6 +1213,36 @@ mod tests {
     }
 
     #[test]
+    fn a_percent_escape_that_is_not_one_is_kept_and_a_plus_is_a_space() {
+        assert_eq!(percent_decode("a%zzb"), "a%zzb");
+        assert_eq!(percent_decode("a+b+c"), "a b c");
+        // a percent sign too close to the end to hold two digits stays as it is
+        assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%4"), "%4");
+        assert_eq!(percent_decode(""), "");
+    }
+
+    #[test]
+    fn percent_escapes_are_read_as_utf8_and_a_broken_sequence_becomes_the_replacement() {
+        assert_eq!(percent_decode("%e2%82%ac"), "\u{20ac}");
+        assert_eq!(percent_decode("%41%42"), "AB");
+        assert_eq!(percent_decode("%ff"), "\u{fffd}");
+    }
+
+    #[test]
+    fn the_first_parameter_with_the_key_wins_and_the_key_itself_may_be_escaped() {
+        assert_eq!(query_param("/x?a=1&a=2", "a").as_deref(), Some("1"));
+        assert_eq!(
+            query_param("/x?w%6frkspace=v", "workspace").as_deref(),
+            Some("v")
+        );
+        assert_eq!(query_param("/x?a=", "a").as_deref(), Some(""));
+        assert_eq!(query_param("/x?a+b=1", "a b").as_deref(), Some("1"));
+        assert_eq!(query_param("/x", "a"), None);
+        assert_eq!(query_param("/x?b=1", "a"), None);
+    }
+
+    #[test]
     fn non_get_methods_get_405() {
         let ws = tempdir();
         let port = start_test_server(ws);
