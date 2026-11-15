@@ -418,6 +418,14 @@ impl DryRunRoute {
 }
 
 #[cfg(test)]
+impl DryRunRoute {
+    /// Takes every slot of the route, so that the next dry run is answered "busy" without a process being started.
+    pub(crate) fn occupy_every_slot(&self) {
+        self.running.store(MAX_CONCURRENT, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::certificate::{decode_hex, Signer};
