@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [0.1.9]
+
 - **The SDK pin and the shared tools are up to date:** the SDK dependency names the newest release tag, and the shared tools are the canonical copies again.
 - **The answer "too many computations are running" is tested over HTTP for the poses and for the dry run:** with every slot of the route taken, `GET /twin/poses` and `POST /dryrun/trajectory` answer `503` and start no process (`src/server/twin/tests/busy.rs`, 2 tests, no child binary needed). They close lines of `server/twin.rs` that the coverage job listed as not run.
 - **More tests for the reading of a query string and for a server that signs nothing:** the percent escapes of an address are tested at their edges (a bad escape kept as it is, a plus as a space, a percent sign too near the end, bytes read as UTF-8 with the replacement for a broken sequence, the first of two equal keys, an escaped key), and a server started without a certifier is checked to answer 404 on the drift routes, for a `GET` and a `POST`, whatever token the request carries. No behavior changes. The floor of the coverage job goes from 93.9 to 94.3, the figure measured on this change (94.33 % of the lines).
@@ -11,6 +14,8 @@
 All notable changes to this project are documented here.
 
 - **A simulation bench and a coverage floor on CI:** the workflow `Simulation bench` runs the tests of `src/simulation_bench.rs`: two simulated robots receive the same seeded orders and the drift monitor watches the difference while faults are injected into the one that stands for the real machine (a joint that sticks, an encoder that jumps, a lost order, an actuator that is too slow, one bad reading). It names the joint, stays quiet on a healthy machine with a noisy sensor, takes three readings to raise an alarm, and no order, however far outside the travel, takes a joint past its limits or its top speed. The workflow `Coverage` measures the line coverage with `cargo llvm-cov` and fails under a floor. 9 new tests.
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
 
 ## [0.1.8] - **README: the platform statement:** a note says that where the README speaks of the CM5 it means the pilot bench that runs today, and that the target platform of HYDRA-UMC, an NVIDIA Jetson Orin NX 16 GB, is a design that has not been built or tested.
 - The rigid joints of the simulated robot can be coupled through the articulated engine: a `coupled` block in `--sim-config` (`{"urdf": ..., "binary": ..., "timeout_ms": ...}`, off unless given) turns the joints that have a `rigid` block into the joints of one r
