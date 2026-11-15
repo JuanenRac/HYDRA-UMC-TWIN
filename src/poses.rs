@@ -265,6 +265,14 @@ pub fn rfc3339_utc(ms: u64) -> String {
 }
 
 #[cfg(test)]
+impl PoseRoute {
+    /// Takes every slot of the route, so that the next computation is answered "busy" without a process being started.
+    pub(crate) fn occupy_every_slot(&self) {
+        self.running.store(MAX_CONCURRENT, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
