@@ -10,6 +10,22 @@ updates:
       default-days: 7
     labels:
       - "dependencies"
+    ignore:
+      - dependency-name: "ed25519-dalek"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "getrandom"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "jsonschema"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+      - dependency-name: "sha2"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     groups:
       cargo_updates:
         patterns:
