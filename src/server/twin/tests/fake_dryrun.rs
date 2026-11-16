@@ -20,10 +20,10 @@ fn fake_checker(tag: &str, mode: &str) -> PathBuf {
         r#"#!/bin/sh
 mode={mode}
 case "$mode" in
-  clean) echo '{{"ok":true,"complete":true}}'; exit 0 ;;
-  partial) echo '{{"ok":true,"complete":false}}'; exit 0 ;;
-  broken) echo '{{"ok":false,"complete":true}}'; exit 1 ;;
-  liar) echo '{{"ok":true,"complete":true}}'; exit 1 ;;
+  clean) echo '{{"ok":true,"complete":true,"unchecked":[]}}'; exit 0 ;;
+  partial) echo '{{"ok":true,"complete":false,"unchecked":[]}}'; exit 0 ;;
+  broken) echo '{{"ok":false,"complete":true,"unchecked":[]}}'; exit 1 ;;
+  liar) echo '{{"ok":true,"complete":true,"unchecked":[]}}'; exit 1 ;;
   nojson) echo 'not json'; exit 0 ;;
   nofields) echo '{{"ok":true}}'; exit 0 ;;
   refuse) echo "check-trajectory: unknown joint zz" >&2; exit 2 ;;
