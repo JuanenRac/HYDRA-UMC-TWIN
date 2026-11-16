@@ -339,7 +339,13 @@ impl DryRunRoute {
                         "the answer of the child does not agree with its exit status".into(),
                     ));
                 }
-                Ok((ok, complete))
+                // "complete" is believed only when the child also says that nothing was left unchecked; a child that does not
+                // report the list (an older one) is not believed
+                let nothing_unchecked = answer
+                    .get("unchecked")
+                    .and_then(Value::as_array)
+                    .is_some_and(|list| list.is_empty());
+                Ok((ok, complete && nothing_unchecked))
             }
             Some(2) => Err(DryRunError::Refused(
                 stderr
@@ -674,17 +680,48 @@ mod tests {
     fn the_answer_of_the_child_is_read_and_must_agree_with_its_exit_status() {
         let _turn = SCRIPT_TURN.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch_dir("answers");
-        let good = fake(&dir, r#"{"ok":true,"complete":true}"#, 0, false);
+        let good = fake(
+            &dir,
+            r#"{"ok":true,"complete":true,"unchecked":[]}"#,
+            0,
+            false,
+        );
         let c = route(good.to_str().unwrap(), quick())
             .check(&samples(), None)
             .unwrap();
         assert_eq!((c.trajectory_ok, c.trajectory_complete), (true, true));
-        let broken = fake(&dir, r#"{"ok":false,"complete":true}"#, 1, false);
+        // a complete answer that lists what was left unchecked, or does not list it at all, is not complete
+        let listed = fake(
+            &dir,
+            r#"{"ok":true,"complete":true,"unchecked":["velocity:j"]}"#,
+            0,
+            false,
+        );
+        let c = route(listed.to_str().unwrap(), quick())
+            .check(&samples(), None)
+            .unwrap();
+        assert_eq!((c.trajectory_ok, c.trajectory_complete), (true, false));
+        let silent2 = fake(&dir, r#"{"ok":true,"complete":true}"#, 0, false);
+        let c = route(silent2.to_str().unwrap(), quick())
+            .check(&samples(), None)
+            .unwrap();
+        assert_eq!((c.trajectory_ok, c.trajectory_complete), (true, false));
+        let broken = fake(
+            &dir,
+            r#"{"ok":false,"complete":true,"unchecked":[]}"#,
+            1,
+            false,
+        );
         let c = route(broken.to_str().unwrap(), quick())
             .check(&samples(), None)
             .unwrap();
         assert!(!c.trajectory_ok);
-        let liar = fake(&dir, r#"{"ok":true,"complete":true}"#, 1, false);
+        let liar = fake(
+            &dir,
+            r#"{"ok":true,"complete":true,"unchecked":[]}"#,
+            1,
+            false,
+        );
         assert!(matches!(
             route(liar.to_str().unwrap(), quick()).check(&samples(), None),
             Err(DryRunError::Unavailable(_))
@@ -754,7 +791,7 @@ mod tests {
     ) -> PathBuf {
         let hang = if predict_hangs { "sleep 30\n" } else { "" };
         let body = format!(
-            "#!/bin/sh\ncase \"$1\" in\n  check-trajectory)\n    echo '{{\"ok\":true,\"complete\":true}}'\n    exit 0 ;;\n  predict-collision)\n    {hang}    echo '{predict_output}'\n    [ {predict_code} -eq 2 ] && echo 'predict-collision: unknown joint wrist' >&2\n    exit {predict_code} ;;\nesac\nexit 64\n"
+            "#!/bin/sh\ncase \"$1\" in\n  check-trajectory)\n    echo '{{\"ok\":true,\"complete\":true,\"unchecked\":[]}}'\n    exit 0 ;;\n  predict-collision)\n    {hang}    echo '{predict_output}'\n    [ {predict_code} -eq 2 ] && echo 'predict-collision: unknown joint wrist' >&2\n    exit {predict_code} ;;\nesac\nexit 64\n"
         );
         let path = dir.join("two-faced.sh");
         std::fs::write(&path, body).unwrap();

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **A dry run is a pass only when the replica reports nothing left unchecked:** the answer of `check-trajectory` must now carry an empty `unchecked` list besides `complete: true`; an answer that lists something, or does not carry the list (an older replica), gives the verdict `incomplete`. 1 test extended.
+
 
 ## [0.1.9]
 
