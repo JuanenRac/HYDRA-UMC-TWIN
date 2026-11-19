@@ -227,14 +227,14 @@ pub fn decode_hex(text: &str) -> Result<Vec<u8>, ()> {
 /// 16 random bytes from the operating system, as 32 hexadecimal characters.
 pub fn random_nonce() -> Result<String, String> {
     let mut bytes = [0u8; 16];
-    getrandom::getrandom(&mut bytes).map_err(|e| format!("no source of randomness: {e}"))?;
+    getrandom::fill(&mut bytes).map_err(|e| format!("no source of randomness: {e}"))?;
     Ok(encode_hex(&bytes))
 }
 
 /// A new signing seed from the operating system, as 64 hexadecimal characters.
 pub fn random_seed_hex() -> Result<String, String> {
     let mut bytes = [0u8; 32];
-    getrandom::getrandom(&mut bytes).map_err(|e| format!("no source of randomness: {e}"))?;
+    getrandom::fill(&mut bytes).map_err(|e| format!("no source of randomness: {e}"))?;
     Ok(encode_hex(&bytes))
 }
 

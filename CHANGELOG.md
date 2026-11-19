@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **The randomness and JSON Schema crates move to their newest major versions:** the operating system randomness 0.3 and the JSON Schema validator 0.60 (now the same version as the Rust client of the SDK). The signing and digest crates stay on their current major, because their newest major needs a Rust compiler newer than the one of the Debian build.
 - **A dry run is a pass only when the replica reports nothing left unchecked:** the answer of `check-trajectory` must now carry an empty `unchecked` list besides `complete: true`; an answer that lists something, or does not carry the list (an older replica), gives the verdict `incomplete`. 1 test extended.
 
 
