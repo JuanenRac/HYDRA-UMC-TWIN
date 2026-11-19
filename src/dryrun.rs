@@ -131,7 +131,7 @@ pub fn canonical_trajectory(samples: &[Sample]) -> String {
 }
 
 pub fn trajectory_sha256(samples: &[Sample]) -> String {
-    crate::certificate::encode_hex(&Sha256::digest(canonical_trajectory(samples).as_bytes()))
+    crate::certificate::encode_hex(&Sha256::digest(canonical_trajectory(samples).as_bytes())[..])
 }
 
 /// The verdict for what the checks found. Fail closed: only a complete, clean answer is a pass.
