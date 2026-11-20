@@ -406,7 +406,7 @@ mod tests {
     fn the_pass_rate_counts_only_what_the_scenario_verified() {
         let config = config();
         let report = run_sweep(&config, &mut |case: &Case| match &case.change {
-            Change::Parameter { factor, .. } if *factor > 1.0 => Ok(case.seed % 2 == 0),
+            Change::Parameter { factor, .. } if *factor > 1.0 => Ok((case.seed & 1) == 0),
             Change::Mount {
                 axis: Axis::Forward,
                 value,
@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn the_same_configuration_gives_the_same_table() {
         let config = config();
-        let mut scenario = |case: &Case| -> Result<bool, String> { Ok(case.seed % 3 != 0) };
+        let mut scenario = |case: &Case| -> Result<bool, String> { Ok(case.seed % 3 > 0) };
         let a = run_sweep(&config, &mut scenario).unwrap();
         let b = run_sweep(&config, &mut scenario).unwrap();
         assert_eq!(a, b);
