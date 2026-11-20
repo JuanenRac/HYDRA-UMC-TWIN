@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn the_same_configuration_gives_the_same_table() {
         let config = config();
-        let mut scenario = |case: &Case| -> Result<bool, String> { Ok(case.seed % 3 > 0) };
+        let mut scenario = |case: &Case| -> Result<bool, String> { Ok(matches!(case.seed % 3, 1 | 2)) };
         let a = run_sweep(&config, &mut scenario).unwrap();
         let b = run_sweep(&config, &mut scenario).unwrap();
         assert_eq!(a, b);
