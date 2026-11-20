@@ -323,3 +323,8 @@ Off by default, each with its own switch; all need the signing key and the token
 ## The identity of HYDRA-UMC-SERVER (`serve --identity-key-file`)
 
 `serve --identity-key-file FILE` (or `HYDRA_UMC_TWIN_IDENTITY_KEY_FILE`; off by default) gives the signing key of the server (its `JWT_SECRET`, 32 characters or more, read from a file and never printed). A signed token of the server (HS256 with `username`, `role` and `exp`) is then accepted next to the certify token: a viewer may read but not change, and a request with no credential is refused even on loopback, `GET /health` and `GET /metrics` included. The routes of the interlock (certify, state, predict, simulation) keep asking for the certify token after that, because they sign and move a robot model. Without the switch nothing changes.
+
+## `verify-grasp <observation.json> [--config <verify.json>] [--check grasp|placement|pick-and-place]`
+
+Judges a grasp and a placement only from measured poses. Exit `0` verified, `1` failed, `3` unverified (the data cannot support a
+verdict: not a pass), `2` a wrong command line, file or configuration. See `docs/VERIFICATION.md`.

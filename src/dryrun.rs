@@ -475,6 +475,59 @@ mod tests {
         }
     }
 
+    /// Design rule: the verdict degrades towards the safer side and never towards a pass. Over every combination of what the checks
+    /// found and of the two switches, a pass needs a clean trajectory check, a complete one and no collision finding that is
+    /// worse than the switches allow; and a check that is missing or incomplete never gives a better verdict than the same
+    /// answer with that check complete.
+    #[test]
+    fn no_missing_or_worse_finding_ever_improves_the_verdict() {
+        fn rank(v: Verdict) -> u8 {
+            match v {
+                Verdict::Fail => 0,
+                Verdict::Incomplete => 1,
+                Verdict::Pass => 2,
+            }
+        }
+        let findings: [Option<(bool, &str)>; 5] = [
+            None,
+            Some((false, "clear")),
+            Some((false, "warning")),
+            Some((true, "danger")),
+            Some((true, "clear")),
+        ];
+        for require in [true, false] {
+            for on_warning in [true, false] {
+                let cfg = DryRunCfg {
+                    require_collision_check: require,
+                    fail_on_warning: on_warning,
+                    ..DryRunCfg::default()
+                };
+                for ok in [true, false] {
+                    for complete in [true, false] {
+                        for finding in findings {
+                            let verdict = decide(&checks(ok, complete, finding), &cfg);
+                            if verdict == Verdict::Pass {
+                                assert!(ok && complete, "{ok} {complete} {finding:?}");
+                                if let Some((collision, level)) = finding {
+                                    assert!(!collision);
+                                    assert!(!on_warning || level == "clear");
+                                } else {
+                                    assert!(!require);
+                                }
+                            }
+                            // the same answer with the trajectory check complete is never worse
+                            let better = decide(&checks(ok, true, finding), &cfg);
+                            assert!(rank(better) >= rank(verdict));
+                            // the same answer with a clean trajectory check is never worse
+                            let cleaner = decide(&checks(true, complete, finding), &cfg);
+                            assert!(rank(cleaner) >= rank(verdict));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn only_a_complete_and_clean_answer_is_a_pass() {
         let cfg = DryRunCfg::default();

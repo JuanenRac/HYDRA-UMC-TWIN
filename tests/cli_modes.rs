@@ -429,3 +429,84 @@ fn the_websocket_and_the_vehicle_input_are_off_and_refuse_half_configurations() 
     assert_eq!(code, Some(2));
     assert!(stderr.contains("port"), "{stderr}");
 }
+
+// -- verify-grasp: the verdict comes from the measured poses; a controller that says "done" proves nothing, and data that cannot
+// support a verdict is never a pass (exit 3, not 0).
+
+fn carry(object_z: f64, claim: bool) -> String {
+    let samples: Vec<String> = (0..6)
+        .map(|i| {
+            let x = 40.0 * f64::from(i);
+            format!(
+                r#"{{"t_s": {}, "object": [{x}, 0, {object_z}], "gripper": [{x}, 0, {}]}}"#,
+                0.1 * f64::from(i),
+                object_z + 2.0
+            )
+        })
+        .collect();
+    format!(
+        r#"{{"controller_reports_done": {claim}, "rest_object": [0, 0, 0], "transport": [{}], "destination": [200, 0, 0], "final_object": [200, 0, 0]}}"#,
+        samples.join(",")
+    )
+}
+
+#[test]
+fn verify_grasp_says_verified_failed_or_unverified_by_its_exit_code() {
+    let dir = scratch("verify");
+    let good = dir.join("good.json");
+    std::fs::write(&good, carry(50.0, true)).unwrap();
+    let (code, stdout, _) = run(&["verify-grasp", &p(&good)]);
+    assert_eq!(code, Some(0), "{stdout}");
+    assert!(stdout.contains("VERIFY=VERIFIED"), "{stdout}");
+
+    // the controller claims success and the object never left the table
+    let stuck = dir.join("stuck.json");
+    std::fs::write(&stuck, carry(0.0, true)).unwrap();
+    let (code, stdout, _) = run(&["verify-grasp", &p(&stuck), "--check", "grasp"]);
+    assert_eq!(code, Some(1), "{stdout}");
+    assert!(stdout.contains("VERIFY=FAILED"), "{stdout}");
+    assert!(stdout.contains("lift_too_low"), "{stdout}");
+
+    // nothing measured: not a pass
+    let empty = dir.join("empty.json");
+    std::fs::write(&empty, r#"{"controller_reports_done": true}"#).unwrap();
+    let (code, stdout, _) = run(&["verify-grasp", &p(&empty)]);
+    assert_eq!(code, Some(3), "{stdout}");
+    assert!(stdout.contains("VERIFY=UNVERIFIED"), "{stdout}");
+}
+
+#[test]
+fn verify_grasp_reads_its_tolerances_from_the_configuration_file() {
+    let dir = scratch("verify-config");
+    let low = dir.join("low.json");
+    std::fs::write(&low, carry(12.0, false)).unwrap();
+    let (code, _, _) = run(&["verify-grasp", &p(&low), "--check", "grasp"]);
+    assert_eq!(code, Some(1));
+    let config = dir.join("verify.json");
+    std::fs::write(&config, r#"{"min_lift_mm": 10}"#).unwrap();
+    let (code, stdout, _) = run(&["verify-grasp", &p(&low), "--config", &p(&config)]);
+    assert_eq!(code, Some(0), "{stdout}");
+}
+
+#[test]
+fn verify_grasp_refuses_bad_usage_with_exit_code_two() {
+    let dir = scratch("verify-usage");
+    let (code, _, stderr) = run(&["verify-grasp"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("usage"), "{stderr}");
+    let (code, _, _) = run(&["verify-grasp", &p(&dir.join("missing.json"))]);
+    assert_eq!(code, Some(2));
+    let bad = dir.join("bad.json");
+    std::fs::write(&bad, r#"{"success": true}"#).unwrap();
+    let (code, _, stderr) = run(&["verify-grasp", &p(&bad)]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("not an observation"), "{stderr}");
+    let good = dir.join("good.json");
+    std::fs::write(&good, carry(50.0, true)).unwrap();
+    let (code, _, _) = run(&["verify-grasp", &p(&good), "--check", "nonsense"]);
+    assert_eq!(code, Some(2));
+    let zero = dir.join("zero.json");
+    std::fs::write(&zero, r#"{"hold_radius_mm": 0}"#).unwrap();
+    let (code, _, _) = run(&["verify-grasp", &p(&good), "--config", &p(&zero)]);
+    assert_eq!(code, Some(2));
+}
