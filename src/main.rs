@@ -38,6 +38,12 @@ mod simulation_bench;
 mod test_cert;
 mod twincfg;
 mod uav;
+// the transport profile and the replayed claim of a controller are for the callers that wire a simulator
+#[allow(dead_code)]
+mod verify;
+// the sweep is a library for a caller that brings its own scenario; the twin has no task controller to wire it to yet
+#[allow(dead_code)]
+mod sweep;
 mod ws;
 
 use contract::SyncReadiness;
@@ -853,6 +859,65 @@ fn run_serve(args: &[String]) -> ExitCode {
     }
 }
 
+fn run_verify_grasp(args: &[String]) -> ExitCode {
+    let Some(path) = args.first().filter(|a| !a.starts_with("--")) else {
+        eprintln!(
+            "usage: hydra-umc-twin verify-grasp <observation.json> [--config <verify.json>] [--check grasp|placement|pick-and-place]"
+        );
+        return ExitCode::from(2);
+    };
+    let read = |p: &str| -> Result<String, String> {
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {p}: {e}"))
+    };
+    let config = match find_flag(args, "--config") {
+        Some(p) => read(&p).and_then(|t| verify::VerifyConfig::parse(&t)),
+        None => Ok(verify::VerifyConfig::default()),
+    };
+    let config = match config {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("[twin] {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let observation = read(path).and_then(|t| {
+        serde_json::from_str::<verify::Observation>(&t)
+            .map_err(|e| format!("{path} is not an observation: {e}"))
+    });
+    let observation = match observation {
+        Ok(observation) => observation,
+        Err(error) => {
+            eprintln!("[twin] {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let outcome = match find_flag(args, "--check").as_deref() {
+        None | Some("pick-and-place") => verify::verify_pick_and_place(&config, &observation),
+        Some("grasp") => verify::verify_grasp(&config, &observation),
+        Some("placement") => verify::verify_placement(&config, &observation),
+        Some(other) => {
+            eprintln!("[twin] --check must be grasp, placement or pick-and-place, not {other}");
+            return ExitCode::from(2);
+        }
+    };
+    let codes: Vec<&str> = outcome.reasons.iter().map(|r| r.code()).collect();
+    match outcome.verdict {
+        verify::Verdict::Verified => {
+            println!("VERIFY=VERIFIED");
+            ExitCode::SUCCESS
+        }
+        verify::Verdict::Failed => {
+            println!("VERIFY=FAILED reasons={}", codes.join(","));
+            ExitCode::from(1)
+        }
+        // not a pass and not a failure of the task: the data could not support a verdict
+        verify::Verdict::Unverified => {
+            println!("VERIFY=UNVERIFIED reasons={}", codes.join(","));
+            ExitCode::from(3)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
@@ -863,6 +928,7 @@ fn main() -> ExitCode {
         Some("family-health") => run_family_health(&args[1..]),
         Some("serve") => run_serve(&args[1..]),
         Some("keygen") => run_keygen(&args[1..]),
+        Some("verify-grasp") => run_verify_grasp(&args[1..]),
         _ => {
             println!("{PROJECT_NAME} v{VERSION}");
             println!("{ROLE}");
