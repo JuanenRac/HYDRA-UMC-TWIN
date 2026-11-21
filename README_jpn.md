@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-307%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-347%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.9-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.9` |
 | 成熟度 | 機能する |
-| テスト | 307 (`cargo test`) |
+| テスト | 347 (`cargo test`) |
 | 技術 | Rust / tiny_http |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | シミュレーションのみ：エミュレーター、模擬部品、シミュレーターで試験済み。このバージョンについて実機での動作記録はありません |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点はこの README の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 307 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 347 件。変更のたびに実行されます |
 | 実機 | 🟠 | シミュレーションのみ：エミュレーター、模擬部品、シミュレーターで試験済み。このバージョンについて実機での動作記録はありません |
 | インターフェースとプロトコル | 🟡 | 提供するルートやメッセージは文書化され、クライアントで試験済みです。すべてのクライアントがまだ使ったわけではありません |
 | 連携 | 🟠 | メッセージとルートは SDK の共通契約に照らして検証されていますが、実機と一緒に動かしたことはありません |
@@ -89,7 +89,7 @@ Rust で書かれており、現在は 3 つの子プロジェクト（PHYSICS-R
 
 **HYDRA-UMC-TWIN** は Digital Twin ファミリーの統合の親です。3 つの子のマニフェストを読み、ファミリーが準備できて揃っているかを報告し、その健全性を確認し、リスクレポートがツインから来たことをハードウェア・イン・ザ・ループのブリッジに伝えるインターロック証明書に署名します。物理エンジン自体は計画中です。
 
-最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。WebSocket（既定ではオフ）がクライアントへ状態を配信し、入力口が無人機のブリッジから位置と姿勢を受け取り、データレイクへの送信は HTTPS も使えます。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。
+最小限の運動学ツインにはグラフィックエンジンは不要です。`GET /twin/poses` は関節の最新の報告から各関節フレームの姿勢を返し、`POST /dryrun/trajectory` は計画された軌道をシミュレーションで実行して、`pass` だけが許可となる判定に署名し、`POST /drift/observe` は実機とシミュレーションの差を監視します（HYDRA-UMC-DATALAKE への送信は任意で、既定ではオフ）。WebSocket（既定ではオフ）がクライアントへ状態を配信し、入力口が無人機のブリッジから位置と姿勢を受け取り、データレイクへの送信は HTTPS も使えます。実機では未検証です。`docs/KINEMATIC_TWIN.md` を参照してください。把持と配置は計測された姿勢で判定され（`verify-grasp`）、`sweep` は合成シナリオ上で物理パラメータと取り付けに対する感度を掃引します。ロボットではなくモデルです。[docs/VERIFICATION.md](docs/VERIFICATION.md) を参照してください。
 
 > **プラットフォーム：** この README の「CM5」は、現在動作している試験用ベンチを指します。HYDRA-UMC の目標プラットフォームは NVIDIA Jetson Orin NX 16 GB ですが、これは製作も試験もされていない設計です。
 
@@ -172,7 +172,7 @@ HTTP API の `?workspace=` による上書きは、既定では配信中のワ�
 
 ## 🧪 テスト
 
-`cargo test` で自動テスト 307 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`cargo test` で自動テスト 347 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -183,7 +183,7 @@ Rust ツールチェーン（`cargo`/`rustc`、[rustup](https://rustup.rs) 経�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（307 件のテスト）、その後 `cargo build --release`
+./build.sh   # 、`cargo test`（347 件のテスト）、その後 `cargo build --release`
 ./run.sh     # target/release/hydra-umc-twin を実行し、名前 + バージョン + 役割を表示
 ```
 

@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-307%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-347%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.9-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.9` |
 | Maturity | Functional |
-| Tests | 307 (`cargo test`) |
+| Tests | 347 (`cargo test`) |
 | Stack | Rust / tiny_http |
 | Target | The Raspberry Pi CM5 of a HYDRA-UMC cell |
 | On real hardware | Simulated only: tested against emulators, fakes or simulators; no run on real hardware is recorded for this version |
@@ -52,7 +52,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Area | State | What it means here |
 |---|---|---|
 | Software | 🟡 | Works for its main purpose; the honesty check of this README lists what is still missing |
-| Tests | 🟢 | 307 automated tests, run on every change |
+| Tests | 🟢 | 347 automated tests, run on every change |
 | Real hardware | 🟠 | Simulated only: tested against emulators, fakes or simulators; no run on real hardware is recorded for this version |
 | Interface and protocols | 🟡 | The routes or messages it offers are documented and tested with a client; not every client has used them yet |
 | Integration | 🟠 | Its messages and routes are checked against the shared contracts of the SDK; it has not run together with the real equipment |
@@ -89,7 +89,7 @@ Written in Rust, today it reads the manifests of its three children (PHYSICS-REP
 
 **HYDRA-UMC-TWIN** is the integration parent of the Digital Twin family. It reads the manifests of its three children, reports whether the family is ready and in step, probes their health, and signs interlock certificates that tell the hardware-in-the-loop bridge a risk report came from the twin. The physics engine itself is still planned.
 
-A minimal kinematic twin needs no graphics engine: `GET /twin/poses` gives the pose of every joint frame from the last reports of the joints, `POST /dryrun/trajectory` runs a planned trajectory in simulation and signs a verdict that only `pass` turns into permission, and `POST /drift/observe` watches the difference between the real robot and the simulated one, with an optional, off-by-default sending to HYDRA-UMC-DATALAKE. A WebSocket (off by default) pushes the state to the clients, an input takes the position and attitude of an unmanned vehicle from its bridge, and the sending to the data lake can use HTTPS. Not tried with a real robot; see `docs/KINEMATIC_TWIN.md`.
+A minimal kinematic twin needs no graphics engine: `GET /twin/poses` gives the pose of every joint frame from the last reports of the joints, `POST /dryrun/trajectory` runs a planned trajectory in simulation and signs a verdict that only `pass` turns into permission, and `POST /drift/observe` watches the difference between the real robot and the simulated one, with an optional, off-by-default sending to HYDRA-UMC-DATALAKE. A WebSocket (off by default) pushes the state to the clients, an input takes the position and attitude of an unmanned vehicle from its bridge, and the sending to the data lake can use HTTPS. Not tried with a real robot; see `docs/KINEMATIC_TWIN.md`. Grasps and placements are judged from measured poses (`verify-grasp`), and `sweep` runs the sensitivity to physical parameters and to the mounting over a synthetic scenario, a model and not a robot; see [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 > **Platform:** where this README says CM5, it means the pilot bench that runs today; the target platform of HYDRA-UMC is an NVIDIA Jetson Orin NX 16 GB, a design that has not been built or tested.
 
@@ -172,7 +172,7 @@ Requires the stable Rust toolchain (edition 2021) with `cargo`.
 
 ## 🧪 Testing
 
-307 automated tests run with `cargo test`. They need no hardware and nothing outside this machine.
+347 automated tests run with `cargo test`. They need no hardware and nothing outside this machine.
 
 The CI runs `HYDRA_UMC_CI=1 python tools/ci_validate.py`, which checks the manifest, the documents, the eight READMEs and the pictures.
 
@@ -182,7 +182,7 @@ Requires the Rust toolchain (`cargo`/`rustc`, install via [rustup](https://rustu
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (307 tests), then `cargo build --release`
+./build.sh   # `cargo test` (347 tests), then `cargo build --release`
 ./run.sh     # runs target/release/hydra-umc-twin, prints name + version + role
 ```
 

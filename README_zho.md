@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-307%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-347%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.9-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.9` |
 | 成熟度 | 可用 |
-| 测试 | 307 (`cargo test`) |
+| 测试 | 347 (`cargo test`) |
 | 技术栈 | Rust / tiny_http |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 仅模拟：使用模拟器、替身或仿真测试；此版本没有在真实硬件上运行的记录 |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；本 README 中的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 307 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 347 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🟠 | 仅模拟：使用模拟器、替身或仿真测试；此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
 | 集成 | 🟠 | 其消息和路由已对照 SDK 的共享契约检查；尚未与真实设备一起运行 |
@@ -89,7 +89,7 @@ GPL-3.0-or-later - see LICENSE
 
 **HYDRA-UMC-TWIN** 是 Digital Twin 系列的集成父项目。它读取三个子项目的清单，报告系列是否就绪且同步，探测其健康状况，并签署互锁证书，告诉硬件在环桥接某份风险报告来自孪生体。物理引擎本身仍在计划中。
 
-最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。WebSocket（默认关闭）向客户端推送状态，输入口从无人载具的桥接接收位置与姿态，发送到数据湖时可使用 HTTPS。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。
+最小运动学孪生体不需要图形引擎：`GET /twin/poses` 根据各关节的最新报告给出每个关节坐标系的位姿，`POST /dryrun/trajectory` 在仿真中运行已规划的轨迹并签署裁决（只有 `pass` 才算许可），`POST /drift/observe` 监视真实机器人与仿真机器人之间的差异，并可选地（默认关闭）发送到 HYDRA-UMC-DATALAKE。WebSocket（默认关闭）向客户端推送状态，输入口从无人载具的桥接接收位置与姿态，发送到数据湖时可使用 HTTPS。尚未在真实机器人上试过；参见 `docs/KINEMATIC_TWIN.md`。抓取与放置依据测得的位姿判定（`verify-grasp`），`sweep` 在合成场景上扫描对物理参数和安装位置的敏感度，这是模型而不是机器人；参见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
 
 > **平台：** 本 README 中的 CM5 指的是目前正在运行的试验台；HYDRA-UMC 的目标平台是 NVIDIA Jetson Orin NX 16 GB，这是尚未制造或测试的设计。
 
@@ -172,7 +172,7 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 
 ## 🧪 测试
 
-运行 `cargo test` 会执行 307 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `cargo test` 会执行 347 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -183,7 +183,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（307 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（347 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 
