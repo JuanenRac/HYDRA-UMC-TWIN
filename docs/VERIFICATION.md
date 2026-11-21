@@ -91,5 +91,31 @@ The scenario is a function the caller gives. It answers verified, not verified, 
 the sweep stops at the first one, keeps the rows that ran, and the report says `ABORTED` with the case. A sweep is limited to
 64 values per list, 1000 seeds per row and 100000 runs in all. The same configuration gives the same table.
 
-The sweep is a library: the twin runs no task controller yet, so nothing in the server calls it. Connecting it to the simulated
-robot (a scenario that runs the checks of `verify-grasp` over a simulated carry) is future work.
+The sweep is a library: a caller brings its own scenario. The twin runs no task controller yet, so nothing in the server calls it;
+connecting it to the simulated robot is future work. For the command line there is a synthetic scenario (next section).
+
+## `sweep`: the synthetic scenario
+
+```
+hydra-umc-twin sweep [<sweep.json>] [--verify-config <verify.json>] [--format markdown|csv] [--output <file>]
+```
+
+`src/synthetic.rs` is a small model of a pick and place, not a measurement of a robot. It builds a measured carry from a few
+physical numbers and judges it with the same checks and the same configuration as `verify-grasp`:
+
+* The grip holds while the friction of two fingers (`2 * friction * grip_force`) covers the weight plus the push of the top
+  acceleration of the carry. Under that, the object slips down the gripper in proportion to the shortfall (up to 100 mm at the
+  end of the carry) and the check of the hold fails.
+* A misaligned mounting does not change the carry; it moves where the object ends: `forward` and `lateral` in millimetres, `yaw`
+  in degrees across a lever arm of 300 mm. Past `dest_tolerance_mm` the placement fails.
+* The sensors add a noise of up to 1 mm drawn from the seed, so the same seed gives the same carry and the same configuration
+  gives the same table.
+
+The parameters it knows are `mass` (kg, 0.6), `friction` (0.5), `grip_force` (N, 8) and `noise` (mm, 1). A parameter it does not
+know is an error that aborts the sweep, never a row that is skipped. Without a file the command runs a built-in sweep (the three
+physical parameters at 0.5, 0.75, 1.5 and 2 times, the mounting off by 3 and 6 mm either way on both axes and by -1, 1 and 2
+degrees, five seeds each). The table goes to the standard output, or to `--output` (a file that exists is never overwritten).
+The line `SWEEP=COMPLETE rows=N` or `SWEEP=ABORTED rows=N` goes to the standard error.
+
+Exit `0` the sweep ran in full, `3` it was aborted (an evaluation failed, or the data could not support a verdict: the table says
+where and is not a result), `2` a wrong command line, file or configuration.
