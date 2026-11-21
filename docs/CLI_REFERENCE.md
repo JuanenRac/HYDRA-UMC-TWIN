@@ -328,3 +328,11 @@ Off by default, each with its own switch; all need the signing key and the token
 
 Judges a grasp and a placement only from measured poses. Exit `0` verified, `1` failed, `3` unverified (the data cannot support a
 verdict: not a pass), `2` a wrong command line, file or configuration. See `docs/VERIFICATION.md`.
+
+## `sweep [<sweep.json>] [--verify-config <verify.json>] [--format markdown|csv] [--output <file>]`
+
+Runs a sweep of the sensitivity to physical parameters (`mass`, `friction`, `grip_force`, `noise`) and to the misalignment of the
+mounting (`forward`, `lateral`, `yaw`) over a synthetic pick and place, and writes the table as Markdown (default) or CSV, to the
+standard output or to a new file (never over an existing one). Without a file it runs a built-in sweep. Exit `0` ran in full, `3`
+aborted (a case that cannot be evaluated is never a pass; the table says which), `2` a wrong command line, file or configuration.
+A model, not a measurement of a robot. See `docs/VERIFICATION.md`.

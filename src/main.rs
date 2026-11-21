@@ -41,9 +41,10 @@ mod uav;
 // the transport profile and the replayed claim of a controller are for the callers that wire a simulator
 #[allow(dead_code)]
 mod verify;
-// the sweep is a library for a caller that brings its own scenario; the twin has no task controller to wire it to yet
+// the sweep runs the synthetic scenario from the command line; a caller with its own scenario uses the library directly
 #[allow(dead_code)]
 mod sweep;
+mod synthetic;
 mod ws;
 
 use contract::SyncReadiness;
@@ -918,6 +919,89 @@ fn run_verify_grasp(args: &[String]) -> ExitCode {
     }
 }
 
+fn run_sweep_command(args: &[String]) -> ExitCode {
+    let usage = "usage: hydra-umc-twin sweep [<sweep.json>] [--verify-config <verify.json>] [--format markdown|csv] [--output <file>]";
+    let positional = args.first().filter(|a| !a.starts_with("--"));
+    let read = |p: &str| -> Result<String, String> {
+        std::fs::read_to_string(p).map_err(|e| format!("cannot read {p}: {e}"))
+    };
+    let known = ["--verify-config", "--format", "--output"];
+    let mut rest = if positional.is_some() {
+        &args[1..]
+    } else {
+        args
+    };
+    while let Some(flag) = rest.first() {
+        if !known.contains(&flag.as_str()) || rest.len() < 2 {
+            eprintln!("[twin] {usage}");
+            return ExitCode::from(2);
+        }
+        rest = &rest[2..];
+    }
+    let config = match positional {
+        Some(path) => read(path).and_then(|t| sweep::SweepConfig::parse(&t)),
+        None => Ok(synthetic::default_sweep()),
+    };
+    let verify = match find_flag(args, "--verify-config") {
+        Some(p) => read(&p).and_then(|t| verify::VerifyConfig::parse(&t)),
+        None => Ok(verify::VerifyConfig::default()),
+    };
+    let csv = match find_flag(args, "--format").as_deref() {
+        None | Some("markdown") => false,
+        Some("csv") => true,
+        Some(other) => {
+            eprintln!("[twin] --format must be markdown or csv, not {other}");
+            return ExitCode::from(2);
+        }
+    };
+    let (config, verify) = match (config, verify) {
+        (Ok(config), Ok(verify)) => (config, verify),
+        (Err(error), _) | (_, Err(error)) => {
+            eprintln!("[twin] {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let scenario = synthetic::Scenario::default();
+    let report = match sweep::run_sweep(&config, &mut |case: &sweep::Case| {
+        synthetic::evaluate(&scenario, &verify, case)
+    }) {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("[twin] {error}");
+            return ExitCode::from(2);
+        }
+    };
+    let text = if csv {
+        report.to_csv()
+    } else {
+        report.to_markdown()
+    };
+    match find_flag(args, "--output") {
+        Some(path) => {
+            use std::io::Write;
+            // a report is never written over a file that exists
+            let written = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .and_then(|mut f| f.write_all(text.as_bytes()));
+            if let Err(error) = written {
+                eprintln!("[twin] cannot write {path}: {error}");
+                return ExitCode::from(2);
+            }
+        }
+        None => print!("{text}"),
+    }
+    // an aborted sweep is not a result: the data could not support one
+    if report.is_complete() {
+        eprintln!("SWEEP=COMPLETE rows={}", report.rows.len());
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("SWEEP=ABORTED rows={}", report.rows.len());
+        ExitCode::from(3)
+    }
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
 
@@ -929,6 +1013,7 @@ fn main() -> ExitCode {
         Some("serve") => run_serve(&args[1..]),
         Some("keygen") => run_keygen(&args[1..]),
         Some("verify-grasp") => run_verify_grasp(&args[1..]),
+        Some("sweep") => run_sweep_command(&args[1..]),
         _ => {
             println!("{PROJECT_NAME} v{VERSION}");
             println!("{ROLE}");

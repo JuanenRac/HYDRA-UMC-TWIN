@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-307%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-347%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.9-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Versione | `0.1.9` |
 | Maturità | Funzionale |
-| Test | 307 (`cargo test`) |
+| Test | 347 (`cargo test`) |
 | Tecnologia | Rust / tiny_http |
 | Destinazione | Il Raspberry Pi CM5 di una cella HYDRA-UMC |
 | Su hardware reale | Solo simulato: provato con emulatori, test double o simulatori; per questa versione non risulta alcuna esecuzione su hardware reale |
@@ -52,7 +52,7 @@ Ogni riga è una parte di questo repository e il semaforo dice a che punto è og
 | Area | Stato | Cosa significa qui |
 |---|---|---|
 | Software | 🟡 | Funziona per il suo scopo principale; la verifica di onestà di questo README elenca ciò che manca ancora |
-| Test | 🟢 | 307 test automatici, eseguiti a ogni modifica |
+| Test | 🟢 | 347 test automatici, eseguiti a ogni modifica |
 | Hardware reale | 🟠 | Solo simulato: provato con emulatori, test double o simulatori; per questa versione non risulta alcuna esecuzione su hardware reale |
 | Interfaccia e protocolli | 🟡 | Le rotte o i messaggi offerti sono documentati e provati con un client; non tutti i client li hanno ancora usati |
 | Integrazione | 🟠 | I suoi messaggi e le sue rotte sono verificati rispetto ai contratti condivisi dell'SDK; non ha ancora funzionato insieme all'apparecchiatura reale |
@@ -89,7 +89,7 @@ Scritto in Rust, oggi legge i manifesti dei suoi tre figli (PHYSICS-REPLICA, HIL
 
 **HYDRA-UMC-TWIN** è il genitore di integrazione della famiglia Digital Twin. Legge i manifesti dei suoi tre figli, indica se la famiglia è pronta e allineata, ne verifica lo stato di salute e firma certificati di interblocco che dicono al ponte hardware-in-the-loop che un rapporto di rischio proviene dal gemello. Il motore fisico vero e proprio è ancora previsto.
 
-Un gemello cinematico minimo non richiede un motore grafico: `GET /twin/poses` fornisce la posa di ogni sistema di riferimento dei giunti dagli ultimi rapporti dei giunti, `POST /dryrun/trajectory` esegue in simulazione una traiettoria pianificata e firma un verdetto in cui solo `pass` vale come permesso, e `POST /drift/observe` sorveglia la differenza tra il robot reale e quello simulato, con un invio facoltativo, spento per impostazione predefinita, a HYDRA-UMC-DATALAKE. Un WebSocket (spento per impostazione predefinita) invia lo stato ai client, un ingresso riceve posizione e assetto di un veicolo senza pilota dal suo bridge, e l'invio al data lake può usare HTTPS. Non provato con un robot reale; vedere `docs/KINEMATIC_TWIN.md`.
+Un gemello cinematico minimo non richiede un motore grafico: `GET /twin/poses` fornisce la posa di ogni sistema di riferimento dei giunti dagli ultimi rapporti dei giunti, `POST /dryrun/trajectory` esegue in simulazione una traiettoria pianificata e firma un verdetto in cui solo `pass` vale come permesso, e `POST /drift/observe` sorveglia la differenza tra il robot reale e quello simulato, con un invio facoltativo, spento per impostazione predefinita, a HYDRA-UMC-DATALAKE. Un WebSocket (spento per impostazione predefinita) invia lo stato ai client, un ingresso riceve posizione e assetto di un veicolo senza pilota dal suo bridge, e l'invio al data lake può usare HTTPS. Non provato con un robot reale; vedere `docs/KINEMATIC_TWIN.md`. Prese e posizionamenti sono giudicati dalle pose misurate (`verify-grasp`), e `sweep` esplora la sensibilità ai parametri fisici e al montaggio su uno scenario sintetico, un modello e non un robot; vedere [docs/VERIFICATION.md](docs/VERIFICATION.md).
 
 > **Piattaforma:** dove questo README dice CM5, intende il banco pilota che funziona oggi; la piattaforma di destinazione di HYDRA-UMC è un NVIDIA Jetson Orin NX da 16 GB, un progetto non costruito né provato.
 
@@ -172,7 +172,7 @@ Richiede la toolchain Rust stabile (edizione 2021) con `cargo`.
 
 ## 🧪 Test
 
-307 test automatici si eseguono con `cargo test`. Non richiedono hardware né nulla al di fuori di questa macchina.
+347 test automatici si eseguono con `cargo test`. Non richiedono hardware né nulla al di fuori di questa macchina.
 
 La CI esegue `HYDRA_UMC_CI=1 python tools/ci_validate.py`, che controlla il manifesto, i documenti, gli otto README e le immagini.
 
@@ -182,7 +182,7 @@ Richiede il toolchain Rust (`cargo`/`rustc`, installabile via [rustup](https://r
 
 ```bash
 # Linux / macOS
-./build.sh   # `cargo test` (307 test), poi `cargo build --release`
+./build.sh   # `cargo test` (347 test), poi `cargo build --release`
 ./run.sh     # esegue target/release/hydra-umc-twin, stampa nome + version + ruolo
 ```
 

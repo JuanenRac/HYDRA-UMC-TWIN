@@ -510,3 +510,108 @@ fn verify_grasp_refuses_bad_usage_with_exit_code_two() {
     let (code, _, _) = run(&["verify-grasp", &p(&good), "--config", &p(&zero)]);
     assert_eq!(code, Some(2));
 }
+
+// -- sweep: the synthetic scenario run over a sweep, as a Markdown or CSV table; an aborted sweep is never a result (exit 3).
+
+#[test]
+fn sweep_without_a_file_runs_the_default_sweep_and_prints_the_table() {
+    let (code, stdout, stderr) = run(&["sweep"]);
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stderr.contains("SWEEP=COMPLETE rows=24"), "{stderr}");
+    assert!(stdout.starts_with("| kind | name |"), "{stdout}");
+    assert!(
+        stdout.contains("| nominal | nominal | 1 |  | 5 | 5 | 1.000 |"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("ABORTED"), "{stdout}");
+    // the same command gives the same table
+    let (_, again, _) = run(&["sweep"]);
+    assert_eq!(stdout, again);
+}
+
+#[test]
+fn sweep_reads_a_file_writes_csv_and_never_overwrites_a_report() {
+    let dir = scratch("sweep-file");
+    let config = dir.join("sweep.json");
+    std::fs::write(
+        &config,
+        r#"{"parameters": [{"name": "mass", "nominal": 0.6, "factors": [0.5, 2.0]}], "seeds": 3}"#,
+    )
+    .unwrap();
+    let (code, stdout, _) = run(&["sweep", &p(&config), "--format", "csv"]);
+    assert_eq!(code, Some(0));
+    let mut lines = stdout.lines();
+    assert_eq!(
+        lines.next(),
+        Some("kind,name,factor,value,runs,passed,pass_rate")
+    );
+    assert_eq!(lines.next(), Some("nominal,nominal,1,,3,3,1.000"));
+    assert_eq!(lines.next(), Some("parameter,mass,0.5,0.3,3,3,1.000"));
+    assert_eq!(lines.next(), Some("parameter,mass,2,1.2,3,0,0.000"));
+    let out = dir.join("report.csv");
+    let (code, stdout, _) = run(&[
+        "sweep",
+        &p(&config),
+        "--format",
+        "csv",
+        "--output",
+        &p(&out),
+    ]);
+    assert_eq!(code, Some(0));
+    assert!(stdout.is_empty(), "{stdout}");
+    assert!(std::fs::read_to_string(&out)
+        .unwrap()
+        .contains("parameter,mass,2,1.2,3,0,0.000"));
+    // a second run does not overwrite it
+    let (code, _, stderr) = run(&["sweep", &p(&config), "--output", &p(&out)]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("cannot write"), "{stderr}");
+    assert!(std::fs::read_to_string(&out).unwrap().starts_with("kind,"));
+}
+
+#[test]
+fn sweep_that_cannot_be_evaluated_is_aborted_with_exit_code_three() {
+    let dir = scratch("sweep-abort");
+    let config = dir.join("sweep.json");
+    // the synthetic scenario has no such parameter: the sweep stops there and says so
+    std::fs::write(
+        &config,
+        r#"{"parameters": [{"name": "colour", "nominal": 1.0}], "seeds": 2}"#,
+    )
+    .unwrap();
+    let (code, stdout, stderr) = run(&["sweep", &p(&config)]);
+    assert_eq!(code, Some(3), "{stderr}");
+    assert!(
+        stdout.contains("ABORTED: parameter colour seed 0"),
+        "{stdout}"
+    );
+    assert!(stderr.contains("SWEEP=ABORTED"), "{stderr}");
+    // data the checks cannot judge is also an abort, never a pass
+    let verify = dir.join("verify.json");
+    std::fs::write(&verify, r#"{"min_samples": 50}"#).unwrap();
+    let (code, stdout, _) = run(&["sweep", "--verify-config", &p(&verify)]);
+    assert_eq!(code, Some(3));
+    assert!(stdout.contains("too_few_samples"), "{stdout}");
+}
+
+#[test]
+fn sweep_refuses_bad_usage_with_exit_code_two() {
+    let dir = scratch("sweep-usage");
+    let (code, _, stderr) = run(&["sweep", "--nonsense", "x"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("usage"), "{stderr}");
+    let (code, _, _) = run(&["sweep", "--format"]);
+    assert_eq!(code, Some(2));
+    let (code, _, stderr) = run(&["sweep", "--format", "xml"]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("markdown or csv"), "{stderr}");
+    let (code, _, _) = run(&["sweep", &p(&dir.join("missing.json"))]);
+    assert_eq!(code, Some(2));
+    let bad = dir.join("bad.json");
+    std::fs::write(&bad, r#"{"seeds": 0}"#).unwrap();
+    let (code, _, stderr) = run(&["sweep", &p(&bad)]);
+    assert_eq!(code, Some(2));
+    assert!(stderr.contains("seeds"), "{stderr}");
+    let (code, _, _) = run(&["sweep", "--verify-config", &p(&dir.join("missing.json"))]);
+    assert_eq!(code, Some(2));
+}
