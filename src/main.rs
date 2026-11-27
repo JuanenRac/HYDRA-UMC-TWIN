@@ -287,6 +287,7 @@ fn load_report_token(
         Some(path) => Some(
             std::fs::read_to_string(&path)
                 .map_err(|e| format!("cannot read --report-token-file: {e}"))?
+                .trim_start_matches('\u{feff}')
                 .trim()
                 .to_string(),
         ),
@@ -327,6 +328,7 @@ fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> 
         Some(path) => Some(
             std::fs::read_to_string(&path)
                 .map_err(|e| format!("cannot read --certify-token-file: {e}"))?
+                .trim_start_matches('\u{feff}')
                 .trim()
                 .to_string(),
         ),
@@ -343,7 +345,7 @@ fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> 
                 return Err("the certify token must have at least 16 characters".into());
             }
             let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read --signing-key-file: {e}"))?;
-            let signer = certificate::Signer::from_seed_hex(&text)?;
+            let signer = certificate::Signer::from_seed_hex(text.trim_start_matches('\u{feff}'))?;
             Ok(Some(server::Certifier { signer, token }))
         }
     }
