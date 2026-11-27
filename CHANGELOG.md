@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **Key and token files saved with a byte order mark are read:** a file written by an editor of Windows as "UTF-8 with BOM" kept the mark in front of the secret, so the tokens of the server were refused. The mark is dropped now; a file in another encoding (UTF-16) is refused.
 - **Whoever reports the joints can have a token of its own:** `--report-token-file` (or `HYDRA_UMC_TWIN_REPORT_TOKEN`) is accepted on `/interlock/state` and cannot ask for a signature. The certify token is still accepted there until `--report-token-only` is given, so a bridge can be moved without a gap. Nothing changes without the option.
 - **A test that starts the real server waits for its answer:** it failed once with no answer to the first request on a loaded runner.
 
