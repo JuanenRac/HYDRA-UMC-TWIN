@@ -915,6 +915,19 @@ fn get(port: u16, path: &str) -> (u16, String) {
     (status, text)
 }
 
+/// `get` until the server really answers: the port can accept a connection before the first worker serves it, and on a loaded runner that
+/// first request has come back with nothing (status 0).
+fn get_answer(port: u16, path: &str) -> (u16, String) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    loop {
+        let answer = get(port, path);
+        if answer.0 != 0 || std::time::Instant::now() >= deadline {
+            return answer;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
 fn wait_for(port: u16) -> bool {
     for _ in 0..100 {
         if TcpStream::connect(("127.0.0.1", port)).is_ok() {
@@ -923,6 +936,25 @@ fn wait_for(port: u16) -> bool {
         std::thread::sleep(Duration::from_millis(50));
     }
     false
+}
+
+#[test]
+fn the_report_token_is_its_own_and_needs_the_certifier() {
+    let dir = scratch("report-token");
+    let own = some_file(&dir, "report.token", "a-report-token-of-sixteen+");
+    let flags = args(&["--report-token-file", &path_arg(&own)]);
+    let certifier = load_certifier(&certify_flags(&dir)).unwrap().unwrap();
+    assert!(load_report_token(&flags, Some(&certifier))
+        .unwrap()
+        .is_some());
+    assert!(load_report_token(&flags, None).is_err());
+    let same_as_certify = some_file(&dir, "same.token", &certifier.token);
+    let flags = args(&["--report-token-file", &path_arg(&same_as_certify)]);
+    assert!(load_report_token(&flags, Some(&certifier)).is_err());
+    let short = some_file(&dir, "short.token", "short");
+    let flags = args(&["--report-token-file", &path_arg(&short)]);
+    assert!(load_report_token(&flags, Some(&certifier)).is_err());
+    assert!(load_report_token(&args(&["--report-token-only"]), Some(&certifier)).is_err());
 }
 
 #[test]
@@ -971,9 +1003,9 @@ fn a_real_serve_answers_on_a_free_port_with_the_options_the_operator_gave() {
     });
     assert!(wait_for(port), "the server never listened");
     // with the identity key loaded every route needs an identity: an unsigned call is refused, and it is refused with a status the client can read
-    let (status, _) = get(port, "/family-status");
+    let (status, _) = get_answer(port, "/family-status");
     assert!(matches!(status, 401 | 403), "status {status}");
-    let (status, _) = get(port, "/no-such-route");
+    let (status, _) = get_answer(port, "/no-such-route");
     assert!(matches!(status, 401 | 403 | 404), "status {status}");
 }
 

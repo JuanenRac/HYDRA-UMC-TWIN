@@ -36,6 +36,10 @@ pub struct Extras {
     /// The signing key of HYDRA-UMC-SERVER (`--identity-key-file`, see `server_identity.rs`). With it a signed token of the server is accepted next to the certify
     /// token, a viewer may read but not change, and nothing is open, not even `GET /health` or `GET /metrics`. None: the earlier rules.
     pub identity_key: Option<Vec<u8>>,
+    /// `--report-token-file`: a token for whoever only reports the joints (`/interlock/state`). It cannot ask for a signature.
+    pub report_token: Option<String>,
+    /// `--report-token-only`: the certify token is no longer accepted for a report. Off while the reporters are moved to their own token.
+    pub report_token_only: bool,
 }
 
 impl Default for Extras {
@@ -49,6 +53,8 @@ impl Default for Extras {
             lang: Lang::En,
             health_open: false,
             identity_key: None,
+            report_token: None,
+            report_token_only: false,
         }
     }
 }

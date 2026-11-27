@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- **Whoever reports the joints can have a token of its own:** `--report-token-file` (or `HYDRA_UMC_TWIN_REPORT_TOKEN`) is accepted on `/interlock/state` and cannot ask for a signature. The certify token is still accepted there until `--report-token-only` is given, so a bridge can be moved without a gap. Nothing changes without the option.
+- **A test that starts the real server waits for its answer:** it failed once with no answer to the first request on a loaded runner.
+
 - **The collision prediction does not complete a state with an old report:** a joint a state leaves out was taken from its last report however old it was; one older than `--collision-base-max-age-ms` (default 2000 ms, `0` takes any age) now answers `422` and no prediction is made; the same holds for the collision check inside `POST /dryrun/trajectory`, which then signs no verdict. Test.
 
 ## [0.2.0] - Sensitivity sweeps and grasp verification

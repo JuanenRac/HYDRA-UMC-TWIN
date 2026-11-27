@@ -239,6 +239,8 @@ overwrites a file. `serve --signing-key-file PATH --certify-token-file PATH` (or
 The twin keeps the newest report of every real joint that HYDRA-UMC-HIL-BRIDGE sends it. Both routes use the token of `--certify-token-file` and exist only when
 the signing is configured (otherwise `404`).
 
+`serve --report-token-file PATH` (or `HYDRA_UMC_TWIN_REPORT_TOKEN`) gives the reporter of the joints a token of its own (16 characters or more, not the certify token): it is accepted on `/interlock/state` only and cannot ask for a signature. The certify token stays accepted there until `--report-token-only` is given. HYDRA-UMC-HIL-BRIDGE takes the report token with `--twin-state-token-file`.
+
 ```json
 {"joint":"shoulder","position":0.5,"seq":7,"stamp_ms":1700000000000,"source":"measured"}
 ```
