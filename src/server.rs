@@ -187,9 +187,36 @@ fn bearer_matches(request: &tiny_http::Request, expected: &str) -> bool {
 /// token, the request does not come from a browser, it is declared as JSON and the body is read within `max_bytes`. On any failure the
 /// answer is already written and None is returned.
 fn read_guarded_post(
+    request: tiny_http::Request,
+    certifier: Option<&Certifier>,
+    max_bytes: u64,
+) -> Option<(tiny_http::Request, Vec<u8>)> {
+    read_post_allowed(request, certifier, max_bytes, |request, certifier| {
+        bearer_matches(request, &certifier.token)
+    })
+}
+
+/// Whether the caller may report or read the joints: the report token, and the certify token unless `--report-token-only`.
+fn state_token_matches(
+    request: &tiny_http::Request,
+    certifier: &Certifier,
+    extras: &Extras,
+) -> bool {
+    match extras.report_token.as_deref() {
+        Some(report) => {
+            bearer_matches(request, report)
+                || (!extras.report_token_only && bearer_matches(request, &certifier.token))
+        }
+        None => bearer_matches(request, &certifier.token),
+    }
+}
+
+/// `read_guarded_post` with the question about the token given by the caller.
+fn read_post_allowed(
     mut request: tiny_http::Request,
     certifier: Option<&Certifier>,
     max_bytes: u64,
+    allowed: impl Fn(&tiny_http::Request, &Certifier) -> bool,
 ) -> Option<(tiny_http::Request, Vec<u8>)> {
     use std::io::Read;
     let Some(certifier) = certifier else {
@@ -200,7 +227,7 @@ fn read_guarded_post(
         );
         return None;
     };
-    if !bearer_matches(&request, &certifier.token) {
+    if !allowed(&request, certifier) {
         crate::metrics::count(&crate::metrics::UNAUTHORIZED);
         crate::metrics::note_status(401);
         let response = tiny_http::Response::from_string(
@@ -326,11 +353,15 @@ fn handle_certify(request: tiny_http::Request, context: &Context) {
 /// The largest body of `POST /interlock/state`: one report is about a hundred bytes of JSON.
 const MAX_STATE_BODY_BYTES: u64 = 2 * 1024;
 
-/// `POST /interlock/state`: the bridge tells the twin where a real joint is (see `joint_state.rs`). Same token as the certificates.
+/// `POST /interlock/state`: the bridge tells the twin where a real joint is (see `joint_state.rs`). The report token, or the one of the
+/// certificates (see `state_token_matches`).
 fn handle_state_report(request: tiny_http::Request, context: &Context) {
-    let Some((request, raw)) =
-        read_guarded_post(request, context.certifier.as_ref(), MAX_STATE_BODY_BYTES)
-    else {
+    let Some((request, raw)) = read_post_allowed(
+        request,
+        context.certifier.as_ref(),
+        MAX_STATE_BODY_BYTES,
+        |request, certifier| state_token_matches(request, certifier, &context.extras),
+    ) else {
         return;
     };
     let report: crate::joint_state::JointStateReport = match serde_json::from_slice(&raw) {
@@ -384,7 +415,7 @@ fn handle_state_list(request: tiny_http::Request, context: &Context) {
         );
         return;
     };
-    if !bearer_matches(&request, &certifier.token) {
+    if !state_token_matches(&request, certifier, &context.extras) {
         crate::metrics::count(&crate::metrics::UNAUTHORIZED);
         crate::metrics::note_status(401);
         let response = tiny_http::Response::from_string(
@@ -962,13 +993,22 @@ fn handle_request(request: tiny_http::Request, context: &Context) {
             })
             .map(|h| h.value.as_str().to_string());
         let own = context.certifier.as_ref().map(|c| c.token.as_str());
-        if !crate::server_identity::allowed(
-            presented.as_deref(),
-            request.method().as_str(),
-            own,
-            key,
-            crate::server_identity::now_seconds(),
-        ) {
+        // the reporter holds only its own token, and only for the joints
+        let reporter = path == "/interlock/state"
+            && context
+                .extras
+                .report_token
+                .as_deref()
+                .is_some_and(|report| bearer_matches(&request, report));
+        if !reporter
+            && !crate::server_identity::allowed(
+                presented.as_deref(),
+                request.method().as_str(),
+                own,
+                key,
+                crate::server_identity::now_seconds(),
+            )
+        {
             crate::metrics::count(&crate::metrics::UNAUTHORIZED);
             crate::metrics::note_status(401);
             let response = tiny_http::Response::from_string(

@@ -277,6 +277,47 @@ fn run_family_health(args: &[String]) -> ExitCode {
     }
 }
 
+/// The token of the reporter of the joints, from `--report-token-file` (or HYDRA_UMC_TWIN_REPORT_TOKEN). It needs the certifier, has at least
+/// 16 characters and is not the certify token: the point is that whoever reports cannot ask for a signature.
+fn load_report_token(
+    args: &[String],
+    certifier: Option<&server::Certifier>,
+) -> Result<Option<String>, String> {
+    let token = match find_flag(args, "--report-token-file") {
+        Some(path) => Some(
+            std::fs::read_to_string(&path)
+                .map_err(|e| format!("cannot read --report-token-file: {e}"))?
+                .trim()
+                .to_string(),
+        ),
+        None => env::var("HYDRA_UMC_TWIN_REPORT_TOKEN")
+            .ok()
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty()),
+    };
+    let only = args.iter().any(|a| a == "--report-token-only");
+    let Some(token) = token else {
+        return if only {
+            Err(
+                "--report-token-only needs --report-token-file (or HYDRA_UMC_TWIN_REPORT_TOKEN)"
+                    .into(),
+            )
+        } else {
+            Ok(None)
+        };
+    };
+    let Some(certifier) = certifier else {
+        return Err("a report token needs --signing-key-file and --certify-token-file: without them there are no interlock routes".into());
+    };
+    if token.chars().count() < 16 {
+        return Err("the report token must have at least 16 characters".into());
+    }
+    if token == certifier.token {
+        return Err("the report token must not be the certify token".into());
+    }
+    Ok(Some(token))
+}
+
 /// The key and the token of `POST /interlock/certify`, from `--signing-key-file` / `--certify-token-file` (or HYDRA_UMC_TWIN_CERTIFY_TOKEN).
 /// Neither: the route is off. One without the other is an error, so a half-configured server never starts.
 fn load_certifier(args: &[String]) -> Result<Option<server::Certifier>, String> {
@@ -788,6 +829,17 @@ fn run_serve(args: &[String]) -> ExitCode {
                 eprintln!("[twin] fatal: --identity-key-file: {e}");
                 return ExitCode::from(2);
             }
+        }
+    }
+
+    match load_report_token(args, certifier.as_ref()) {
+        Ok(token) => {
+            extras.report_token_only = args.iter().any(|a| a == "--report-token-only");
+            extras.report_token = token;
+        }
+        Err(e) => {
+            eprintln!("[twin] fatal: {e}");
+            return ExitCode::from(2);
         }
     }
 
