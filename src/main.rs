@@ -404,7 +404,6 @@ fn load_collision(
     )?;
     let max_states = whole(
         "--collision-max-states",
-        "--collision-base-max-age-ms",
         collision::DEFAULT_MAX_STATES as u64,
         1,
         collision::HARD_MAX_STATES as u64,
