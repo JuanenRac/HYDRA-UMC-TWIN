@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.1] - Install on the CM5 again
 
 - **The program installs on the CM5 again:** it is built with Rust 1.85, the compiler of Debian trixie that the installer uses on the device. The SHA-2 digest stays at its new major, on the last release that builds with 1.85 (0.11.0); the minimum Rust version of the crate is 1.85 again and CI builds, lints and tests with it.
 - **Key and token files saved with a byte order mark are read:** a file written by an editor of Windows as "UTF-8 with BOM" kept the mark in front of the secret, so the tokens of the server were refused. The mark is dropped now; a file in another encoding (UTF-16) is refused.

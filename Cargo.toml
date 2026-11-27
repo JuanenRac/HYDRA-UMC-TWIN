@@ -1,6 +1,6 @@
 [package]
 name = "hydra-umc-twin"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 # The CM5 (Raspberry Pi OS trixie) compiles this program on the device with the rustc of Debian, 1.85.
 # Do not raise this number (or lock a library that needs a newer one) without upgrading the CM5 first;
