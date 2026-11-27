@@ -217,11 +217,23 @@ fn handle_dryrun(request: tiny_http::Request, context: &Context) {
         }
         Err(_) => unreachable!("parsing only fails as a bad request"),
     };
-    let reported = context
-        .states
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .positions();
+    let (reported, stale) = {
+        let store = context.states.lock().unwrap_or_else(|p| p.into_inner());
+        let states: Vec<_> = samples.iter().map(|s| s.joints.clone()).collect();
+        let stale = context
+            .collision
+            .as_ref()
+            .and_then(|c| c.stale_base(&states, &store, std::time::Instant::now()));
+        (store.positions(), stale)
+    };
+    if let Some(reason) = stale {
+        write_json(
+            request,
+            422,
+            &json!({"error": reason, "note": "no verdict was given: an input that cannot be checked is never read as safe"}),
+        );
+        return;
+    }
     let checks = route.check(&samples, context.collision.as_ref().map(|c| (c, &reported)));
     match checks {
         Ok(checks) => {

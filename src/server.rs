@@ -494,24 +494,8 @@ fn handle_predict_collision(request: tiny_http::Request, context: &Context) {
     // A joint a state leaves out is taken from its last report: an old one says nothing about where the joint is now.
     let (reported, stale) = {
         let store = context.states.lock().unwrap_or_else(|p| p.into_inner());
-        let reported = store.positions();
-        let now = std::time::Instant::now();
-        let stale = route.base_max_age.and_then(|limit| {
-            reported
-                .keys()
-                .filter(|joint| states.iter().any(|state| !state.contains_key(*joint)))
-                .find_map(|joint| {
-                    let age = store.age(joint, now)?;
-                    (age > limit).then(|| {
-                        format!(
-                            "the last report of joint {joint} is {} ms old (limit {} ms): give its position in every state",
-                            age.as_millis(),
-                            limit.as_millis()
-                        )
-                    })
-                })
-        });
-        (reported, stale)
+        let stale = route.stale_base(&states, &store, std::time::Instant::now());
+        (store.positions(), stale)
     };
     if let Some(reason) = stale {
         write_json(

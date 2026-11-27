@@ -51,6 +51,32 @@ pub struct CollisionRoute {
     running: AtomicUsize,
 }
 
+impl CollisionRoute {
+    /// Why the reports cannot complete these states: a joint that some state leaves out and whose last report is older than the limit. `None` when they can.
+    pub fn stale_base(
+        &self,
+        states: &[BTreeMap<String, f64>],
+        reports: &crate::joint_state::JointStateStore,
+        now: std::time::Instant,
+    ) -> Option<String> {
+        let limit = self.base_max_age?;
+        reports
+            .positions()
+            .keys()
+            .filter(|joint| states.iter().any(|state| !state.contains_key(*joint)))
+            .find_map(|joint| {
+                let age = reports.age(joint, now)?;
+                (age > limit).then(|| {
+                    format!(
+                        "the last report of joint {joint} is {} ms old (limit {} ms): give its position in every state",
+                        age.as_millis(),
+                        limit.as_millis()
+                    )
+                })
+            })
+    }
+}
+
 /// The default of `--collision-base-max-age-ms`.
 pub const DEFAULT_BASE_MAX_AGE_MS: u64 = 2_000;
 
