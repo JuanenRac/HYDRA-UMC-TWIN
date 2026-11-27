@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- **The collision prediction does not complete a state with an old report:** a joint a state leaves out was taken from its last report however old it was; one older than `--collision-base-max-age-ms` (default 2000 ms, `0` takes any age) now answers `422` and no prediction is made; the same holds for the collision check inside `POST /dryrun/trajectory`, which then signs no verdict. Test.
+
 ## [0.2.0] - Sensitivity sweeps and grasp verification
 
 - **The build can prepare its draft release:** the draft job names the repository itself, so the `gh release` commands work in a job that has no checkout.

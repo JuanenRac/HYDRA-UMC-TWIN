@@ -350,6 +350,7 @@ fn load_collision(
         "--collision-config",
         "--collision-timeout-ms",
         "--collision-max-states",
+        "--collision-base-max-age-ms",
     ];
     if !has_flag(args, "--collision-predict") {
         if let Some(flag) = flags.iter().find(|f| find_flag(args, f).is_some()) {
@@ -407,14 +408,22 @@ fn load_collision(
         1,
         collision::HARD_MAX_STATES as u64,
     )? as usize;
-    Ok(Some(collision::CollisionRoute::new(
+    let mut route = collision::CollisionRoute::new(
         binary,
         urdf,
         zones,
         config,
         std::time::Duration::from_millis(timeout_ms),
         max_states,
-    )))
+    );
+    if let Some(raw) = find_flag(args, "--collision-base-max-age-ms") {
+        // how old a reported joint may be and still complete a predicted state; 0 takes any age
+        let ms: u64 = raw.parse().map_err(|_| {
+            format!("--collision-base-max-age-ms needs a whole number of milliseconds, got {raw}")
+        })?;
+        route.base_max_age = (ms > 0).then(|| std::time::Duration::from_millis(ms));
+    }
+    Ok(Some(route))
 }
 
 /// The binary of HYDRA-UMC-PHYSICS-REPLICA: `--physics-replica-bin`, HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN or the one built next to the workspace.
