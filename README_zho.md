@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/-Rust-orange.svg" alt="">
   <img src="https://img.shields.io/badge/Feature-HIL%20Ready-green.svg" alt="Feature">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-347%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-350%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.2.0-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -36,7 +36,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.2.0` |
 | 成熟度 | 可用 |
-| 测试 | 347 (`cargo test`) |
+| 测试 | 350 (`cargo test`) |
 | 技术栈 | Rust / tiny_http |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 仅模拟：使用模拟器、替身或仿真测试；此版本没有在真实硬件上运行的记录 |
@@ -52,7 +52,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；本 README 中的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 347 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 350 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🟠 | 仅模拟：使用模拟器、替身或仿真测试；此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
 | 集成 | 🟠 | 其消息和路由已对照 SDK 的共享契约检查；尚未与真实设备一起运行 |
@@ -172,7 +172,7 @@ HTTP API 的 `?workspace=` 覆盖默认限制在所提供的工作区内，因�
 
 ## 🧪 测试
 
-运行 `cargo test` 会执行 347 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `cargo test` 会执行 350 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -183,7 +183,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 
 ```bash
 # Linux / macOS
-./build.sh   # 、`cargo test`（347 个测试），然后执行 `cargo build --release`
+./build.sh   # 、`cargo test`（350 个测试），然后执行 `cargo build --release`
 ./run.sh     # 运行 target/release/hydra-umc-twin，打印名称 + 版本 + 角色
 ```
 
