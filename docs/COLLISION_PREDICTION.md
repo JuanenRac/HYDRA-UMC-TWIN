@@ -28,6 +28,7 @@ where the robot is and starts a process, so it uses the same token as
 | `--physics-replica-bin PATH` | the binary of HYDRA-UMC-PHYSICS-REPLICA (also `HYDRA_UMC_TWIN_PHYSICS_REPLICA_BIN`; else the one built next to the workspace) | built one |
 | `--collision-timeout-ms N` | how long a prediction may take (100 to 60000) | `5000` |
 | `--collision-max-states N` | most states in a request (1 to 256) | `64` |
+| `--collision-base-max-age-ms N` | how old a reported joint may be and still complete a state that leaves it out; `0` takes any age (a stale report answers `422`) | `2000` |
 
 The options of the prediction without `--collision-predict` stop the start, so a
 half-configured server never runs.

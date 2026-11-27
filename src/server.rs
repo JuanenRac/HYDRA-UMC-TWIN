@@ -491,11 +491,36 @@ fn handle_predict_collision(request: tiny_http::Request, context: &Context) {
         }
         Err(_) => unreachable!("parsing only fails as a bad request"),
     };
-    let reported = context
-        .states
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .positions();
+    // A joint a state leaves out is taken from its last report: an old one says nothing about where the joint is now.
+    let (reported, stale) = {
+        let store = context.states.lock().unwrap_or_else(|p| p.into_inner());
+        let reported = store.positions();
+        let now = std::time::Instant::now();
+        let stale = route.base_max_age.and_then(|limit| {
+            reported
+                .keys()
+                .filter(|joint| states.iter().any(|state| !state.contains_key(*joint)))
+                .find_map(|joint| {
+                    let age = store.age(joint, now)?;
+                    (age > limit).then(|| {
+                        format!(
+                            "the last report of joint {joint} is {} ms old (limit {} ms): give its position in every state",
+                            age.as_millis(),
+                            limit.as_millis()
+                        )
+                    })
+                })
+        });
+        (reported, stale)
+    };
+    if let Some(reason) = stale {
+        write_json(
+            request,
+            422,
+            &json!({"error": reason, "note": "no prediction was made: an unknown position is never read as clear"}),
+        );
+        return;
+    }
     match route.predict(&states, &reported) {
         Ok(mut answer) => {
             answer["reported_joints"] = json!(reported.len());
@@ -2140,6 +2165,54 @@ mod tests {
         assert_eq!(post_predict(port, &auth(), &big).0, 413);
         // GET on the path is still not a route
         assert_eq!(get(port, "/predict/collision").0, 404);
+    }
+
+    #[test]
+    fn an_old_report_does_not_complete_a_state_that_leaves_the_joint_out() {
+        let server = bind("127.0.0.1:0").expect("bind");
+        let port = server.server_addr().to_ip().expect("ip").port();
+        let certifier = Certifier {
+            signer: Signer::from_seed([7u8; 32]),
+            token: CERTIFY_TOKEN.to_string(),
+        };
+        let (urdf, zones, config) = collision_files("stale-base");
+        let mut route = crate::collision::CollisionRoute::new(
+            PathBuf::from("definitely-not-a-binary-9f2c"),
+            urdf,
+            zones,
+            config,
+            std::time::Duration::from_millis(5000),
+            8,
+        );
+        assert_eq!(
+            route.base_max_age,
+            Some(std::time::Duration::from_millis(2000)),
+            "the default limit"
+        );
+        route.base_max_age = Some(std::time::Duration::from_millis(50));
+        let ws = tempdir();
+        thread::spawn(move || {
+            run_with_collision(
+                server,
+                ws,
+                None,
+                Some(certifier),
+                DEFAULT_WORKERS,
+                None,
+                None,
+                Some(route),
+            )
+        });
+        let report = r#"{"joint":"shoulder","position":0.5,"seq":1,"stamp_ms":1700000000000,"source":"measured"}"#;
+        assert_eq!(post_state(port, &auth(), report).0, 200);
+        thread::sleep(std::time::Duration::from_millis(150));
+        let (status, body) = post_predict(port, &auth(), r#"{"states":[{"elbow":0}]}"#);
+        assert_eq!(status, 422, "{body}");
+        assert!(body.contains("joint shoulder"), "{body}");
+        // with the position in every state the old report is not used: the prediction goes on to the child (here missing)
+        let (status, body) =
+            post_predict(port, &auth(), r#"{"states":[{"shoulder":0,"elbow":0}]}"#);
+        assert_eq!(status, 502, "{body}");
     }
 
     #[test]

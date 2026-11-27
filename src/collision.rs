@@ -46,8 +46,13 @@ pub struct CollisionRoute {
     pub config: PathBuf,
     pub timeout: Duration,
     pub max_states: usize,
+    /// How old a reported joint may be and still complete a state that leaves it out; None: any age.
+    pub base_max_age: Option<Duration>,
     running: AtomicUsize,
 }
+
+/// The default of `--collision-base-max-age-ms`.
+pub const DEFAULT_BASE_MAX_AGE_MS: u64 = 2_000;
 
 #[derive(Debug, PartialEq)]
 pub enum CollisionError {
@@ -79,6 +84,7 @@ impl CollisionRoute {
             config,
             timeout,
             max_states,
+            base_max_age: Some(Duration::from_millis(DEFAULT_BASE_MAX_AGE_MS)),
             running: AtomicUsize::new(0),
         }
     }
